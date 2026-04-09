@@ -31,6 +31,32 @@ export class MapsController {
     return this.mapsService.getServiceBounds();
   }
 
+  @ApiOperation({
+    summary: 'Get all active cities with ID, name, state (public)',
+  })
+  @Get('active-locations')
+  async getActiveLocations() {
+    return this.mapsService.getActiveLocations();
+  }
+
+  @ApiOperation({
+    summary: 'Resolve GPS coordinates to an active City record (public)',
+  })
+  @Get('city-by-coords')
+  async getCityByCoords(
+    @Query('lat') lat: string,
+    @Query('lng') lng: string,
+  ) {
+    if (!lat || !lng) {
+      throw new BadRequestException('lat and lng are required');
+    }
+    const result = await this.mapsService.getCityByCoords(
+      parseFloat(lat),
+      parseFloat(lng),
+    );
+    return result ?? { city: null, message: 'No active service area found for your location.' };
+  }
+
   /**
    * 🔒 SECURED AUTOCOMPLETE ENDPOINTS
    * These endpoints are now protected with:

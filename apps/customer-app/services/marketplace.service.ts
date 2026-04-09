@@ -5,14 +5,20 @@ import {
   StoreFilterSlug,
 } from "@/types/home";
 
-export async function fetchMarketplaceHome(): Promise<MarketplaceHomeResponse> {
-  return request("marketplace/home");
+export async function fetchMarketplaceHome(
+  cityId?: string,
+): Promise<MarketplaceHomeResponse> {
+  const params = new URLSearchParams();
+  if (cityId) params.set("cityId", cityId);
+  const suffix = params.toString();
+  return request(`marketplace/home${suffix ? `?${suffix}` : ""}`);
 }
 
 export type StoresQuery = {
   page?: number;
   limit?: number;
   type?: Exclude<StoreFilterSlug, "all"> | string;
+  cityId?: string;
 };
 
 export async function fetchPaginatedStores(
@@ -23,6 +29,7 @@ export async function fetchPaginatedStores(
   if (query.limit) params.set("limit", String(query.limit));
   const type = query.type?.toString().trim();
   if (type && type !== "all") params.set("type", type);
+  if (query.cityId) params.set("cityId", query.cityId);
 
   const suffix = params.toString();
   return request(`marketplace/stores${suffix ? `?${suffix}` : ""}`);

@@ -62,4 +62,8 @@ export type StoreData = {
     | null;
   /** Human-readable closed message returned by the server */
   closedMessage?: string | null;
+  /** The city this store resides in */
+  cityId?: string;
+  /** Whether the store is available in the user's location */
+  isAvailableInLocation?: boolean;
 };

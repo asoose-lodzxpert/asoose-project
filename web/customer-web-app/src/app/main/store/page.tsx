@@ -12,6 +12,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ApiService } from "@/services/api.service";
+import { useRideStore } from "@/app/main/ride/store/ride";
 import {
   Store,
   ChevronRight,
@@ -111,12 +112,18 @@ function useStoreData(query: string | null) {
   }>({ verticals: [], banners: [], searchResults: null });
 
   const [loading, setLoading] = useState(true);
+  const userLocation = useRideStore((state) => state.userLocation);
+  
   const cacheRef = useRef<Map<string, { data: any; timestamp: number }>>(
     new Map(),
   );
 
   const fetchData = useCallback(async (q: string | null) => {
-    const cacheKey = q ? `search:${q}` : "home";
+    // Include location in cache key so switching locations refreshes the data
+    const cacheKey = q 
+      ? `search:${q}:${userLocation?.lat}:${userLocation?.lng}` 
+      : `home:${userLocation?.lat}:${userLocation?.lng}`;
+    
     const cached = cacheRef.current.get(cacheKey);
 
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
@@ -127,9 +134,14 @@ function useStoreData(query: string | null) {
 
     setLoading(true);
     try {
+      const locQuery = userLocation 
+        ? `&lat=${userLocation.lat}&lng=${userLocation.lng}` 
+        : "";
+
       const endpoint = q
-        ? `/marketplace/search?q=${encodeURIComponent(q)}`
-        : `/marketplace/home`;
+        ? `/marketplace/search?q=${encodeURIComponent(q)}${locQuery}`
+        : `/marketplace/home?${locQuery.slice(1)}`; // Remove leading & if no search query
+      
       const json = await ApiService.get<any>(endpoint);
 
       let processedData;
@@ -184,7 +196,7 @@ function useStoreData(query: string | null) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userLocation]);
 
   return { ...data, loading, fetchData };
 }
@@ -193,6 +205,7 @@ function useStoreData(query: string | null) {
 function StorePage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const userLocation = useRideStore((state) => state.userLocation);
   const query = searchParams.get("q")?.trim() || null;
 
   // Data
@@ -318,7 +331,7 @@ function StorePage() {
                 {verticals.map((v) => (
                   <Link
                     key={v.id}
-                    href={`/main/store/category/${v.id}`}
+                    href={`/main/store/category/${v.id}${userLocation ? `?lat=${userLocation.lat}&lng=${userLocation.lng}` : ""}`}
                     className="min-w-[72px] snap-start flex flex-col items-center gap-2 group cursor-pointer"
                   >
                     <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-white dark:bg-[#151515] border border-gray-100 dark:border-white/5 flex items-center justify-center text-gray-400 group-hover:bg-yellow-500 group-hover:text-black group-hover:border-yellow-500 transition-all shadow-sm">
@@ -349,7 +362,7 @@ function StorePage() {
                       </p>
                     </div>
                     <Link
-                      href={`/main/store/category/${section.id}`}
+                      href={`/main/store/category/${section.id}${userLocation ? `?lat=${userLocation.lat}&lng=${userLocation.lng}` : ""}`}
                       className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center hover:bg-yellow-500 hover:text-black transition-colors"
                     >
                       <ChevronRight className="w-4 h-4" />

@@ -16,6 +16,7 @@ import Swal from "sweetalert2";
 import { getSession } from "next-auth/react"; // ✅ Import NextAuth
 import { ProductModal, ModifierGroup } from "@/store/ProductModal";
 import { ApiService } from "@/services/api.service";
+import { useRideStore } from "@/app/main/ride/store/ride";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
@@ -55,6 +56,7 @@ interface Store {
   type: "RESTAURANT" | "STORE";
   deliveryTime: string;
   address: string;
+  isAvailableInLocation?: boolean;
   products: Product[];
   reviews: Review[];
 }
@@ -100,8 +102,12 @@ export default function StorePage() {
   const fetchStoreData = useCallback(async () => {
     try {
       setError(null);
+      const userLocation = useRideStore.getState().userLocation;
+      const locQuery = userLocation
+        ? `?lat=${userLocation.lat}&lng=${userLocation.lng}`
+        : "";
       const data = await ApiService.get<Store>(
-        `/marketplace/vendor/${slugOrId}`,
+        `/marketplace/vendor/${slugOrId}${locQuery}`,
       );
       // Normalise: API returns `images: string[]`; components expect `image: string`
       const normalizedProducts = (data.products || []).map((p: any) => ({
@@ -254,6 +260,7 @@ export default function StorePage() {
               type={store.type}
               time={store.deliveryTime}
               address={store.address}
+              isAvailable={store.isAvailableInLocation}
             />
 
             <div className="space-y-6">
@@ -301,6 +308,8 @@ export default function StorePage() {
                         key={item.id}
                         {...item}
                         storeId={store.id}
+                        isAvailable={store.isAvailableInLocation}
+                        isSoldOut={item.manageStock && ((item.stock || 0) <= 0 || item.status === "OUT_OF_STOCK")}
                         href={
                           item.slug
                             ? `/product/${item.slug}`

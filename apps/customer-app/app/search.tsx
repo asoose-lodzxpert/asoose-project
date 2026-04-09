@@ -17,8 +17,10 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { CategoryFilter } from "@/components/store/CategoryFilter";
 import { ThemedView } from "@/components/themed-view";
 import { VendorCard } from "@/components/home/VendorCard";
-import { useThemeColor } from "@/hooks/use-theme-color";
+import { useThemeColor,
+} from "@/hooks/use-theme-color";
 import { useCart } from "@/context/CartContext";
+import { useLocation } from "@/context/LocationContext";
 import { searchMarketplace } from "@/services/search.service";
 import type { SearchResult, SearchFilters } from "@/types/marketplace";
 import type { Product } from "@/types/store-types";
@@ -40,6 +42,7 @@ export default function SearchScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const { items, addItem, increaseQty, decreaseQty } = useCart();
+  const { location: userLocation } = useLocation();
 
   const textColor = useThemeColor({}, "textPrimary");
   const mutedColor = useThemeColor({}, "textMuted");
@@ -78,7 +81,12 @@ export default function SearchScreen() {
         maxPrice: maxPrice < 10000 ? maxPrice : undefined,
       };
 
-      const results = await searchMarketplace(debouncedQuery, filters);
+      const results = await searchMarketplace(
+        debouncedQuery,
+        filters,
+        userLocation?.coords?.latitude,
+        userLocation?.coords?.longitude,
+      );
       setSearchResults(results);
     } catch (err) {
       setError("Failed to search. Please try again.");

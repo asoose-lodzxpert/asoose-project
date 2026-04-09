@@ -4,6 +4,7 @@ import * as argon2 from 'argon2';
 import { seedAdmin } from './admin-seed';
 import { seedBanks } from './08-bank';
 import { seedServiceZones } from './09-service-zones';
+import { seedCities } from './10-cities';
 import { seedCategories } from './categories';
 import { seedVendorsAndProducts } from './03-vendors-products';
 
@@ -32,8 +33,7 @@ async function main() {
       password: hashedPassword,
       role: UserRole.SUPER_ADMIN,
       status: UserStatus.ACTIVE,
-      verificationStatus: 'VERIFIED', // Correct field from your schema
-      // isVerified: true, <--- REMOVED (This caused the error)
+      verificationStatus: 'VERIFIED',
     },
   });
 
@@ -47,11 +47,15 @@ async function main() {
 
   // Seed Admin
   await seedAdmin(prisma);
+  // Seed Service Zones (polygon-based geofences for map detection)
+  await seedServiceZones(prisma);
+  // Seed Cities (source of truth for service availability toggles)
+  await seedCities(prisma);
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Error seeding Super Admin:', e);
+    console.error('❌ Error seeding:', e);
     process.exit(1);
   })
   .finally(async () => {

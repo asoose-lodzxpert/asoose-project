@@ -17,6 +17,7 @@ import { MarketplaceService } from './marketplace.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { MapsService } from 'src/maps/maps.service';
 
 export interface SearchResponseDto {
   stores: any[];
@@ -29,14 +30,46 @@ export interface SearchResponseDto {
   version: '1',
 })
 export class MarketplaceController {
-  constructor(private readonly marketplaceService: MarketplaceService) {}
+  constructor(
+    private readonly marketplaceService: MarketplaceService,
+    private readonly mapsService: MapsService,
+  ) {}
 
   @ApiOperation({
-    summary: 'Get home page data (banners, featured stores, categories)',
+    summary: 'Get home page data — filtered by city (use cityId or lat/lng)',
   })
   @Get('home')
-  async getHomeData() {
-    return this.marketplaceService.getHomeData();
+  async getHomeData(
+    @Query('cityId') cityId?: string,
+    @Query('lat') lat?: string,
+    @Query('lng') lng?: string,
+    @Request() req?,
+  ) {
+    const userId = req?.user?.userId || req?.user?.sub || req?.user?.id;
+    const resolvedCityId = await this.resolveCity(cityId, lat, lng, userId);
+    return this.marketplaceService.getHomeData(resolvedCityId);
+  }
+
+  private async resolveCity(cityId?: string, lat?: string, lng?: string, userId?: string) {
+    if (cityId) return cityId;
+    if (lat && lng) {
+      const city = await this.mapsService.getCityByCoords(
+        parseFloat(lat),
+        parseFloat(lng),
+      );
+      return city?.id || undefined;
+    }
+    
+    // Fallback: If logged in, use user's default address city
+    if (userId) {
+      const activeAddress = await this.marketplaceService.getUserDefaultAddress(userId);
+      if (activeAddress?.lat && activeAddress?.lng) {
+        const city = await this.mapsService.getCityByCoords(activeAddress.lat, activeAddress.lng);
+        return city?.id || undefined;
+      }
+    }
+    
+    return undefined;
   }
 
   @ApiOperation({ summary: 'Get all active promotional banners' })
@@ -53,14 +86,23 @@ export class MarketplaceController {
     return this.marketplaceService.search(q);
   }
 
-  @ApiOperation({ summary: 'Get stores and products in a category' })
+  @ApiOperation({ summary: 'Get stores and products in a category, filtered by city' })
   @Get('categories/:id')
-  async getCategory(@Param('id') id: string, @Query('sort') sort?: string) {
+  async getCategory(
+    @Param('id') id: string,
+    @Query('sort') sort?: string,
+    @Query('cityId') cityId?: string,
+    @Query('lat') lat?: string,
+    @Query('lng') lng?: string,
+    @Request() req?,
+  ) {
+    const userId = req?.user?.userId || req?.user?.sub || req?.user?.id;
+    const resolvedCityId = await this.resolveCity(cityId, lat, lng, userId);
     const categoryData = await this.marketplaceService.getCategoryData(
       id,
       sort || 'all',
+      resolvedCityId,
     );
-
     if (!categoryData) {
       throw new NotFoundException(`Category vertical not found: ${id}`);
     }
@@ -69,8 +111,15 @@ export class MarketplaceController {
 
   @ApiOperation({ summary: 'Get vendor/restaurant details by ID or slug' })
   @Get(['vendor/:id', 'restaurant/:id'])
-  async getVendor(@Param('id') id: string) {
-    const vendor = await this.marketplaceService.getVendorDetails(id);
+  async getVendor(
+    @Param('id') id: string,
+    @Query('lat') lat?: string,
+    @Query('lng') lng?: string,
+    @Request() req?,
+  ) {
+    const userId = req?.user?.userId || req?.user?.sub || req?.user?.id;
+    const resolvedCityId = await this.resolveCity(undefined, lat, lng, userId);
+    const vendor = await this.marketplaceService.getVendorDetails(id, resolvedCityId);
     if (!vendor) {
       throw new NotFoundException(`Vendor not found for id/slug: ${id}`);
     }
@@ -78,7 +127,7 @@ export class MarketplaceController {
   }
 
   @ApiOperation({
-    summary: 'Get paginated list of stores with optional type filter',
+    summary: 'Get paginated list of stores filtered by city',
   })
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Get('stores')
@@ -86,9 +135,13 @@ export class MarketplaceController {
     @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
     @Query('type') type?: string,
+    @Query('cityId') cityId?: string,
+    @Query('lat') lat?: string,
+    @Query('lng') lng?: string,
   ) {
-    const safeLimit = Math.min(limit, 50); // enforce max 50 per page
-    return this.marketplaceService.getPaginatedStores(page, safeLimit, type);
+    const safeLimit = Math.min(limit, 50);
+    const resolvedCityId = await this.resolveCity(cityId, lat, lng);
+    return this.marketplaceService.getPaginatedStores(page, safeLimit, type, resolvedCityId);
   }
 
   @ApiOperation({ summary: 'Get product details by ID or slug' })
@@ -152,14 +205,10 @@ export class MarketplaceController {
     return this.marketplaceService.deleteReview(userId, storeId);
   }
 
-  /**
-   * Guideline 1.2 — Report offensive / spam UGC content
-   * POST /marketplace/report
-   */
   @ApiOperation({ summary: 'Report a store or review (UGC moderation)' })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  @Throttle({ default: { limit: 5, ttl: 60_000 } }) // 5 reports/minute per user
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('report')
   async reportContent(
     @Request() req,

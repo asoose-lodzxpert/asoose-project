@@ -166,6 +166,14 @@ export default function CartScreen() {
                     {item.price.toLocaleString()}
                   </ThemedText>
 
+                  {item.available === false && (
+                    <View style={styles.unavailableBadge}>
+                      <ThemedText style={styles.unavailableText}>
+                        Not available in your location
+                      </ThemedText>
+                    </View>
+                  )}
+
                   {/* Modifier selections */}
                   {item.modifierGroups && item.modifierGroups.length > 0 && (
                     <View style={styles.modifiersWrap}>
@@ -342,13 +350,15 @@ export default function CartScreen() {
           ]}
         >
           <ThemedText style={[styles.checkoutText, { color: onPrimary }]}>
-            Checkout · {currency}
-            {estimatedTotal.toLocaleString()}
+            {canCheckout 
+              ? `Checkout · ${currency}${estimatedTotal.toLocaleString()}` 
+              : items.some(i => i.available === false)
+                ? "Items unavailable"
+                : "Add items to checkout"
+            }
           </ThemedText>
         </Pressable>
       </View>
-
-      />
     </View>
   );
 }
@@ -562,4 +572,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   shopBtnText: { fontSize: 14, fontWeight: "700" },
+  unavailableBadge: {
+    backgroundColor: "#FEE2E2",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginTop: 4,
+    alignSelf: "flex-start",
+  },
+  unavailableText: {
+    color: "#B91C1C",
+    fontSize: 10,
+    fontWeight: "700",
+  },
 });

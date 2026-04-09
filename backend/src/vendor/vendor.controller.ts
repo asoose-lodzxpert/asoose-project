@@ -241,4 +241,18 @@ export class VendorController {
   getAccountDeletionStatus(@Req() req) {
     return this.vendorService.getAccountDeletionStatus(req.user.id);
   }
+
+  @ApiOperation({ summary: 'Get list of active service cities for vendor selection' })
+  @Get('cities')
+  @Roles(UserRole.VENDOR)
+  getActiveCities() {
+    return this.vendorService.getActiveCities();
+  }
+
+  @ApiOperation({ summary: 'Update the city the vendor store is registered in' })
+  @Patch('city')
+  @Roles(UserRole.VENDOR)
+  updateStoreCity(@Req() req, @Body() body: { cityId: string }) {
+    return this.vendorService.updateStoreCity(req.user.id, body.cityId);
+  }
 }

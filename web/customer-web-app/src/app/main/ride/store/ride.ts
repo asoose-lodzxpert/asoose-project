@@ -110,6 +110,9 @@ interface RideState {
   clearDropoffLocation: () => void;
   clearAllLocations: () => void;
 
+  cityId: string | null;
+  setCityId: (id: string | null) => void;
+
   // --- Resetters ---
   resetRide: () => void;
 }
@@ -144,6 +147,7 @@ const initialState = {
   feedback: "",
   isConfiguring: null,
   startOtp: null,
+  cityId: null,
 };
 
 export const useRideStore = create<RideState>()(
@@ -181,6 +185,7 @@ export const useRideStore = create<RideState>()(
       setPaymentConfirmed: (confirmed) => set({ paymentConfirmed: confirmed }),
       setLockedEstimate: (estimate) => set({ lockedEstimate: estimate }),
       setStartOtp: (otp) => set({ startOtp: otp }),
+      setCityId: (id) => set({ cityId: id }),
 
       // --- Clear Actions ---
       clearPickupLocation: () =>
@@ -243,6 +248,7 @@ export const useRideStore = create<RideState>()(
         paymentConfirmed: state.paymentConfirmed,
         lockedEstimate: state.lockedEstimate,
         startOtp: state.startOtp,
+        cityId: state.cityId,
         // driverLocation / driverHeading intentionally excluded (M3 fix):
         // persisting stale GPS causes a jarring marker jump on page reload until
         // live data arrives. The 5s REST poll and socket repopulate within seconds.

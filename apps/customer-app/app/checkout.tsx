@@ -591,13 +591,24 @@ export default function CheckoutScreen() {
           ]}
         >
           <Pressable
-            disabled={isProcessing || !selectedAddress || !user || isLoadingFee}
+            disabled={
+              isProcessing || 
+              !selectedAddress || 
+              !user || 
+              isLoadingFee || 
+              items.some(i => i.available === false)
+            }
             onPress={() => setShowConfirmModal(true)}
             style={[
               styles.payButton,
               { backgroundColor: primary },
-              (!selectedAddress || !user || isProcessing || isLoadingFee) &&
-                styles.disabled,
+              (
+                !selectedAddress || 
+                !user || 
+                isProcessing || 
+                isLoadingFee || 
+                items.some(i => i.available === false)
+              ) && styles.disabled,
             ]}
           >
             {isProcessing ? (

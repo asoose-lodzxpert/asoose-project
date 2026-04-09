@@ -23,6 +23,7 @@ import { AdminNotificationsModule } from './notifications/notifications.module';
 import { MapsModule } from './maps/maps.module';
 import { NoticesModule } from './notices/notices.module';
 import { InquiriesModule } from './inquiries/inquiries.module';
+import { CitiesModule } from './cities/cities.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { InquiriesModule } from './inquiries/inquiries.module';
     MapsModule,
     NoticesModule,
     InquiriesModule,
+    CitiesModule,
   ],
   controllers: [SettingsController, ActivityLogController],
   providers: [

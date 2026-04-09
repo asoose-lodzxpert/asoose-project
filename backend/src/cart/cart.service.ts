@@ -9,6 +9,7 @@ import { GetCartSummaryDto } from './dto/cart-summary.dto';
 import { AddToCartDto } from './dto/add-to-cart.dto';
 import { PricingService } from '../users/pricing.service';
 import { FareService } from '../fare/fare.service';
+import { MapsService } from '../maps/maps.service';
 import type { RedisClientType } from 'redis';
 
 @Injectable()
@@ -17,6 +18,7 @@ export class CartService {
     private prisma: PrismaService,
     private pricingService: PricingService,
     private fareService: FareService,
+    private mapsService: MapsService,
     @Inject('REDIS_CLIENT') private readonly redis: RedisClientType,
   ) {}
 
@@ -152,6 +154,13 @@ export class CartService {
       string,
       { store: any; items: any[]; total: number }
     >();
+    
+    // Resolve city if coords provided
+    let resolvedCityId: string | null = null;
+    if (dto.lat && dto.lng) {
+      const resolved = await this.mapsService.getCityByCoords(dto.lat, dto.lng);
+      resolvedCityId = resolved?.id || null;
+    }
 
     for (const itemDto of dto.items) {
       const product = products.find((p) => p.id === itemDto.productId);
@@ -180,11 +189,18 @@ export class CartService {
       const unitPrice = product.price + modifierAddon;
       const lineTotal = unitPrice * itemDto.quantity;
 
+      // Check availability based on city
+      const isAvailableInLocation = resolvedCityId && product.store.cityId 
+        ? product.store.cityId === resolvedCityId 
+        : true; // Default to true if city can't be resolved or check omitted
+
       group.items.push({
         ...product,
         quantity: itemDto.quantity,
-        price: unitPrice, // authoritative unit price including modifiers
+        price: unitPrice,
         lineTotal,
+        available: product.status === 'ACTIVE' && product.stock >= itemDto.quantity && isAvailableInLocation,
+        isAvailableInLocation, // Pass this flag explicitly as well
       });
       group.total += lineTotal;
     }

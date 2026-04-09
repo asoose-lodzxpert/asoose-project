@@ -27,6 +27,7 @@ import { TripsModule } from './trips/trips.module';
 import { VendorModule } from 'src/vendor/vendor.module';
 import { QueueModule } from 'src/matching/queue/queue.module';
 import { FareModule } from '../fare/fare.module';
+import { MapsModule } from 'src/maps/maps.module';
 import { PaystackAccountService } from '../payment/paystack-account.service';
 
 @Module({
@@ -42,6 +43,7 @@ import { PaystackAccountService } from '../payment/paystack-account.service';
     VendorModule,
     QueueModule,
     FareModule,
+    MapsModule,
     BullModule.registerQueue(
       { name: 'email' },
       { name: 'order-reminders' },

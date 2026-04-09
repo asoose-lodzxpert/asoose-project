@@ -60,6 +60,21 @@ export default function VendorRegistrationPage() {
     acceptedTerms: false,
   });
 
+  const handleBackToApp = () => {
+    // Attempt to open the vendor app using its registered scheme
+    window.location.href = "vendorapp://";
+    
+    // Fallback for desktop or if app isn't installed
+    setTimeout(() => {
+      if (document.hasFocus()) {
+        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        if (!isMobile) {
+          toast.info("Please open this link on your mobile phone where the ASOOSE Vendor app is installed.");
+        }
+      }
+    }, 2500);
+  };
+
   const handleNext = () => {
     if (validateStep()) {
       setStep(prev => prev + 1);
@@ -93,6 +108,10 @@ export default function VendorRegistrationPage() {
       case 3:
         if (!data.step3.storeName || !data.step3.storeDescription || !data.step3.storeLogoFile || !data.step3.storeBannerFile || !data.step3.location) {
           toast.error("Please complete your store setup.");
+          return false;
+        }
+        if (!data.step3.cityId) {
+          toast.error("Please select your service city.");
           return false;
         }
         return true;
@@ -129,6 +148,7 @@ export default function VendorRegistrationPage() {
       
       formData.append("location", JSON.stringify(data.step3.location));
       formData.append("openHours", JSON.stringify(data.step3.openHours));
+      if (data.step3.cityId) formData.append("cityId", data.step3.cityId);
 
       await ApiService.postFormData("/auth/vendor/register", formData);
       
@@ -215,7 +235,12 @@ export default function VendorRegistrationPage() {
                     <ArrowLeft size={18} /> Back
                   </button>
                 ) : (
-                  <div /> 
+                  <button 
+                    onClick={handleBackToApp}
+                    className="flex items-center gap-2 px-8 py-3.5 text-gray-400 hover:text-yellow-500 transition-all font-bold text-sm"
+                  >
+                    <ArrowLeft size={18} /> Back to App
+                  </button>
                 )}
                 <button 
                   onClick={step < 4 ? handleNext : handleSubmitAttempt}
@@ -286,10 +311,10 @@ export default function VendorRegistrationPage() {
                    Thank you for choosing ASOOSE. Your application has been successfully submitted and is now under review. We'll notify you via email once your store is ready.
                 </p>
                 <button 
-                  onClick={() => router.push("/sign-in?vendor_onboarding=success")}
+                  onClick={handleBackToApp}
                   className="w-full px-8 py-5 bg-green-500 hover:bg-green-400 text-white rounded-[1.5rem] font-black shadow-2xl shadow-green-500/30 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  Continue to Login
+                  Back to App
                 </button>
              </div>
           </div>

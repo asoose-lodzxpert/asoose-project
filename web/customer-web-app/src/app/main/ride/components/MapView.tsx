@@ -258,6 +258,15 @@ export function MapView() {
     }
   };
 
+  const userLocation = useRideStore((state) => state.userLocation);
+
+  // Auto-center map on user location when it first arrives
+  useEffect(() => {
+    if (userLocation && mapInstanceRef.current && !pickupLocation) {
+      mapInstanceRef.current.panTo(userLocation);
+    }
+  }, [userLocation, pickupLocation]);
+
   if (loadError) {
     return (
       <div className="flex items-center justify-center h-full bg-zinc-900 text-white">
@@ -269,7 +278,7 @@ export function MapView() {
   return isLoaded ? (
     <GoogleMap
       mapContainerStyle={containerStyle}
-      center={defaultCenter}
+      center={userLocation || defaultCenter}
       zoom={14} // Adjusted zoom slightly for city view
       options={mapOptions}
       onLoad={onMapLoad}

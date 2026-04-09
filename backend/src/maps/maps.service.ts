@@ -422,4 +422,52 @@ export class MapsService {
 
     return { url: `${baseUrl}?${params.toString()}` };
   }
+
+  /**
+   * Returns all active cities from the City table.
+   * Used to populate dropdowns in the registration flow and app startup.
+   */
+  async getActiveLocations(): Promise<{ id: string; name: string; state: string }[]> {
+    return this.prisma.city.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, state: true },
+      orderBy: [{ state: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  /**
+   * Resolves GPS coordinates to the nearest active City using
+   * existing ServiceZone polygon data (Ray-Casting algorithm).
+   * This is the ONLY place GPS is used — for one-time city detection on app start.
+   */
+  async getCityByCoords(lat: number, lng: number): Promise<{ id: string; name: string; state: string } | null> {
+    const zones = await this.prisma.serviceZone.findMany({
+      where: { isActive: true },
+    });
+
+    for (const zone of zones) {
+      const coords = zone.coordinates as { lat: number; lng: number }[];
+      if (this.pointInPolygon(lat, lng, coords)) {
+        // Zone name should match a City name (case-insensitive)
+        const city = await this.prisma.city.findFirst({
+          where: { name: { equals: zone.name, mode: 'insensitive' }, isActive: true },
+          select: { id: true, name: true, state: true },
+        });
+        if (city) return city;
+      }
+    }
+    return null;
+  }
+
+  /** Ray-Casting point-in-polygon test */
+  private pointInPolygon(lat: number, lng: number, polygon: { lat: number; lng: number }[]): boolean {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i].lat, yi = polygon[i].lng;
+      const xj = polygon[j].lat, yj = polygon[j].lng;
+      const intersect = yi > lng !== yj > lng && lat < ((xj - xi) * (lng - yi)) / (yj - yi) + xi;
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
 }

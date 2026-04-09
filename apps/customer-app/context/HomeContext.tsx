@@ -13,6 +13,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useLocation } from "./LocationContext";
 
 export type HomeContextType = {
   banners: Banner[];
@@ -39,6 +40,8 @@ const HomeContext = createContext<HomeContextType | undefined>(undefined);
 export function HomeProvider({ children }: { children: ReactNode }) {
   const [category, setCategory] = useState<StoreFilterSlug | string>("all");
   const isFirstMount = useRef(true);
+  const { city } = useLocation();
+  const cityId = city?.id;
 
   // Banners
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -62,7 +65,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
     try {
       setBannersLoading(true);
       setBannersError(null);
-      const response = await fetchMarketplaceHome();
+      const response = await fetchMarketplaceHome(cityId);
       setBanners(response.banners ?? []);
     } catch (error) {
       setBannersError(
@@ -71,13 +74,13 @@ export function HomeProvider({ children }: { children: ReactNode }) {
     } finally {
       setBannersLoading(false);
     }
-  }, []);
+  }, [cityId]);
 
   const refreshVerticals = useCallback(async () => {
     try {
       setVerticalsLoading(true);
       setVerticalsError(null);
-      const response = await fetchMarketplaceHome();
+      const response = await fetchMarketplaceHome(cityId);
       setVerticals(response.verticals ?? []);
     } catch (error) {
       setVerticalsError(
@@ -86,7 +89,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
     } finally {
       setVerticalsLoading(false);
     }
-  }, []);
+  }, [cityId]);
 
   const loadStores = useCallback(
     async (pageToLoad: number, reset = false) => {
@@ -97,6 +100,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
           page: pageToLoad,
           limit: 10,
           type: category === "all" ? undefined : category,
+          cityId,
         });
         setStores((prev) =>
           reset ? fetchedStores : [...prev, ...fetchedStores],
@@ -112,7 +116,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
         if (reset) setInitialStoreLoading(false);
       }
     },
-    [category],
+    [category, cityId],
   );
 
   const refreshStores = useCallback(async () => {
@@ -123,14 +127,16 @@ export function HomeProvider({ children }: { children: ReactNode }) {
     await loadStores(1, true);
   }, [loadStores]);
 
-  // Refresh stores when category changes (but not on initial mount)
+  // Refresh stores when category or location changes (but not on initial mount)
   useEffect(() => {
     if (isFirstMount.current) {
       isFirstMount.current = false;
       return;
     }
     refreshStores();
-  }, [category, refreshStores]);
+    refreshBanners();
+    refreshVerticals();
+  }, [category, cityId, refreshStores, refreshBanners, refreshVerticals]);
 
   const loadMore = useCallback(() => {
     if (storeLoading || initialStoreLoading || !hasMore) return;

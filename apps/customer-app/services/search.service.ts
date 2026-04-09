@@ -18,6 +18,8 @@ import type {
 export async function searchMarketplace(
   query: string,
   filters?: SearchFilters,
+  lat?: number,
+  lng?: number,
 ): Promise<SearchResult> {
   if (!query.trim()) {
     return { stores: [], products: [] };
@@ -29,6 +31,9 @@ export async function searchMarketplace(
   // Note: Backend currently only supports 'q' parameter
   // Filters are applied client-side for now
   // Future: Backend should support these query params
+
+  if (lat) params.set("lat", String(lat));
+  if (lng) params.set("lng", String(lng));
 
   const result = (await request(
     `marketplace/search?${params.toString()}`,
@@ -113,11 +118,15 @@ function applyClientSideFilters(
 export async function fetchCategoryDetail(
   categoryId: string,
   sort: CategorySortOption = "all",
+  lat?: number,
+  lng?: number,
 ): Promise<CategoryDetailResponse> {
   const params = new URLSearchParams();
   if (sort && sort !== "all") {
     params.set("sort", sort);
   }
+  if (lat) params.set("lat", String(lat));
+  if (lng) params.set("lng", String(lng));
 
   const suffix = params.toString();
   return request(

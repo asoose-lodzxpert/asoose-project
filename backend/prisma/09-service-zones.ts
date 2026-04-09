@@ -13,6 +13,7 @@ import { PrismaClient } from '@prisma/client';
 const ZONES = [
   {
     name: 'Maiduguri',
+    state: 'Borno',
     description: 'Maiduguri city and surrounding area in Borno State',
     coordinates: [
       { lat: 11.70, lng: 13.00 },  // SW corner
@@ -22,6 +23,19 @@ const ZONES = [
     ],
     isActive: true,
     basePriceMultiplier: 1.0,
+  },
+  {
+    name: 'Abuja',
+    state: 'FCT',
+    description: 'Federal Capital Territory, Abuja Municipal Area Council',
+    coordinates: [
+      { lat: 8.80, lng: 7.20 },  // SW corner
+      { lat: 8.80, lng: 7.60 },  // SE corner
+      { lat: 9.20, lng: 7.60 },  // NE corner
+      { lat: 9.20, lng: 7.20 },  // NW corner
+    ],
+    isActive: true,
+    basePriceMultiplier: 1.2, // Slightly higher for FCT
   },
 ];
 

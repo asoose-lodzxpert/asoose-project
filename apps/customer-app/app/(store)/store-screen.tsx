@@ -38,6 +38,7 @@ import { ModifierSelectionModal } from "@/components/ModifierSelectionModal";
 import type { ModifierGroup } from "@/components/ModifierSelectionModal";
 import { fetchActiveBanners } from "@/services/banner.service";
 import type { Banner } from "@/services/banner.service";
+import { useLocation } from "@/context/LocationContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -62,12 +63,14 @@ export default function StoreScreen() {
   const [error, setError] = useState<string | null>(null);
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const retryTimeoutRef = React.useRef<number | null>(null);
+  const retryTimeoutRef = React.useRef<any>(null);
 
   const [currentTab, setCurrentTab] = useState<TabType>("all");
   const [activeCategory, setActiveCategory] = useState("All");
   const [searchValue, setSearchValue] = useState("");
   const [displayLimit, setDisplayLimit] = useState(12);
+
+  const { location } = useLocation();
 
   // Banners
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -84,6 +87,8 @@ export default function StoreScreen() {
 
   // Derived availability state
   const isStoreClosed = storeData ? !storeData.isCurrentlyOpen : false;
+  const isUnavailableInLocation = storeData ? storeData.isAvailableInLocation === false : false;
+  
   const closedMessage =
     storeData?.closedMessage ||
     (storeData && !storeData.isCurrentlyOpen
@@ -107,7 +112,11 @@ export default function StoreScreen() {
       }
 
       try {
-        const data = await fetchStoreBySlug(slug);
+        const data = await fetchStoreBySlug(
+          slug, 
+          location?.coords?.latitude, 
+          location?.coords?.longitude
+        );
         setStoreData(data);
         setError(null);
         setRetryCount(0);
@@ -226,12 +235,15 @@ export default function StoreScreen() {
       if (!storeData) return;
 
       // Guard: prevent ordering from a closed store
-      if (isStoreClosed) {
+      if (isStoreClosed || isUnavailableInLocation) {
         Toast.show({
           type: "error",
-          text1: "Store is currently closed",
-          text2:
-            closedMessage ?? "This store is not accepting orders right now.",
+          text1: isUnavailableInLocation 
+            ? "Store unavailable in your location"
+            : "Store is currently closed",
+          text2: isUnavailableInLocation
+            ? "This store does not deliver to your current area."
+            : closedMessage ?? "This store is not accepting orders right now.",
         });
         return;
       }
@@ -498,12 +510,22 @@ export default function StoreScreen() {
           activeCategory={activeCategory}
           onCategoryChange={setActiveCategory}
         />
+        {isUnavailableInLocation && (
+           <View style={[styles.closedBanner, { backgroundColor: '#fee2e2', borderColor: '#ef4444' }]}>
+             <ThemedText style={{ color: '#b91c1c', fontWeight: 'bold' }}>
+               📍 Not available in your location
+             </ThemedText>
+             <ThemedText style={{ color: '#b91c1c', fontSize: 12 }}>
+               This store does not provide services in your current city.
+             </ThemedText>
+           </View>
+        )}
         <ProductList
           products={productsToShow}
           isRestaurant={!!isRestaurant}
           onAddToCart={handleAddToCart}
           vendorId={storeData.id}
-          disabled={isStoreClosed}
+          disabled={isStoreClosed || isUnavailableInLocation}
         />
       </>
     );

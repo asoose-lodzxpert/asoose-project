@@ -8,6 +8,7 @@ export interface CartItem {
   price: number;
   quantity: number;
   restaurantId: string;
+  cityId?: string; // ✅ Track which city the item belongs to
   image?: string | null;
   modifierIds?: string[];
   modifierNames?: string[];

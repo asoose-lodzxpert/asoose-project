@@ -1,10 +1,10 @@
 import { ThemedText } from "@/components/themed-text";
 import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { STATE_CITIES, STATES } from "@/config/states";
+import { fetchActiveLocations } from "@/services/maps";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { SignupForm } from "@/types/signup";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { CustomDropdown } from "../CustomDropdown";
 import { DatePicker } from "../DatePicker";
@@ -25,10 +25,28 @@ export function StepPersonalDetails({ data, onChange }: Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // Dynamic Locations
+  const [activeZones, setActiveZones] = useState<{ name: string; state: string }[]>([]);
+  const [loadingLocations, setLoadingLocations] = useState(true);
+
+  useEffect(() => {
+    fetchActiveLocations()
+      .then(setActiveZones)
+      .catch((err) => console.error("Failed to fetch locations", err))
+      .finally(() => setLoadingLocations(false));
+  }, []);
+
+  const availableStates = useMemo(() => {
+    const states = new Set(activeZones.map(z => z.state));
+    return Array.from(states).map(s => ({ label: s, value: s }));
+  }, [activeZones]);
+
   const cities = useMemo(() => {
     if (!selectedState) return [];
-    return STATE_CITIES[selectedState] || [];
-  }, [selectedState]);
+    return activeZones
+      .filter(z => z.state === selectedState)
+      .map(z => ({ label: z.name, value: z.name }));
+  }, [selectedState, activeZones]);
 
   return (
     <View>
@@ -210,16 +228,17 @@ export function StepPersonalDetails({ data, onChange }: Props) {
 
       {/* State */}
       <CustomDropdown
-        data={STATES}
+        data={availableStates}
         value={selectedState}
         onChange={(v) => {
           setSelectedState(v as string);
           onChange("state", v as string);
           onChange("city", null);
         }}
-        placeholder="Select state"
+        placeholder={loadingLocations ? "Loading..." : "Select state"}
         containerStyle={{ flex: 2, marginTop: 20 }}
         label="Choose your state"
+        disabled={loadingLocations}
       />
 
       {/* City */}

@@ -22,14 +22,19 @@ const API_FILTER_MAP: Record<string, string> = {
 async function getCategoryData(
   id: string,
   filterSlug: string = "all",
+  lat?: string,
+  lng?: string,
 ): Promise<CategoryData | null> {
   try {
     const apiSortParam = API_FILTER_MAP[filterSlug];
-    let url = `${API_URL}/marketplace/categories/${id}`;
+    let url = `${API_URL}/marketplace/categories/${id}?`;
 
-    if (apiSortParam) {
-      url += `?sort=${apiSortParam}`;
-    }
+    const params = new URLSearchParams();
+    if (apiSortParam) params.set("sort", apiSortParam);
+    if (lat) params.set("lat", lat);
+    if (lng) params.set("lng", lng);
+
+    url += params.toString();
 
     const res = await fetch(url, {
       next: { revalidate: 60 },
@@ -52,7 +57,7 @@ async function getCategoryData(
 // 1. Update Types to be Promises
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; lat?: string; lng?: string }>;
 }
 
 export default async function CategoryPage({
@@ -64,13 +69,15 @@ export default async function CategoryPage({
   const resolvedSearchParams = await searchParams;
 
   const filter = resolvedSearchParams.filter || "all";
+  const lat = resolvedSearchParams.lat;
+  const lng = resolvedSearchParams.lng;
   const categoryId = resolvedParams.id;
 
   let categoryData: CategoryData | null = null;
   let error: string | null = null;
 
   try {
-    categoryData = await getCategoryData(categoryId, filter);
+    categoryData = await getCategoryData(categoryId, filter, lat, lng);
   } catch (err) {
     error = err instanceof Error ? err.message : "An unexpected error occurred";
   }

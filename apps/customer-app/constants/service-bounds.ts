@@ -33,20 +33,28 @@ const FALLBACK_BOUNDS: ServiceBounds[] = [
     minLng: 13.0,
     maxLng: 13.3,
   },
+  {
+    name: "Abuja",
+    minLat: 8.8,
+    maxLat: 9.2,
+    minLng: 7.2,
+    maxLng: 7.6,
+  },
 ];
 
 // Private mutable cache — updated by loadServiceBounds()
 let _activeBounds: ServiceBounds[] = [...FALLBACK_BOUNDS];
 
 /**
- * Default map center object.  Its properties are updated in-place when
- * loadServiceBounds() succeeds, so all existing imports stay in sync.
+ * Default map center object. Initialized to a view that encompasses
+ * all active (fallback) zones. Properties are updated in-place when
+ * loadServiceBounds() succeeds.
  */
 export const DEFAULT_MAP_CENTER = {
-  latitude: 11.83,
-  longitude: 13.15,
-  latitudeDelta: 0.18,
-  longitudeDelta: 0.18,
+  latitude: 10.3, // Roughly between Maiduguri and Abuja
+  longitude: 10.2, 
+  latitudeDelta: 4.5,
+  longitudeDelta: 6.5,
 };
 
 // ── AsyncStorage cache ────────────────────────────────────────────────────────
