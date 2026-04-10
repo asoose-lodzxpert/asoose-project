@@ -113,7 +113,7 @@ export const LocationDisclosureModal: React.FC<
                     { color: textSecondary, marginTop: 8 },
                   ]}
                 >
-                  By tapping "I Agree", you authorize ASOOSE to access your
+                  By tapping "Continue", you authorize ASOOSE to access your
                   device location for store operations, including order delivery
                   coordination, real-time tracking, and customer communication.
                   Location data is encrypted and used solely for order
@@ -131,7 +131,7 @@ export const LocationDisclosureModal: React.FC<
             >
               <IconSymbol name="checkmark" size={18} color="#fff" />
               <ThemedText style={[styles.buttonText, { color: "#fff" }]}>
-                I Agree & Continue
+                Continue
               </ThemedText>
             </Pressable>
           </ThemedView>

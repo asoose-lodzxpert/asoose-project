@@ -214,14 +214,16 @@ export default function LoginScreen() {
                 </View>
 
                 {/* Footer */}
-                <View style={styles.footer}>
-                  <ThemedText>
-                    Don't have an account?{" "}
-                    <ThemedText type="link" onPress={handleSignUp}>
-                      Sign up
+                {Platform.OS !== "ios" && (
+                  <View style={styles.footer}>
+                    <ThemedText>
+                      Don't have an account?{" "}
+                      <ThemedText type="link" onPress={handleSignUp}>
+                        Sign up
+                      </ThemedText>
                     </ThemedText>
-                  </ThemedText>
-                </View>
+                  </View>
+                )}
               </View>
             </ScrollView>
           </KeyboardAvoidingView>

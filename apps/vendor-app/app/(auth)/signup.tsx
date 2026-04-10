@@ -21,29 +21,14 @@ import React, { useState, useEffect } from "react";
 import { Pressable, StyleSheet, View, ActivityIndicator, Platform } from "react-native";
 import Toast from "react-native-toast-message";
 
+import { IconSymbol } from "@/components/ui/icon-symbol";
+
 const VENDOR_ONBOARDING_URL = "https://asoose.com/vendor/register";
 
 export default function Signup() {
   const router = useRouter();
 
-  useEffect(() => {
-    if (Platform.OS === "ios") {
-      WebBrowser.openBrowserAsync(VENDOR_ONBOARDING_URL);
-      // Also go back so they don't see the form if they dismiss the browser
-      router.back();
-    }
-  }, []);
 
-  if (Platform.OS === "ios") {
-    return (
-      <ThemedView style={styles.container}>
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 24 }}>
-          <ActivityIndicator size="large" />
-          <ThemedText style={{ marginTop: 16 }}>Redirecting to web registration...</ThemedText>
-        </View>
-      </ThemedView>
-    );
-  }
 
   const [step, setStep] = useState<number>(1);
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -70,6 +55,34 @@ export default function Signup() {
   const brandPrimary = useThemeColor({}, "brandPrimary");
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
   const textSecondary = useThemeColor({}, "textSecondary");
+
+  if (Platform.OS === "ios") {
+    return (
+      <ThemedView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 32 }}>
+          <IconSymbol name="info.circle.fill" size={48} color={brandPrimary} />
+          <ThemedText type="title" style={{ marginTop: 24, textAlign: "center" }}>
+            Account Registration
+          </ThemedText>
+          <ThemedText style={{ marginTop: 16, textAlign: "center", color: textSecondary, lineHeight: 22 }}>
+            Account registration for businesses and organizations is managed through our administrative portal.
+          </ThemedText>
+          <ThemedText style={{ marginTop: 8, textAlign: "center", color: textSecondary, lineHeight: 22 }}>
+            Please contact your organization's administrator or visit our website to register your business.
+          </ThemedText>
+          
+          <Pressable 
+            style={[styles.button, { backgroundColor: brandPrimary, marginTop: 32, width: '100%' }]}
+            onPress={() => router.back()}
+          >
+            <ThemedText style={{ color: textOnPrimary }} type="defaultSemiBold">
+              Go Back
+            </ThemedText>
+          </Pressable>
+        </View>
+      </ThemedView>
+    );
+  }
 
   // Change handlers
   const handleChangeStep1 = <K extends keyof SignupStep1Data>(
