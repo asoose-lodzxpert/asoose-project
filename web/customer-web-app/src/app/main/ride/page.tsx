@@ -12,6 +12,7 @@ import { GlobalErrorBanner } from "./components/GlobalErrorBanner";
 import { RideSafetyControls } from "./components/RideSafetyControls";
 import { useRideSynchronization } from "./hooks/useRideSynchronization";
 import { Sidebar } from "./components/Sidebar";
+import { Suspense } from "react";
 
 export default function Home() {
   const { data: session } = useSession();
@@ -56,7 +57,9 @@ export default function Home() {
         {showSidebar && (
           <div className="z-20 w-full max-w-md md:w-[450px] md:min-w-[450px] h-full flex-shrink-0">
             <Sidebar>
-              <RideController />
+              <Suspense fallback={<div className="p-8 text-center text-zinc-500">Loading ride details...</div>}>
+                <RideController />
+              </Suspense>
             </Sidebar>
           </div>
         )}
@@ -70,7 +73,11 @@ export default function Home() {
           <RideSafetyControls />
 
           {/* --- Ride-state floating panels (searching, confirmed, arrived, in-progress, finished) --- */}
-          {!showSidebar && <RideController />}
+          {!showSidebar && (
+            <Suspense fallback={null}>
+              <RideController />
+            </Suspense>
+          )}
         </div>
       </div>
     </GlobalErrorBoundary>
