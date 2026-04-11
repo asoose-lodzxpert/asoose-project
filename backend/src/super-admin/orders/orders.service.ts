@@ -36,84 +36,137 @@ export class OrdersService {
     const storeType =
       type && type !== 'All' ? SERVICE_TYPE_MAP[type] : undefined;
 
-    const where: Prisma.OrderWhereInput = {
-      // Only show paid orders in the admin dashboard
-      paymentStatus: 'PAID',
-      // BUGFIX: Exclude admin-managed stores from global Orders view
-      // Admin-managed orders should only appear in the Store Orders section
-      store: {
-        isAdminManaged: false,
-        ...(storeType && { type: storeType }),
-      },
-      ...(search && {
-        OR: [
-          { id: { contains: search, mode: 'insensitive' } },
-          { user: { name: { contains: search, mode: 'insensitive' } } },
-          { store: { name: { contains: search, mode: 'insensitive' } } },
-          // Added: Search by OrderGroup ID
-          { orderGroupId: { contains: search, mode: 'insensitive' } },
-        ],
-      }),
-      ...(status &&
-        status !== 'All' && {
-          status: status as Prisma.EnumOrderStatusFilter,
-        }),
-      ...((from || to) && {
-        createdAt: {
-          ...(from && { gte: new Date(new Date(from).setHours(0, 0, 0, 0)) }),
-          ...(to && { lte: new Date(new Date(to).setHours(23, 59, 59, 999)) }),
-        },
-      }),
-    };
+    // Use raw SQL to get unique "Entries" (Group ID or Solo Order ID)
+    // This handles unified pagination while showing only one row per group.
+    
+    // Build dynamic conditions for raw SQL
+    const conditions: string[] = [];
+    const params: any[] = [];
 
-    const [orders, total] = await Promise.all([
-      this.prisma.order.findMany({
-        where,
-        skip,
-        take: Number(limit),
-        orderBy: { createdAt: 'desc' },
-        include: {
-          user: { select: { name: true } },
-          store: { select: { name: true, type: true } },
-          // Γ£à FIX: Include Direct Payment AND Group Payment
-          payment: { select: { status: true, amount: true, method: true } },
-          orderGroup: {
+    if (storeType) {
+      conditions.push(`s.type = $${params.length + 1}`);
+      params.push(storeType);
+    }
+
+    if (status && status !== 'All') {
+      conditions.push(`o.status = $${params.length + 1}::"OrderStatus"`);
+      params.push(status);
+    }
+
+    if (from) {
+      conditions.push(`o."createdAt" >= $${params.length + 1}`);
+      params.push(new Date(new Date(from).setHours(0, 0, 0, 0)));
+    }
+    if (to) {
+      conditions.push(`o."createdAt" <= $${params.length + 1}`);
+      params.push(new Date(new Date(to).setHours(23, 59, 59, 999)));
+    }
+
+    if (search) {
+      const searchIdx = params.length + 1;
+      conditions.push(`(
+        o.id ILIKE $${searchIdx} OR 
+        u.name ILIKE $${searchIdx} OR 
+        s.name ILIKE $${searchIdx} OR 
+        o."orderGroupId" ILIKE $${searchIdx}
+      )`);
+      params.push(`%${search}%`);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Step 1 — Get unique Entry IDs (Group or Solo)
+    // We sort by the LATEST creation date in a group if it exists
+    const entries = await this.prisma.$queryRawUnsafe<any[]>(`
+      SELECT 
+        COALESCE(o."orderGroupId", o.id) as "id",
+        MAX(o."createdAt") as "sortDate",
+        CASE WHEN o."orderGroupId" IS NOT NULL THEN 'GROUP' ELSE 'SOLO' END as "entryType"
+      FROM "Order" o
+      JOIN "Store" s ON o."storeId" = s.id
+      JOIN "User" u ON o."userId" = u.id
+      ${whereClause}
+      GROUP BY COALESCE(o."orderGroupId", o.id), "entryType"
+      ORDER BY "sortDate" DESC
+      LIMIT ${Number(limit)} OFFSET ${skip}
+    `, ...params);
+
+    // Step 2 — Get total count of unique entries
+    const countResult = await this.prisma.$queryRawUnsafe<any[]>(`
+      SELECT COUNT(DISTINCT COALESCE(o."orderGroupId", o.id)) as count
+      FROM "Order" o
+      JOIN "Store" s ON o."storeId" = s.id
+      JOIN "User" u ON o."userId" = u.id
+      ${whereClause}
+    `, ...params);
+    const totalCount = Number(countResult[0]?.count || 0);
+
+    // Step 3 — Hydrate entries with full data
+    const data = await Promise.all(
+      entries.map(async (entry) => {
+        if (entry.entryType === 'GROUP') {
+          const group = await this.prisma.orderGroup.findUnique({
+            where: { id: entry.id },
             include: {
+              user: { select: { name: true } },
+              orders: {
+                include: {
+                  store: { select: { name: true, type: true } },
+                  payment: { select: { status: true } },
+                },
+              },
               payment: { select: { status: true, amount: true, method: true } },
             },
-          },
-          delivery: {
-            include: { rider: { select: { name: true } } },
-          },
-        },
+          });
+          if (!group) return null;
+
+          return {
+            id: group.id,
+            groupId: group.id,
+            status: this.deriveGroupStatus(group.orders),
+            customer: group.user.name,
+            vendor: `Multi-vendor (${group.orders.length} stores)`,
+            rider: 'Multi-stop Delivery',
+            amount: group.totalAmount,
+            paymentStatus: group.payment?.status ?? 'UNPAID',
+            type: 'Mixed',
+            placedAt: group.createdAt.toISOString(),
+          };
+        } else {
+          const order = await this.prisma.order.findUnique({
+            where: { id: entry.id },
+            include: {
+              user: { select: { name: true } },
+              store: { select: { name: true, type: true } },
+              payment: { select: { status: true, amount: true, method: true } },
+              delivery: { include: { rider: { select: { name: true } } } },
+            },
+          });
+          if (!order) return null;
+
+          return {
+            id: order.id,
+            groupId: null,
+            status: order.status,
+            customer: order.user.name,
+            vendor: order.store.name,
+            rider: order.delivery?.rider?.name ?? 'Unassigned',
+            amount: order.total,
+            paymentStatus: order.payment?.status ?? 'UNPAID',
+            type: this.mapStoreTypeToService(order.store.type),
+            placedAt: order.createdAt.toISOString(),
+          };
+        }
       }),
-      this.prisma.order.count({ where }),
-    ]);
+    );
 
     return {
-      data: orders.map((order) => {
-        // Resolve Payment Source
-        const payment = order.payment || order.orderGroup?.payment;
-
-        return {
-          id: order.id,
-          groupId: order.orderGroupId, // Expose Group ID
-          status: order.status,
-          customer: order.user.name,
-          vendor: order.store.name,
-          rider: order.delivery?.rider?.name ?? 'Unassigned',
-          // Show Order Total, not Transaction Total
-          amount: order.total,
-          paymentStatus: payment?.status ?? 'UNPAID',
-          type: this.mapStoreTypeToService(order.store.type),
-          placedAt: order.createdAt.toISOString(),
-        };
-      }),
+      data: data.filter(Boolean),
       meta: {
-        total,
+        total: totalCount,
         page: Number(page),
         limit: Number(limit),
-        pages: Math.ceil(total / Number(limit)),
+        pages: Math.ceil(totalCount / Number(limit)),
       },
     };
   }
@@ -122,7 +175,8 @@ export class OrdersService {
   // 2. GET SINGLE ORDER (Fixed for Multi-Vendor)
   // ===========================================================================
   async findOne(id: string) {
-    const order = await this.prisma.order.findUnique({
+    // 1. Try fetching as standard Order
+    let order = await this.prisma.order.findUnique({
       where: { id },
       include: {
         user: true,
@@ -137,10 +191,18 @@ export class OrdersService {
             modifiers: true,
           },
         },
-        // Γ£à FIX: Include Direct Payment AND Group Payment
         payment: true,
         orderGroup: {
-          include: { payment: true },
+          include: {
+            payment: true,
+            orders: {
+              include: {
+                store: { select: { name: true, address: true, vendor: true } },
+                items: { include: { product: true, modifiers: true } },
+                delivery: true,
+              },
+            },
+          },
         },
         delivery: {
           include: {
@@ -152,7 +214,20 @@ export class OrdersService {
       },
     });
 
-    if (!order) throw new NotFoundException(`Order #${id} not found`);
+    // 2. If not found, try fetching as OrderGroup ID
+    if (!order) {
+      const group = await this.prisma.orderGroup.findUnique({
+        where: { id },
+        include: {
+          orders: { select: { id: true } },
+        },
+      });
+      if (group && group.orders.length > 0) {
+        // Redirect to the first order of the group to reuse the logic
+        return this.findOne(group.orders[0].id);
+      }
+      throw new NotFoundException(`Order #${id} not found`);
+    }
 
     const logs = await this.prisma.activityLog.findMany({
       where: { target: { contains: id } },
@@ -369,6 +444,39 @@ export class OrdersService {
     reason: string,
     adminId: string,
   ) {
+    // Check if it's an OrderGroup ID
+    const group = await this.prisma.orderGroup.findUnique({
+      where: { id: orderId },
+      include: { orders: true },
+    });
+
+    if (group) {
+      await this.prisma.$transaction(
+        group.orders.map((o) =>
+          this.prisma.order.update({
+            where: { id: o.id },
+            data: {
+              status: newStatus,
+              cancelledAt: newStatus === 'CANCELLED' ? new Date() : undefined,
+              deliveredAt: newStatus === 'DELIVERED' ? new Date() : undefined,
+            },
+          }),
+        ),
+      );
+
+      await this.prisma.activityLog.create({
+        data: {
+          userId: adminId,
+          action: 'ORDER_GROUP_FORCE_UPDATE',
+          details: `Force status change for GROUP ${orderId} to ${newStatus}. Reason: ${reason}`,
+          target: orderId,
+          metadata: { newStatus, reason, orderCount: group.orders.length },
+        },
+      });
+
+      return { message: `Updated ${group.orders.length} orders in group` };
+    }
+
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
     });
@@ -768,21 +876,44 @@ export class OrdersService {
   }
 
   // --- Transformers ---
+  private deriveGroupStatus(orders: any[]): string {
+    const STATUS_PRIORITY = [
+      'PENDING',
+      'CONFIRMED',
+      'PREPARING',
+      'READY',
+      'DISPATCHED',
+      'DELIVERED',
+      'CANCELLED',
+      'REJECTED',
+    ];
+    const statuses = orders.map((o) => o.status as string);
+    for (const s of STATUS_PRIORITY) {
+      if (statuses.includes(s)) return s;
+    }
+    return statuses[0] || 'PENDING';
+  }
+
   private mapStoreTypeToService(type: string) {
     const entry = Object.entries(SERVICE_TYPE_MAP).find(([k, v]) => v === type);
     return entry ? entry[0] : type;
   }
 
   private transformForDetail(order: any, logs: any[], dispute: any) {
-    // Resolve Payment for Transformer
     const payment = order.payment || order.orderGroup?.payment;
+
+    // ✅ FIX: If this is part of a group, we return the main order but also
+    // include the "Group context" (all sister orders) so the Admin can see
+    // the whole fulfillment status across vendors.
+    const groupOrders = order.orderGroup?.orders || [];
 
     return {
       id: order.id,
-      groupId: order.orderGroupId, // Expose Group ID
-      deliveryId: order.delivery?.id ?? null, // Expose Delivery ID for rider assignment
+      groupId: order.orderGroupId,
+      deliveryId: order.delivery?.id ?? order.orderGroup?.delivery?.id ?? null,
       serviceType: this.mapStoreTypeToService(order.store.type),
       status: order.status,
+      groupStatus: order.orderGroup ? this.deriveGroupStatus(groupOrders) : order.status,
       dispute,
       amount: order.total,
       updatedAt: order.updatedAt,
@@ -794,7 +925,10 @@ export class OrdersService {
         name: order.user.name,
         phone: order.delivery?.recipientPhone || order.user.phone || 'N/A',
         email: order.user.email,
-        address: order.delivery?.dropoffAddress?.street || 'N/A',
+        address:
+          order.delivery?.dropoffAddress?.street ||
+          order.orderGroup?.delivery?.dropoffAddress?.street ||
+          'N/A',
       },
 
       vendor: {
@@ -803,6 +937,22 @@ export class OrdersService {
         ownerName: order.store.vendor?.name || 'N/A',
         ownerPhone: order.store.vendor?.phone || 'N/A',
       },
+
+      // ✅ Include Sister Orders for the UI to traverse
+      subOrders: groupOrders.map((o) => ({
+        id: o.id,
+        storeName: o.store.name,
+        status: o.status,
+        amount: o.total,
+        items: o.items.map((i) => ({
+          name: i.nameSnap,
+          quantity: i.quantity,
+          price: i.price,
+          options: i.selectedOptions,
+          modifiers: i.modifiers?.map((m) => ({ name: m.modifier.name, price: m.modifier.price })) || [],
+        })),
+        delivery: o.delivery,
+      })),
 
       rider: order.delivery?.rider
         ? {
@@ -819,8 +969,8 @@ export class OrdersService {
         options: item.selectedOptions,
         modifiers:
           item.modifiers?.map((m: any) => ({
-            name: m.name,
-            price: m.price,
+            name: m.modifier ? m.modifier.name : m.name,
+            price: m.modifier ? m.modifier.price : m.price,
           })) || [],
         product: item.product,
       })),
@@ -829,7 +979,7 @@ export class OrdersService {
         ? {
             status: payment.status,
             method: payment.method,
-            total: payment.amount, // Transaction Total (may be group total)
+            total: payment.amount,
             isGroupPayment: !!order.orderGroupId,
           }
         : null,

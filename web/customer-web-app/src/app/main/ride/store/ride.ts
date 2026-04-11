@@ -10,7 +10,10 @@ export type RideStage =
   | "in-progress"
   | "payment-required"
   | "finished";
-export type RideType = "economy";
+export type RideType = "economy" | "business";
+
+export type BookingStage = 'IDLE' | 'LOCATION' | 'SCHEDULE' | 'VEHICLE' | 'CONFIRM' | 'SUCCESS';
+export type ActiveTab = 'request' | 'scheduled' | 'history';
 
 interface RideState {
   // --- Ride ID Tracking ---
@@ -67,6 +70,13 @@ interface RideState {
   isConfiguring: "pickup" | "dropoff" | null;
   startOtp: string | null;
 
+  // --- Scheduled Ride & UI State ---
+  activeTab: ActiveTab;
+  bookingStage: BookingStage;
+  scheduledAt: string | null;
+  scheduledVehicleType: string | null;
+  scheduledFare: number | null;
+
   // --- Setters ---
   setRideId: (id: string | null) => void;
   setMapInstance: (map: google.maps.Map | null) => void;
@@ -104,6 +114,12 @@ interface RideState {
     estimate: { fare: number; distance: number; duration: number } | null,
   ) => void;
   setStartOtp: (otp: string | null) => void;
+
+  // --- UI & Scheduled Setters ---
+  setActiveTab: (tab: ActiveTab) => void;
+  setBookingStage: (stage: BookingStage) => void;
+  setScheduledAt: (at: string | null) => void;
+  setScheduledVehicle: (type: string, fare: number) => void;
 
   // --- Clearing Actions ---
   clearPickupLocation: () => void;
@@ -148,6 +164,13 @@ const initialState = {
   isConfiguring: null,
   startOtp: null,
   cityId: null,
+
+  // --- UI & Scheduled ---
+  activeTab: 'request' as ActiveTab,
+  bookingStage: 'IDLE' as BookingStage,
+  scheduledAt: null,
+  scheduledVehicleType: null,
+  scheduledFare: null,
 };
 
 export const useRideStore = create<RideState>()(
@@ -186,6 +209,11 @@ export const useRideStore = create<RideState>()(
       setLockedEstimate: (estimate) => set({ lockedEstimate: estimate }),
       setStartOtp: (otp) => set({ startOtp: otp }),
       setCityId: (id) => set({ cityId: id }),
+
+      setActiveTab: (tab) => set({ activeTab: tab }),
+      setBookingStage: (stage) => set({ bookingStage: stage }),
+      setScheduledAt: (at) => set({ scheduledAt: at }),
+      setScheduledVehicle: (type, fare) => set({ scheduledVehicleType: type, scheduledFare: fare }),
 
       // --- Clear Actions ---
       clearPickupLocation: () =>
@@ -260,6 +288,11 @@ export const useRideStore = create<RideState>()(
         // persisting it caused the LocationSelector overlay to remount on
         // page reload if the user refreshed while pinning a location.
         routePolyline: state.routePolyline,
+        activeTab: state.activeTab,
+        bookingStage: state.bookingStage,
+        scheduledAt: state.scheduledAt,
+        scheduledVehicleType: state.scheduledVehicleType,
+        scheduledFare: state.scheduledFare,
       }),
     },
   ),

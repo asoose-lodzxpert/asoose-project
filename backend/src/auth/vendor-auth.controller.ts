@@ -25,6 +25,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guards';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
+import { ADMIN_ROLES } from '../auth/decorators/admin-roles.constant';
 import { CreateVendorDto } from '../auth/dto/create-vendor.dto';
 import { ResetPasswordDto } from '../auth/dto/reset-password.dto';
 import { UpdateProfileDto } from '../auth/dto/update-profile.dto';
@@ -43,8 +44,8 @@ export class VendorAuthController {
   @ApiResponse({ status: 200, description: 'Vendor profile returned' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Post('me')
-  @UseGuards(JwtAuthGuard)
-  @Roles(UserRole.VENDOR)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   async getMe(@Req() req) {
     const { id, email } = req.user || {};
     return await this.vendorAuthService.getPublicVendorDetails(id || email);
@@ -160,7 +161,7 @@ export class VendorAuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Patch('profile')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   updateProfile(@Body() dto: UpdateProfileDto, @Req() req) {
     return this.vendorAuthService.updateVendorProfile(req.user.id, dto);
   }
@@ -192,8 +193,8 @@ export class VendorAuthController {
   @ApiOperation({ summary: 'Get vendor notification preferences' })
   @ApiResponse({ status: 200, description: 'Preferences returned' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @UseGuards(JwtAuthGuard)
-  @Roles(UserRole.VENDOR)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   @Get('notifications-preferences')
   async getNotificationsPreferences(@Req() req) {
     const { id } = req.user || {};
@@ -204,8 +205,8 @@ export class VendorAuthController {
   @ApiOperation({ summary: 'Update vendor notification preferences' })
   @ApiResponse({ status: 200, description: 'Preferences updated' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @UseGuards(JwtAuthGuard)
-  @Roles(UserRole.VENDOR)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   @Put('notifications-preferences')
   async updateNotificationsPreferences(@Req() req, @Body() body) {
     const { id } = req.user || {};
@@ -216,16 +217,16 @@ export class VendorAuthController {
   @ApiOperation({ summary: 'Update vendor business information' })
   @ApiResponse({ status: 200, description: 'Business info updated' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @UseGuards(JwtAuthGuard)
-  @Roles(UserRole.VENDOR)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   @Put('business-info')
   async updateBusinessInfo(@Req() req, @Body() body) {
     const { id } = req.user || {};
     return this.vendorAuthService.updateBusinessInfo(id, body);
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Roles(UserRole.VENDOR)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update vendor business documents' })
   @ApiResponse({ status: 200, description: 'Documents updated' })
@@ -240,8 +241,8 @@ export class VendorAuthController {
   @ApiOperation({ summary: 'Update vendor store details' })
   @ApiResponse({ status: 200, description: 'Store details updated' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @UseGuards(JwtAuthGuard)
-  @Roles(UserRole.VENDOR)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   @Put('store-details')
   async updateStoreDetails(@Req() req, @Body() body) {
     const { id } = req.user || {};
@@ -252,8 +253,8 @@ export class VendorAuthController {
   @ApiOperation({ summary: 'Get vendor business details' })
   @ApiResponse({ status: 200, description: 'Business details returned' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @UseGuards(JwtAuthGuard)
-  @Roles(UserRole.VENDOR)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   @Get('business-details')
   async getBusinessDetails(@Req() req) {
     const { id } = req.user || {};

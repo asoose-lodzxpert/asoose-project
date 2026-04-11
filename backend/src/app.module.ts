@@ -33,6 +33,7 @@ import { LoggerModule } from './libs/logger/logger.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { SupportModule } from './support/support.module';
 import { AdminAuditModule } from './admin-audit/admin-audit.module';
+import { ScheduledRidesModule } from './scheduled-rides/scheduled-rides.module';
 
 @Module({
   imports: [
@@ -113,6 +114,7 @@ import { AdminAuditModule } from './admin-audit/admin-audit.module';
     FareModule,
     SupportModule,
     AdminAuditModule,
+    ScheduledRidesModule,
   ],
   controllers: [AppController],
   providers: [

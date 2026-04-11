@@ -41,6 +41,6 @@ const devOnlyControllers =
     TripsCommonService,
     RidesCleanupService,
   ],
-  exports: [TripsService],
+  exports: [TripsService, TripsCommonService],
 })
 export class TripsModule {}

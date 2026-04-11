@@ -118,6 +118,10 @@ export class PaymentStatusService {
       ? targetStatus
       : PaymentStatus.PENDING;
 
+    this.logger.log(
+      `Verifying payment ref: ${verification.reference}. Gateway status: ${verification.status} -> targetStatus: ${targetStatus} -> finalStatus: ${finalStatus}`,
+    );
+
     const paidAt = verification.paidAt
       ? new Date(verification.paidAt)
       : new Date();
@@ -158,6 +162,9 @@ export class PaymentStatusService {
             });
 
             // Ledger: Record Incoming Payment
+            this.logger.log(
+              `Recording ledger for Order Group ${payment.orderGroupId} (Status: COMPLETED)`,
+            );
             await this.ledger.recordPayment(
               {
                 id: payment.id,
@@ -321,6 +328,9 @@ export class PaymentStatusService {
               const ride = payment.ride;
               const platformFeeRate = 0.2;
 
+              this.logger.log(
+                `Recording ledger for Ride ${payment.rideId} (Status: COMPLETED)`,
+              );
               await this.ledger.recordPayment(
                 {
                   id: payment.id,
@@ -333,13 +343,17 @@ export class PaymentStatusService {
                 tx,
               );
 
+              const totalFare = Number(payment.amount);
+              const platformFee = Math.round(totalFare * platformFeeRate);
+              const driverFee = totalFare - platformFee;
+
               await this.ledger.recordRideEarnings(
                 {
                   id: payment.rideId,
                   riderId: currentRide.riderId,
-                  totalFare: payment.amount,
-                  platformFee: payment.amount * platformFeeRate,
-                  driverFee: payment.amount,
+                  totalFare,
+                  platformFee,
+                  driverFee,
                 },
                 tx,
               );

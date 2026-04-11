@@ -145,6 +145,7 @@ export default function OrdersScreen() {
       case "REQUESTED":
       case "SEARCHING_DRIVER":
       case "ASSIGNED":
+      case "DRIVER_ASSIGNED_SCHED":
         return "#F59E0B";
       case "DRIVER_ACCEPTED":
       case "PAID":
@@ -178,6 +179,8 @@ export default function OrdersScreen() {
         return "Paid";
       case "ASSIGNED":
         return "Assigned";
+      case "DRIVER_ASSIGNED_SCHED":
+        return "Scheduled";
       case "ACCEPTED":
         return "Accepted";
       case "PICKED_UP":

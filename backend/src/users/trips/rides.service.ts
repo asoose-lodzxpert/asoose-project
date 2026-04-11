@@ -21,6 +21,7 @@ import { GeoService } from '../../matching/geo/geo.service';
 import { EventBusService } from '../../matching/events/event-bus.service';
 import { QueueService } from '../../matching/queue/queue.service';
 import { NotificationsGateway } from '../../notifications/notifications.gateway';
+import { NotificationsService } from '../../notifications/notifications.service';
 import {
   RequestRideDto,
   CancelTripDto,
@@ -53,6 +54,7 @@ export class RidesService {
     private readonly driverStateService: DriverStateService,
     private readonly paymentInitService: PaymentInitService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly notificationsService: NotificationsService,
   ) { }
 
   // ========================================
@@ -503,11 +505,19 @@ export class RidesService {
 
     const ride = await this.prisma.ride.findUnique({
       where: { id: rideId },
-      include: { rider: { include: { vehicle: true } } },
+      include: { rider: { include: { vehicle: true } }, customer: { select: { name: true } } },
     });
 
     if (!ride?.rider)
       throw new InternalServerErrorException('Rider link failed');
+
+    // Admin Notification
+    await this.notificationsService.createForAdmin({
+      title: 'Ride Accepted',
+      message: `Driver ${ride.rider.name} accepted ride ${rideId.slice(0, 8)} for ${ride.customer?.name || 'customer'}.`,
+      type: 'RIDE',
+      metadata: { rideId, riderId, type: 'RIDE_ACCEPTED' },
+    });
 
     // Socket notification is handled by jobs.service.ts (canonical rider-side path).
     // This endpoint is for admin/legacy use only — do not double-emit DRIVER_ACCEPTED.
@@ -550,6 +560,14 @@ export class RidesService {
         status: RideStatus.IN_PROGRESS,
         startedAt: new Date(),
       },
+    });
+
+    // Admin Notification
+    await this.notificationsService.createForAdmin({
+      title: 'Ride Started',
+      message: `Ride ${rideId.slice(0, 8)} has started.`,
+      type: 'RIDE',
+      metadata: { rideId, type: 'RIDE_STARTED' },
     });
 
     // Socket notification (TRIP_STARTED) is handled by jobs.service.ts — do not double-emit.
@@ -598,11 +616,20 @@ export class RidesService {
         },
       });
 
+      // Admin Notification
+      await this.notificationsService.createForAdmin({
+        title: 'Ride Completed',
+        message: `Ride ${rideId.slice(0, 8)} was successfully completed.`,
+        type: 'RIDE',
+        metadata: { rideId, type: 'RIDE_COMPLETED' },
+      });
+
       // Post-ride payment model: driver earnings are recorded when the
       // customer's payment is confirmed via the Paystack webhook
       // (see payment-status.service.ts). No wallet update here.
 
       // Socket notification (TRIP_COMPLETED) is handled by jobs.service.ts — do not double-emit.
+      await this.common.logActivity(riderId, 'RIDE_COMPLETED', { rideId });
       return { message: 'Ride completed' };
     });
   }
@@ -802,7 +829,7 @@ export class RidesService {
     const statusFilter =
       status && allowedStatuses.includes(status) ? status : undefined;
 
-    return this.prisma.ride.findMany({
+    const rides = await this.prisma.ride.findMany({
       where: {
         customerId: userId,
         ...(statusFilter && { status: statusFilter as RideStatus }),
@@ -814,6 +841,9 @@ export class RidesService {
         id: true,
         status: true,
         totalFare: true,
+        scheduledFare: true,
+        isScheduled: true,
+        scheduledAt: true,
         distanceKm: true,
         durationMin: true,
         vehicleType: true,
@@ -860,6 +890,11 @@ export class RidesService {
         payment: { select: { status: true, method: true } },
       },
     });
+
+    return rides.map(r => ({
+      ...r,
+      total: Number(r.totalFare ?? r.scheduledFare ?? 0)
+    }));
   }
 
   async getDriverLocation(userId: string, rideId: string) {

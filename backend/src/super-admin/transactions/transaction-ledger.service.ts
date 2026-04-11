@@ -77,8 +77,15 @@ export class TransactionLedgerService {
             ...(payment.orderGroupId && { orderGroupId: payment.orderGroupId }),
           },
         },
-        // Already recorded — no-op on duplicate (idempotent)
-        update: {},
+        // Synchronize on update to handle late transitions (e.g. PENDING -> COMPLETED)
+        update: {
+          status: payment.status === 'COMPLETED' ? 'COMPLETED' : 'PENDING',
+          amount: payment.amount,
+          description,
+          orderId: payment.orderId,
+          rideId: payment.rideId,
+          orderGroupId: payment.orderGroupId,
+        },
       });
     }, tx);
   }

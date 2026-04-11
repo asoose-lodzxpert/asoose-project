@@ -102,16 +102,18 @@ export default function OrdersPage() {
             {/* ✅ FIX: Group Badge for Multi-Vendor Orders */}
             {row.original.groupId && (
               <div
-                className="flex items-center gap-1 w-fit px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 cursor-pointer hover:bg-purple-500/20 transition-colors"
-                title={`Part of Group Order #${row.original.groupId}`}
-                onClick={() => {
+                className="flex items-center gap-1.5 w-fit px-2 py-0.5 rounded-md bg-purple-500 text-white cursor-pointer hover:bg-purple-600 transition-colors shadow-sm"
+                title={`Multi-vendor Group Order #${row.original.groupId}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                   navigator.clipboard.writeText(row.original.groupId!);
                   toast.success("Group ID Copied");
                 }}
               >
-                <Layers size={10} className="text-purple-400" />
-                <span className="font-mono text-[9px] font-bold text-purple-400">
-                  GRP: {row.original.groupId.substring(0, 6)}
+                <Layers size={10} className="text-white" />
+                <span className="font-mono text-[9px] font-black uppercase tracking-tighter">
+                  GROUP
                 </span>
               </div>
             )}

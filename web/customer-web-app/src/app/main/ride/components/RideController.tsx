@@ -8,11 +8,26 @@ import { TripInProgress } from './TripInProgress';
 import { RatingModal } from './RatingModal';
 import { LocationSelector } from './LocationSelector';
 import { PostRidePayment } from './PostRidePayment';
-import { useReverseGeocoding } from '../hooks/useReverseGeocoding'; // Import Hook
+import { useReverseGeocoding } from '../hooks/useReverseGeocoding';
+import { RideSidebarTabs } from './RideSidebarTabs';
+import { ScheduledRideWizard } from './ScheduledRideWizard';
+import { ScheduledRidesList } from './ScheduledRidesList';
+import { useSearchParams } from 'next/navigation';
+import { useEffect } from 'react';
 
 export function RideController() {
+  const searchParams = useSearchParams();
+  const setActiveTab = useRideStore((state) => state.setActiveTab);
+  const t = searchParams.get('t');
+
+  useEffect(() => {
+    if (t === '1001') setActiveTab('request');
+    else if (t === '1002') setActiveTab('scheduled');
+    else if (t === '1003') setActiveTab('history');
+  }, [t, setActiveTab]);
   const rideStatus = useRideStore((state) => state.rideStatus);
   const isConfiguring = useRideStore((state) => state.isConfiguring);
+  const activeTab = useRideStore((state) => state.activeTab);
 
   // ✅ ACTIVATE REVERSE GEOCODING
   // This ensures that whenever the map updates coordinates, we fetch the address text
@@ -38,6 +53,15 @@ export function RideController() {
       return <RatingModal />;
     case 'idle':
     default:
-      return <RideSelection />;
+      return (
+        <div className="flex flex-col h-full bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800">
+          <RideSidebarTabs />
+          <div className="flex-1 overflow-y-auto">
+            {activeTab === 'request' && <RideSelection />}
+            {activeTab === 'scheduled' && <ScheduledRideWizard />}
+            {activeTab === 'history' && <ScheduledRidesList />}
+          </div>
+        </div>
+      );
   }
 }

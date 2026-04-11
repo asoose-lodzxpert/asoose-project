@@ -9,7 +9,7 @@ import React from 'react';
  */
 export function Sidebar({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-col h-full w-full bg-white dark:bg-zinc-900 shadow-2xl z-20 border-r border-zinc-200 dark:border-zinc-800 overflow-y-auto">
+    <div className="flex flex-col h-full w-full bg-white dark:bg-zinc-900 shadow-2xl z-20 border-r border-zinc-200 dark:border-zinc-800">
       {children}
     </div>
   );

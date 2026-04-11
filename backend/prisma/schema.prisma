@@ -100,6 +100,11 @@ enum RideStatus {
   CANCELLED_BY_USER   // Customer cancelled the ride
   CANCELLED_BY_DRIVER // Driver cancelled the ride
   CANCELLED_BY_SYSTEM // System cancelled (e.g. no driver found after exhausting retries)
+  
+  // ── Scheduled ride states ──
+  SCHEDULED             // Booking confirmed, driver not yet assigned
+  DRIVER_ASSIGNED_SCHED  // Driver assigned ahead of pickup time, pending acceptance
+  CANCELLED_SCHEDULED   // Cancelled before the driver was dispatched
 }
 
 enum DeliveryStatus {
@@ -413,6 +418,10 @@ model Rider {
   deliveries               Delivery[]     @relation("DeliveryRider")
   notifications            Notification[]
   notificationsPreferences Json? // Stores notification preferences
+
+  // Scheduled Ride Relations
+  shifts              DriverShift[]
+  unavailabilities    DriverUnavailability[]
 
   @@index([email])
   @@index([role])
@@ -971,10 +980,71 @@ model Ride {
   dropoffAddress Address  @relation("RideDropoff", fields: [dropoffAddressId], references: [id], onDelete: Restrict)
   payment        Payment? @relation("RidePayment")
 
+  // Scheduled Ride Fields
+  isScheduled          Boolean   @default(false)
+  scheduledAt          DateTime?
+  scheduledFare        Float?
+  cancellationDeadline DateTime?
+  assignmentWindowMin  Int?      @default(90)
+  estimatedDurationMin Int?
+  estimatedEndTime     DateTime?
+  assignedBy           String?   // SYSTEM | ADMIN | userId
+  lateCancellation     Boolean   @default(false)
+
+  reminders            ScheduledRideReminder[]
+
   @@index([customerId, status])
   @@index([riderId, status])
   @@index([status, createdAt])
   @@index([createdAt(sort: Desc)])
+  @@index([isScheduled, scheduledAt])
+  @@index([riderId, scheduledAt, estimatedEndTime])
+}
+
+model DriverUnavailability {
+  id         String   @id @default(uuid())
+  riderId    String
+  startsAt   DateTime
+  endsAt     DateTime
+  reason     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  rider Rider @relation(fields: [riderId], references: [id], onDelete: Cascade)
+
+  @@index([riderId, startsAt, endsAt])
+}
+
+model DriverShift {
+  id          String   @id @default(uuid())
+  riderId     String
+  dayOfWeek   Int?     // 0 (Sun) – 6 (Sat); null = applies every day
+  startTime   String   // "HH:MM" (WAT local time)
+  endTime     String   // "HH:MM" (WAT local time)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rider Rider @relation(fields: [riderId], references: [id], onDelete: Cascade)
+
+  @@index([riderId, dayOfWeek])
+}
+
+model ScheduledRideReminder {
+  id            String   @id @default(uuid())
+  rideId        String
+  channel       String   // "PUSH" | "SMS"
+  sentAt        DateTime?
+  scheduledFor  DateTime
+  minutesBefore Int
+  success       Boolean  @default(false)
+  bullJobId     String?
+  createdAt     DateTime @default(now())
+
+  ride Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
+
+  @@index([rideId])
+  @@index([scheduledFor, success])
 }
 
 model Delivery {

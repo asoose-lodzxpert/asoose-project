@@ -36,6 +36,8 @@ interface Ride {
   to: string;
   fare: string;
   status: string;
+  isScheduled?: boolean;
+  scheduledAt?: string;
   time: string; // ISO String
 }
 
@@ -173,9 +175,11 @@ export default function RidesPage() {
       return "bg-green-500/20 text-green-500 border-green-500/20";
     if (s === "IN PROGRESS" || s === "INPROGRESS")
       return "bg-blue-500/20 text-blue-400 border-blue-500/20";
+    if (s === "SCHEDULED")
+      return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20";
     if (s === "SEARCHING" || s === "REQUESTED")
-      return "bg-yellow-500/20 text-yellow-500 border-yellow-500/20";
-    if (s === "CANCELLED")
+      return "bg-zinc-500/20 text-zinc-400 border-zinc-500/20";
+    if (s === "CANCELLED" || s === "CANCELLED BY USER" || s === "CANCELLED BY DRIVER")
       return "bg-red-500/20 text-red-500 border-red-500/20";
     return "bg-gray-500/20 text-gray-400 border-gray-500/20";
   }, []);
@@ -229,8 +233,8 @@ export default function RidesPage() {
               </div>
             </div>
           ) : (
-            <span className="text-xs text-yellow-500 font-bold bg-yellow-500/10 px-2 py-1 rounded animate-pulse">
-              Searching...
+            <span className="text-xs text-gray-500 font-medium bg-gray-500/10 px-2 py-1 rounded">
+              Not Assigned
             </span>
           ),
       },
@@ -272,11 +276,18 @@ export default function RidesPage() {
         accessorKey: "status",
         header: "Status",
         cell: ({ row }) => (
-          <span
-            className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${getStatusColor(row.original.status)}`}
-          >
-            {row.original.status}
-          </span>
+          <div className="flex flex-col gap-1">
+            <span
+              className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border w-fit ${getStatusColor(row.original.status)}`}
+            >
+              {row.original.status.replace(/_/g, " ")}
+            </span>
+            {row.original.isScheduled && (
+              <span className="text-[9px] bg-yellow-500 text-black px-1.5 py-0.5 rounded font-black uppercase w-fit tracking-tighter">
+                Scheduled
+              </span>
+            )}
+          </div>
         ),
       },
       {
@@ -459,7 +470,7 @@ export default function RidesPage() {
                       <div className="flex justify-between">
                         <span className="text-gray-500">Driver:</span>
                         <span className="text-white">
-                          {ride.driver?.name || "Finding..."}
+                          {ride.driver?.name || "Not Assigned"}
                         </span>
                       </div>
                       <div className="flex justify-between">

@@ -15,9 +15,10 @@ import { Observable } from 'rxjs';
 import { VendorOrdersService } from './vendor-orders.service';
 import { VendorOrdersStreamService } from './vendor-orders-stream.service';
 import { UserRole } from '../../common/enums/user-role.enum';
-import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
-import { RolesGuard } from 'src/auth/roles.guards';
-import { Roles } from 'src/auth/roles.decorator';
+import { ADMIN_ROLES } from '../../auth/decorators/admin-roles.constant';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { RolesGuard } from '../../auth/roles.guards';
+import { Roles } from '../../auth/roles.decorator';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 @ApiTags('Vendor / Orders')
@@ -27,7 +28,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
   version: '1',
 })
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.VENDOR)
+@Roles(UserRole.VENDOR, ...ADMIN_ROLES)
 export class VendorOrdersController {
   private readonly logger = new Logger(VendorOrdersController.name);
 

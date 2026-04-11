@@ -3,6 +3,7 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { ADMIN_ROLES } from '../../auth/decorators/admin-roles.constant';
 import { NotificationService } from './notification.service';
 import { UpdateNotificationSettingsDto } from '../dto/update-notification-settings.dto';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
@@ -18,7 +19,7 @@ export class NotificationController {
 
   @ApiOperation({ summary: 'Get rider push notification settings' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
   @Get('settings')
   async getNotificationSettings(@Req() req) {
     const { id } = req.user || {};
@@ -27,7 +28,7 @@ export class NotificationController {
 
   @ApiOperation({ summary: 'Update rider push notification settings' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
   @Patch('settings')
   async updateNotificationSettings(
     @Req() req,

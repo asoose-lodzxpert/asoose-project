@@ -354,29 +354,50 @@ export class AuthService {
         });
 
         if (existingEmailUser) {
-          // Email exists but no appleId - this is a password-based account
-          // Don't auto-link for security - require email verification first
-          throw new ConflictException(
-            'An account with this email already exists. Please sign in with your password or reset it.',
+          // Auto-link: Apple has already verified ownership of this email address,
+          // so it is safe to link the Apple ID to the existing account.
+          // This mirrors the Google OAuth auto-link behaviour and prevents users
+          // from being locked out when they switch between sign-in methods.
+          if (existingEmailUser.status === 'SUSPENDED') {
+            throw new UnauthorizedException('Account is suspended');
+          }
+          if (existingEmailUser.status === 'BANNED') {
+            throw new UnauthorizedException('Account is banned');
+          }
+
+          user = await this.prisma.user.update({
+            where: { id: existingEmailUser.id },
+            data: { appleId: dto.appleId },
+          });
+          this.logger.log(
+            `Auto-linked Apple ID to existing account: ${dto.email}`,
           );
+        } else {
+          // Create new user with Apple auth
+          const fullName =
+            [dto.firstName, dto.lastName].filter(Boolean).join(' ').trim() ||
+            dto.email.split('@')[0];
+
+          user = await this.prisma.user.create({
+            data: {
+              email: dto.email,
+              appleId: dto.appleId,
+              password: '', // Empty password for OAuth-only users
+              name: fullName,
+              role: 'CUSTOMER',
+              verificationStatus: 'VERIFIED', // OAuth users are pre-verified
+              status: 'ACTIVE',
+            },
+          });
         }
-
-        // Create new user with Apple auth
-        const fullName =
-          [dto.firstName, dto.lastName].filter(Boolean).join(' ').trim() ||
-          dto.email.split('@')[0];
-
-        user = await this.prisma.user.create({
-          data: {
-            email: dto.email,
-            appleId: dto.appleId,
-            password: '', // Empty password for OAuth-only users
-            name: fullName,
-            role: 'CUSTOMER',
-            verificationStatus: 'VERIFIED', // OAuth users are pre-verified
-            status: 'ACTIVE',
-          },
-        });
+      } else {
+        // User found by appleId — enforce status before issuing tokens
+        if (user.status === 'SUSPENDED') {
+          throw new UnauthorizedException('Account is suspended');
+        }
+        if (user.status === 'BANNED') {
+          throw new UnauthorizedException('Account is banned');
+        }
       }
 
       // Generate JWT access and refresh tokens

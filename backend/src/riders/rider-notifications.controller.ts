@@ -14,6 +14,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guards';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
+import { ADMIN_ROLES } from '../auth/decorators/admin-roles.constant';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 @ApiTags('Rider / Notifications')
@@ -23,7 +24,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
   version: '1',
 })
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.RIDER, UserRole.DRIVER)
+@Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
 export class RiderNotificationsController {
   constructor(
     private readonly notificationsService: RiderNotificationsService,

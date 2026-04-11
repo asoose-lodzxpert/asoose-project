@@ -15,6 +15,7 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { ADMIN_ROLES } from '../../auth/decorators/admin-roles.constant';
 import { TripsService } from './trips.service';
 import {
   RequestRideDto,
@@ -34,7 +35,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
   version: '1',
 })
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.CUSTOMER)
+@Roles(UserRole.CUSTOMER, ...ADMIN_ROLES)
 export class TripsController {
   constructor(
     private readonly tripsService: TripsService,
@@ -201,7 +202,7 @@ export class TripsController {
   }
 
   @ApiOperation({ summary: 'Mark driver as arrived at pickup' })
-  @Roles(UserRole.RIDER, UserRole.DRIVER) // override class-level CUSTOMER — only drivers/riders can trigger arrival
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES) // override class-level CUSTOMER — only drivers/riders can trigger arrival
   @Patch('rides/:id/arrived')
   async driverArrived(@Request() req, @Param('id') rideId: string) {
     return this.tripsService.driverArrived(rideId, req.user.id);

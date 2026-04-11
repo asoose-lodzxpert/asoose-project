@@ -119,6 +119,8 @@ interface VendorDetails {
   updatedAt: string;
   isAdminManaged: boolean;
   storeType?: string;
+  city?: { id: string; name: string } | null;
+  cityId?: string | null;
 }
 
 type PayoutsResponse = { history: any[] } | any[];
@@ -252,6 +254,7 @@ export default function VendorDetailPage() {
     address: "",
     commissionRate: 20,
     storeType: "",
+    cityId: "",
   });
 
   // 1. Main Vendor Profile
@@ -274,6 +277,7 @@ export default function VendorDetailPage() {
             email: data.email,
             commissionRate: data.commissionRate ?? 20,
             storeType: data.storeType || "",
+            cityId: data.city?.id || "",
           });
         }
       },
@@ -291,6 +295,13 @@ export default function VendorDetailPage() {
     isEditing ? `/super-admin/vendors/store-types` : null,
     fetcher,
   );
+ 
+  // 2c. Cities list
+  const { data: citiesData } = useSWR<any>(
+    isEditing ? `/super-admin/cities` : null,
+    fetcher,
+  );
+  const cities = citiesData || [];
 
   // 3. Tab Specific Data
   const {
@@ -360,6 +371,7 @@ export default function VendorDetailPage() {
         email: vendor.email,
         commissionRate: vendor.commissionRate ?? 20,
         storeType: vendor.storeType || "",
+        cityId: vendor.city?.id || "",
       });
     }
     setAddressCoords(null);
@@ -394,6 +406,19 @@ export default function VendorDetailPage() {
       return;
     }
 
+    const result = await Swal.fire({
+      title: "Save Changes?",
+      text: "Are you sure you want to update this vendor's information?",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Yes, Save",
+      confirmButtonColor: "#10b981",
+      background: "#1E293B",
+      color: "#fff",
+    });
+
+    if (!result.isConfirmed) return;
+
     setIsSaving(true);
     try {
       const hasImages = logoFile || bannerFile;
@@ -412,6 +437,9 @@ export default function VendorDetailPage() {
         payload.append("commissionRate", String(formData.commissionRate));
         if (formData.storeType) {
           payload.append("storeType", formData.storeType);
+        }
+        if (formData.cityId) {
+          payload.append("cityId", formData.cityId);
         }
         if (addressCoords) {
           payload.append("lat", String(addressCoords.lat));
@@ -877,13 +905,12 @@ export default function VendorDetailPage() {
             formData={formData}
             isEditing={isEditing}
             storeTypes={storeTypes || []}
-            onFormChange={(data) =>
-              setFormData((prev) => ({ ...prev, ...data }))
-            }
+            cities={cities}
+            onFormChange={setFormData}
             addressCoords={addressCoords}
-            onAddressChange={(text, coords) => {
-              setFormData((prev) => ({ ...prev, address: text }));
-              setAddressCoords(coords);
+            onAddressChange={(address, coords) => {
+              setFormData((prev) => ({ ...prev, address }));
+              if (coords) setAddressCoords(coords);
             }}
           />
         </div>

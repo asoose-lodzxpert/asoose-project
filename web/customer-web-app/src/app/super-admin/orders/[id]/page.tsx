@@ -33,8 +33,9 @@ import { formatDateOnly, formatTimeOnly } from "@/utils/formatDate";
 // --- Types ---
 interface OrderDetail {
   id: string;
-  groupId?: string; // ✅ Multi-vendor context
-  deliveryId?: string; // ✅ Linked delivery ID for rider assignment
+  groupId?: string; 
+  groupStatus?: string; // New: Derived status for the whole group
+  deliveryId?: string; 
   serviceType: string;
   status: string;
   amount: number;
@@ -54,14 +55,31 @@ interface OrderDetail {
     quantity: number;
     price: number;
     options?: any;
-    modifiers?: { name: string; price: number }[]; // ✅ Added modifiers support
+    modifiers?: { name: string; price: number }[];
     image?: string;
+  }[];
+  // ✅ New: Added subOrders for multi-vendor grouping
+  subOrders?: {
+    id: string;
+    storeName: string;
+    status: string;
+    amount: number;
+    items: {
+      name: string;
+      quantity: number;
+      price: number;
+      options?: any;
+      modifiers?: { name: string; price: number }[];
+    }[];
+    delivery?: {
+      rider?: { name: string; phone: string };
+    };
   }[];
   payment: {
     status: string;
     method: string;
     total: number;
-    isGroupPayment?: boolean; // ✅ Detects if payment was a multi-cart transaction
+    isGroupPayment?: boolean;
   };
   logs: { date: string; user: string; action: string; details?: string }[];
 }
@@ -233,7 +251,7 @@ export default function OrderDetailsPage() {
             )}
           </div>
           <p className="text-gray-400 text-xs mt-1">
-            Status: <span className="text-white font-bold">{order.status}</span>
+            Status: <span className="text-white font-bold">{order.groupStatus || order.status}</span>
           </p>
         </div>
 
@@ -281,70 +299,117 @@ export default function OrderDetailsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* LEFT COLUMN */}
         <div className="lg:col-span-2 space-y-6 min-w-0">
-          <div className="bg-[#1E293B] border border-slate-800 rounded-xl overflow-hidden shadow-sm">
-            <div className="p-4 md:p-5 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
-              <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <Package className="w-4 h-4 text-yellow-500" /> Items Breakdown
-              </h2>
-              <span className="text-[10px] font-bold text-gray-400 bg-slate-900 px-2 py-1 rounded border border-slate-800 uppercase">
-                {order.serviceType}
-              </span>
-            </div>
-            <div className="p-4 md:p-5 divide-y divide-slate-800">
-              {order.items.map((item, i) => (
-                <div
-                  key={i}
-                  className="py-4 flex items-start justify-between gap-3 md:gap-4"
-                >
-                  <div className="flex items-start gap-3 md:gap-4 flex-1 min-w-0">
-                    <div className="w-12 h-12 md:w-14 md:h-14 bg-slate-900 rounded-lg flex items-center justify-center border border-slate-800 overflow-hidden flex-shrink-0">
-                      {item.image ? (
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Package className="w-5 h-5 text-slate-700" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-bold truncate pr-2">
-                        {item.name}
-                      </p>
-                      <p className="text-gray-500 text-[10px] font-medium uppercase truncate">
-                        {renderItemDetails(item)}
-                      </p>
-                      <span className="text-yellow-500 text-[10px] font-bold md:hidden">
-                        x{item.quantity}
-                      </span>
-                    </div>
+          {order.subOrders && order.subOrders.length > 0 ? (
+            order.subOrders.map((sub, idx) => (
+              <div key={sub.id} className="bg-[#1E293B] border border-slate-800 rounded-xl overflow-hidden shadow-sm mb-6 last:mb-0">
+                <div className="p-4 md:p-5 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
+                  <div className="flex flex-col">
+                    <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                      <Package className="w-4 h-4 text-yellow-500" /> {sub.storeName}
+                    </h2>
+                    <span className="text-[10px] text-gray-500 font-mono mt-0.5">#{sub.id.substring(0, 8).toUpperCase()}</span>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-white text-sm font-bold">
-                      <Currency amount={item.price * item.quantity} />
-                    </p>
-                    <p className="text-gray-500 text-[10px] font-bold hidden md:block">
-                      <Currency amount={item.price} /> Each
-                    </p>
-                    <p className="text-gray-500 text-[10px] font-bold hidden md:block">
-                      Qty: {item.quantity}
-                    </p>
-                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-1 rounded border uppercase ${
+                    sub.status === 'DELIVERED' ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' : 'text-blue-500 bg-blue-500/10 border-blue-500/20'
+                  }`}>
+                    {sub.status}
+                  </span>
                 </div>
-              ))}
-            </div>
-            <div className="bg-slate-900/50 p-4 md:p-5 space-y-2 border-t border-slate-800">
-              <div className="flex justify-between items-center pt-2">
-                <span className="text-sm font-bold text-white uppercase">
-                  Order Total
-                </span>
-                <span className="text-xl font-bold text-yellow-500">
-                  <Currency amount={order.amount} />
+                <div className="p-4 md:p-5 divide-y divide-slate-800">
+                  {sub.items.map((item, i) => (
+                    <div key={i} className="py-4 flex items-start justify-between gap-3 md:gap-4">
+                      <div className="flex items-start gap-4 flex-1 min-w-0">
+                        <div className="w-12 h-12 bg-slate-900 rounded-lg flex items-center justify-center border border-slate-800 flex-shrink-0">
+                          <Package className="w-5 h-5 text-slate-700" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white text-sm font-bold truncate">{item.name}</p>
+                          <p className="text-gray-500 text-[10px] font-medium uppercase truncate">
+                            {renderItemDetails(item as any)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-white text-sm font-bold">
+                          <Currency amount={item.price * item.quantity} />
+                        </p>
+                        <p className="text-gray-500 text-[10px] font-bold">x{item.quantity}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-slate-900/50 p-4 border-t border-slate-800 flex justify-between items-center">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Vendor Subtotal</span>
+                  <span className="text-sm font-bold text-white"><Currency amount={sub.amount} /></span>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="bg-[#1E293B] border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+              <div className="p-4 md:p-5 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
+                <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <Package className="w-4 h-4 text-yellow-500" /> Items Breakdown
+                </h2>
+                <span className="text-[10px] font-bold text-gray-400 bg-slate-900 px-2 py-1 rounded border border-slate-800 uppercase">
+                  {order.serviceType}
                 </span>
               </div>
+              <div className="p-4 md:p-5 divide-y divide-slate-800">
+                {order.items.map((item, i) => (
+                  <div
+                    key={i}
+                    className="py-4 flex items-start justify-between gap-3 md:gap-4"
+                  >
+                    <div className="flex items-start gap-3 md:gap-4 flex-1 min-w-0">
+                      <div className="w-12 h-12 md:w-14 md:h-14 bg-slate-900 rounded-lg flex items-center justify-center border border-slate-800 overflow-hidden flex-shrink-0">
+                        {item.image ? (
+                          <img
+                            src={item.image}
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Package className="w-5 h-5 text-slate-700" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-sm font-bold truncate pr-2">
+                          {item.name}
+                        </p>
+                        <p className="text-gray-500 text-[10px] font-medium uppercase truncate">
+                          {renderItemDetails(item)}
+                        </p>
+                        <span className="text-yellow-500 text-[10px] font-bold md:hidden">
+                          x{item.quantity}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-white text-sm font-bold">
+                        <Currency amount={item.price * item.quantity} />
+                      </p>
+                      <p className="text-gray-500 text-[10px] font-bold hidden md:block">
+                        <Currency amount={item.price} /> Each
+                      </p>
+                      <p className="text-gray-500 text-[10px] font-bold hidden md:block">
+                        Qty: {item.quantity}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-slate-900/50 p-4 md:p-5 space-y-2 border-t border-slate-800">
+                <div className="flex justify-between items-center pt-2">
+                  <span className="text-sm font-bold text-white uppercase">
+                    Order Total
+                  </span>
+                  <span className="text-xl font-bold text-yellow-500">
+                    <Currency amount={order.amount} />
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Activity Timeline */}
           <div className="bg-[#1E293B] border border-slate-800 rounded-xl p-4 md:p-5 shadow-sm">
@@ -432,61 +497,86 @@ export default function OrderDetailsPage() {
               <Navigation className="w-4 h-4 text-purple-500" /> Fulfillment
             </h2>
             <div className="space-y-4">
-              <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-800 min-w-0">
-                <p className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-1">
-                  Store / Vendor
-                </p>
-                <p className="text-white font-bold text-sm mb-1 truncate">
-                  {order.vendor.name}
-                </p>
-                <p className="text-gray-500 text-[10px] font-bold">
-                  {order.vendor.ownerPhone}
-                </p>
-                <a
-                  href={`tel:${order.vendor.ownerPhone}`}
-                  className="block w-full mt-3 py-2 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-lg text-[10px] font-bold text-center uppercase hover:bg-purple-500 hover:text-white transition-all"
-                >
-                  Call Vendor
-                </a>
-              </div>
-
-              {order.rider ? (
-                <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-800 min-w-0">
-                  <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">
-                    Logistics / Rider
-                  </p>
-                  <p className="text-white font-bold text-sm mb-1 truncate">
-                    {order.rider.name}
-                  </p>
-                  <p className="text-gray-500 text-[10px] font-bold truncate">
-                    {order.rider.vehicle} • {order.rider.phone}
-                  </p>
-                  <a
-                    href={`tel:${order.rider.phone}`}
-                    className="block w-full mt-3 py-2 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-lg text-[10px] font-bold text-center uppercase hover:bg-blue-500 hover:text-white transition-all"
-                  >
-                    Call Rider
-                  </a>
-                </div>
-              ) : (
-                <div className="p-5 border border-dashed border-slate-700 rounded-xl text-center bg-slate-900/20">
-                  <p className="text-gray-500 text-[10px] font-bold uppercase mb-3">
-                    No Rider Assigned
-                  </p>
-                  {order.deliveryId ? (
-                    <button
-                      onClick={() => setShowAssignModal(true)}
-                      disabled={order.payment?.status !== "PAID" && order.payment?.status !== "COMPLETED"}
-                      className="w-full py-2 bg-yellow-500 text-slate-900 text-[10px] font-bold rounded-lg uppercase tracking-wider hover:bg-yellow-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Assign Rider
-                    </button>
-                  ) : (
-                    <p className="text-gray-600 text-[10px] italic">
-                      No linked delivery found
+              {order.subOrders && order.subOrders.length > 0 ? (
+                order.subOrders.map((sub) => (
+                  <div key={sub.id} className="p-4 bg-slate-900/50 rounded-lg border border-slate-800 min-w-0">
+                    <p className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-1">
+                      {sub.storeName}
                     </p>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-[10px] text-gray-500 font-mono">#{sub.id.substring(0, 8).toUpperCase()}</span>
+                      <span className="text-[10px] text-white font-bold">{sub.status}</span>
+                    </div>
+                    
+                    {sub.delivery?.rider ? (
+                      <div className="mt-2 py-2 border-t border-slate-800">
+                        <p className="text-[10px] text-blue-400 font-bold uppercase truncate">Rider: {sub.delivery.rider.name}</p>
+                        <p className="text-[9px] text-gray-500">{sub.delivery.rider.phone}</p>
+                      </div>
+                    ) : (
+                      <div className="mt-2 text-[10px] text-gray-600 italic">No Rider Assigned</div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <>
+                  <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-800 min-w-0">
+                    <p className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-1">
+                      Store / Vendor
+                    </p>
+                    <p className="text-white font-bold text-sm mb-1 truncate">
+                      {order.vendor.name}
+                    </p>
+                    <p className="text-gray-500 text-[10px] font-bold">
+                      {order.vendor.ownerPhone}
+                    </p>
+                    <a
+                      href={`tel:${order.vendor.ownerPhone}`}
+                      className="block w-full mt-3 py-2 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-lg text-[10px] font-bold text-center uppercase hover:bg-purple-500 hover:text-white transition-all"
+                    >
+                      Call Vendor
+                    </a>
+                  </div>
+
+                  {order.rider ? (
+                    <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-800 min-w-0">
+                      <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">
+                        Logistics / Rider
+                      </p>
+                      <p className="text-white font-bold text-sm mb-1 truncate">
+                        {order.rider.name}
+                      </p>
+                      <p className="text-gray-500 text-[10px] font-bold truncate">
+                        {order.rider.vehicle} • {order.rider.phone}
+                      </p>
+                      <a
+                        href={`tel:${order.rider.phone}`}
+                        className="block w-full mt-3 py-2 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-lg text-[10px] font-bold text-center uppercase hover:bg-blue-500 hover:text-white transition-all"
+                      >
+                        Call Rider
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="p-5 border border-dashed border-slate-700 rounded-xl text-center bg-slate-900/20">
+                      <p className="text-gray-500 text-[10px] font-bold uppercase mb-3">
+                        No Rider Assigned
+                      </p>
+                      {order.deliveryId ? (
+                        <button
+                          onClick={() => setShowAssignModal(true)}
+                          disabled={order.payment?.status !== "PAID" && order.payment?.status !== "COMPLETED"}
+                          className="w-full py-2 bg-yellow-500 text-slate-900 text-[10px] font-bold rounded-lg uppercase tracking-wider hover:bg-yellow-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Assign Rider
+                        </button>
+                      ) : (
+                        <p className="text-gray-600 text-[10px] italic">
+                          No linked delivery found
+                        </p>
+                      )}
+                    </div>
                   )}
-                </div>
+                </>
               )}
             </div>
           </div>

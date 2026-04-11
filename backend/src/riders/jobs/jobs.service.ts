@@ -41,6 +41,8 @@ function rideStatusToJobStatus(status: RideStatus): string {
       return 'at-pickup';
     case RideStatus.IN_PROGRESS:
       return 'en-route-dropoff';
+    case (RideStatus as any).DRIVER_ASSIGNED_SCHED:
+      return 'incoming-job';
     default:
       return 'online-waiting';
   }
@@ -144,6 +146,7 @@ export class JobsService {
         RideStatus.DRIVER_ACCEPTED,
         RideStatus.PAID,
         RideStatus.IN_PROGRESS,
+        (RideStatus as any).DRIVER_ASSIGNED_SCHED,
         // Legacy statuses kept for backward compatibility
         RideStatus.REQUESTED,
         RideStatus.ACCEPTED,

@@ -16,6 +16,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guards';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
+import { ADMIN_ROLES } from '../auth/decorators/admin-roles.constant';
 import { UsersService } from './users.service';
 import { OrdersService } from './orders.service'; // Import OrdersService
 import { CreateAddressDto, CreateOrderDto } from './dto/users.dto';
@@ -32,14 +33,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
   version: '1',
 })
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(
-  UserRole.CUSTOMER,
-  UserRole.ADMIN,
-  UserRole.SUPER_ADMIN,
-  UserRole.ADMIN_MANAGER,
-  UserRole.ADMIN_SUPPORT,
-  UserRole.ADMIN_FINANCE,
-)
+@Roles(UserRole.CUSTOMER, ...ADMIN_ROLES)
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,

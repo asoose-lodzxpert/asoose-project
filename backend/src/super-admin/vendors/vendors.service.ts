@@ -189,6 +189,7 @@ export class StoresService {
           },
           reviews: { orderBy: { createdAt: 'desc' }, take: 10 },
           vendorPayouts: { orderBy: { createdAt: 'desc' }, take: 10 },
+          city: { select: { id: true, name: true } },
         },
       });
 
@@ -459,6 +460,7 @@ export class StoresService {
             : undefined,
         logo: logoUrl,
         banner: bannerUrl,
+        cityId: dto.cityId || undefined,
         vendor:
           dto.ownerName || dto.phone || dto.email || vendorImageUrl
             ? {
@@ -618,6 +620,7 @@ export class StoresService {
       totalOrders: store.orders.length,
       reviewsCount: store.reviews.length,
       isAdminManaged: store.isAdminManaged ?? false,
+      city: store.city ? { id: store.city.id, name: store.city.name } : null,
 
       orders: store.orders.map((order: any) => ({
         id: order.id,
