@@ -33,6 +33,8 @@ import { formatDateTime, formatTimeOnly } from "@/utils/formatDate";
 interface RideDetail {
   id: string;
   status: string;
+  isScheduled?: boolean;
+  scheduledAt?: string;
   date: string;
   pickup: {
     address: string;
@@ -64,6 +66,7 @@ interface RideDetail {
     base: string;
     distance: string;
     time: string;
+    platformFee: string;
     discount: string;
     total: string;
     method: string;
@@ -364,8 +367,13 @@ export default function RideDetailPage() {
                       : "bg-blue-500/10 text-blue-500 border-blue-500/20 border"
                 }`}
               >
-                {ride.status.replace("_", " ")}
+                {ride.status.replace(/_/g, " ")}
               </span>
+              {ride.isScheduled && (
+                <span className="px-3 py-1 rounded-full text-sm font-black uppercase bg-yellow-500 text-black shadow-lg shadow-yellow-500/20">
+                  Scheduled
+                </span>
+              )}
             </div>
             <p className="text-gray-400 text-sm font-mono mt-1">
               ID: {ride.id} • {formatDateTime(ride.date)}
@@ -704,8 +712,16 @@ export default function RideDetailPage() {
                   <span className="text-white">{ride.fare.base}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Distance</span>
+                  <span className="text-gray-400">Distance Fee</span>
                   <span className="text-white">{ride.fare.distance}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Time Fee</span>
+                  <span className="text-white">{ride.fare.time}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-orange-400">Platform Fee</span>
+                  <span className="text-orange-400">{ride.fare.platformFee}</span>
                 </div>
                 <div className="flex justify-between text-green-500">
                   <span>Discount</span>

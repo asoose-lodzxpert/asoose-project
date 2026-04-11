@@ -17,6 +17,7 @@ interface BusinessInfoCardProps {
   formData: any;
   isEditing: boolean;
   storeTypes: string[];
+  cities: any[];
   onFormChange: (data: any) => void;
   addressCoords: { lat: number; lng: number } | null;
   onAddressChange: (text: string, coords: { lat: number; lng: number } | null) => void;
@@ -27,6 +28,7 @@ const BusinessInfoCard = ({
   formData,
   isEditing,
   storeTypes,
+  cities,
   onFormChange,
   addressCoords,
   onAddressChange,
@@ -164,6 +166,31 @@ const BusinessInfoCard = ({
               <span className="leading-tight">
                 {vendor.address || "No address set"}
               </span>
+            )}
+          </div>
+
+          {/* City */}
+          <div className="flex items-center gap-3 text-sm text-gray-300">
+            <Store className="w-4 h-4 text-gray-500 shrink-0" />
+            {isEditing ? (
+              <select
+                value={formData.cityId || ""}
+                onChange={(e) =>
+                  onFormChange({ ...formData, cityId: e.target.value })
+                }
+                className="bg-[#1E293B] border border-gray-700 text-white text-xs rounded px-2 py-1.5 w-full focus:border-yellow-500 focus:outline-none appearance-none cursor-pointer"
+              >
+                <option value="" disabled>
+                  Select city…
+                </option>
+                {cities.map((city) => (
+                  <option key={city.id} value={city.id}>
+                    {city.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span>{vendor.city?.name || "No city set"}</span>
             )}
           </div>
 

@@ -43,6 +43,7 @@ export async function middleware(req: NextRequest) {
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/settings/maintenance-mode`,
+        { signal: AbortSignal.timeout(3000) },
       );
 
       if (res.ok) {

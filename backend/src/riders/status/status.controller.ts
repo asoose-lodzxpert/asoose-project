@@ -11,6 +11,7 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { ADMIN_ROLES } from '../../auth/decorators/admin-roles.constant';
 import { StatusService } from './status.service';
 import { UpdateRiderStatusDto } from '../dto/update-status.dto';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
@@ -28,7 +29,7 @@ export class StatusController {
     summary: 'Set rider status to online and broadcast location',
   })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
   @Post('online')
   async goOnline(
     @Req() req,
@@ -40,7 +41,7 @@ export class StatusController {
 
   @ApiOperation({ summary: 'Set rider status to offline' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
   @Post('offline')
   async goOffline(@Req() req) {
     const { id, role } = req.user || {};
@@ -49,7 +50,7 @@ export class StatusController {
 
   @ApiOperation({ summary: 'Update online status and/or current coordinates' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
   @Patch('update')
   async updateStatus(@Req() req, @Body() dto: UpdateRiderStatusDto) {
     const { id } = req.user || {};
@@ -58,7 +59,7 @@ export class StatusController {
 
   @ApiOperation({ summary: 'Get current realtime status of the rider' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
   @Get('me')
   async getRealtimeStatus(@Req() req) {
     const { id } = req.user || {};

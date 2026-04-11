@@ -98,6 +98,7 @@ export class FareService {
     const businessPrice = Math.round(economyPrice * 1.5);
 
     const price = dto.vehicleType === 'BUSINESS' ? businessPrice : economyPrice;
+    const platformFee = Math.round(price * 0.2);
 
     return {
       price,
@@ -105,8 +106,14 @@ export class FareService {
       businessPrice,
       isNightRate,
       nightSurchargePerKm: isNightRate ? nightSurchargePerKm : undefined,
-      distance: { meters: distanceMeters, text: distanceText },
+      distance: { meters: distanceMeters, text: distanceText, value: distanceKm },
       eta: { seconds: durationSeconds, text: durationText },
+      breakdown: {
+        baseFare: baseRideFare,
+        distanceFare: variableFare,
+        timeFare: 0,
+        platformFee,
+      }
     };
   }
 

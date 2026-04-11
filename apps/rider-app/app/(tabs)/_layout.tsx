@@ -83,6 +83,17 @@ export default function TabLayout() {
         }}
       />
 
+      {/* Upcoming Scheduled Rides */}
+      <Tabs.Screen
+        name="scheduled"
+        options={{
+          title: "Upcoming",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="calendar" color={color} />
+          ),
+        }}
+      />
+
       {/* Earnings */}
       <Tabs.Screen
         name="earnings"

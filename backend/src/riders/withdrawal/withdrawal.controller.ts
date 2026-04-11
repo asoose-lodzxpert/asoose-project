@@ -3,6 +3,7 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { ADMIN_ROLES } from '../../auth/decorators/admin-roles.constant';
 import { WithdrawalService } from './withdrawal.service';
 import { CreateWithdrawalDto } from '../dto/create-withdrawal.dto';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
@@ -20,7 +21,7 @@ export class WithdrawalController {
     summary: 'Get rider wallet and bank account info for withdrawal',
   })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
   @Get('info')
   async getWithdrawalInfo(@Req() req) {
     const { id } = req.user || {};
@@ -29,7 +30,7 @@ export class WithdrawalController {
 
   @ApiOperation({ summary: 'Request a wallet withdrawal to bank account' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
   @Post('request')
   async requestWithdrawal(
     @Req() req,

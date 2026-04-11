@@ -64,8 +64,7 @@ export class RidesService {
 
     // Build Search Query
     const where: Prisma.RideWhereInput = {
-      // Only show rides with a completed (paid) payment
-      payment: { status: 'COMPLETED' },
+      // Show all rides for admin, not just paid ones
       ...(search && {
         OR: [
           { id: { contains: search, mode: 'insensitive' } },
@@ -342,7 +341,10 @@ export class RidesService {
 
   // 🛠️ Transformers
 
-  private transformRideForList(ride: RideWithListRelations) {
+  private transformRideForList = (ride: RideWithListRelations) => {
+    const isScheduled = ride.isScheduled || ride.status === 'SCHEDULED' || ride.status === 'DRIVER_ASSIGNED_SCHED';
+    const total = ride.totalFare ?? ride.scheduledFare ?? 0;
+    
     return {
       id: ride.id,
       driver: ride.rider
@@ -357,43 +359,34 @@ export class RidesService {
       passenger: ride.customer.name,
       from: ride.pickupAddress.street,
       to: ride.dropoffAddress.street,
-      fare: ride.totalFare ? `$${ride.totalFare.toFixed(2)}` : '-',
-      status:
-        ride.status === 'IN_PROGRESS'
-          ? 'In Progress'
-          : ride.status.charAt(0) + ride.status.slice(1).toLowerCase(),
+      fare: total ? `₦${total.toLocaleString()}` : '-',
+      status: ride.status,
+      isScheduled,
+      scheduledAt: ride.scheduledAt,
       time: ride.createdAt.toISOString(),
     };
   }
 
-  private transformRideForDetail(ride: RideWithDetailRelations) {
+  private transformRideForDetail = (ride: RideWithDetailRelations) => {
+    const isScheduled = ride.isScheduled || ["SCHEDULED", "DRIVER_ASSIGNED_SCHED"].includes(ride.status);
+    const total = ride.totalFare ?? ride.scheduledFare ?? 0;
+
     return {
       id: ride.id,
-      status:
-        ride.status === 'IN_PROGRESS'
-          ? 'In Progress'
-          : ride.status.charAt(0) + ride.status.slice(1).toLowerCase(),
-      date: ride.createdAt.toLocaleDateString(),
+      status: ride.status,
+      isScheduled,
+      scheduledAt: ride.scheduledAt,
+      date: ride.createdAt.toISOString(),
 
       pickup: {
         address: `${ride.pickupAddress.street}, ${ride.pickupAddress.city}`,
-        time: ride.startedAt
-          ? ride.startedAt.toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-          : '-',
+        time: ride.startedAt?.toISOString() || ride.scheduledAt?.toISOString() || ride.createdAt.toISOString(),
         coords: { lat: ride.pickupAddress.lat, lng: ride.pickupAddress.lng },
       },
 
       dropoff: {
         address: `${ride.dropoffAddress.street}, ${ride.dropoffAddress.city}`,
-        time: ride.completedAt
-          ? ride.completedAt.toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-          : 'Est',
+        time: ride.completedAt?.toISOString() || null,
         coords: { lat: ride.dropoffAddress.lat, lng: ride.dropoffAddress.lng },
       },
 
@@ -420,34 +413,44 @@ export class RidesService {
       },
 
       fare: {
-        base: ride.baseFare ? `$${ride.baseFare.toFixed(2)}` : '-',
-        distance: ride.distanceFare ? `$${ride.distanceFare.toFixed(2)}` : '-',
-        time: ride.timeFare ? `$${ride.timeFare.toFixed(2)}` : '-',
-        discount: '$0.00',
-        total: ride.totalFare ? `$${ride.totalFare.toFixed(2)}` : '-',
+        base: ride.baseFare ? `₦${ride.baseFare.toLocaleString()}` : '₦0',
+        distance: ride.distanceFare ? `₦${ride.distanceFare.toLocaleString()}` : '₦0',
+        time: ride.timeFare ? `₦${ride.timeFare.toLocaleString()}` : '₦0',
+        platformFee: ride.platformFee ? `₦${ride.platformFee.toLocaleString()}` : '₦0',
+        discount: '₦0',
+        total: `₦${total.toLocaleString()}`,
         method: ride.payment?.method ?? 'N/A',
       },
 
       timeline: [
         {
           status: 'Ride Requested',
-          time: ride.createdAt.toLocaleTimeString(),
+          time: ride.createdAt.toISOString(),
           done: true,
         },
+        ...(isScheduled ? [{
+          status: 'Ride Scheduled',
+          time: ride.scheduledAt?.toISOString(),
+          done: true,
+          active: ride.status === 'SCHEDULED'
+        }] : []),
         {
           status: 'Driver Assigned',
-          time: ride.acceptedAt?.toLocaleTimeString() || '-',
+          time: ride.acceptedAt?.toISOString() || '-',
           done: !!ride.acceptedAt,
+          active: ride.status === 'ACCEPTED' || ride.status === 'DRIVER_ASSIGNED_SCHED'
         },
         {
           status: 'Trip Started',
-          time: ride.startedAt?.toLocaleTimeString() || '-',
+          time: ride.startedAt?.toISOString() || '-',
           done: !!ride.startedAt,
+          active: ride.status === 'IN_PROGRESS'
         },
         {
           status: 'Trip Completed',
-          time: ride.completedAt?.toLocaleTimeString() || '-',
+          time: ride.completedAt?.toISOString() || '-',
           done: !!ride.completedAt,
+          active: ride.status === 'COMPLETED'
         },
       ],
     };

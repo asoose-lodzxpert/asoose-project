@@ -243,13 +243,24 @@ export class UsersService {
         take: 50,
       });
 
-      return rides.map((r) => ({
-        id: r.id,
-        status: r.status,
-        total: r.totalFare,
-        createdAt: r.createdAt,
-        description: `Ride to ${r.dropoffAddress.street || r.dropoffAddress.city || 'Unknown location'}`,
-      }));
+      return rides.map((r) => {
+        const isScheduled = r.isScheduled || r.status === 'SCHEDULED' || r.status === 'DRIVER_ASSIGNED_SCHED';
+        
+        // Robust total calculation: prioritize totalFare, fallback to scheduledFare, then platform default
+        const totalValue = r.totalFare ?? r.scheduledFare ?? 0;
+        
+        return {
+          id: r.id,
+          status: r.status,
+          total: Number(totalValue),
+          createdAt: r.createdAt,
+          isScheduled,
+          scheduledAt: r.scheduledAt,
+          description: isScheduled 
+            ? `Scheduled ride to ${r.dropoffAddress?.street || r.dropoffAddress?.city || 'Unknown'}`
+            : `Ride to ${r.dropoffAddress?.street || r.dropoffAddress?.city || 'Unknown'}`,
+        };
+      });
     } catch (error) {
       this.logger.error(
         `Failed to fetch rides for user ${userId}`,

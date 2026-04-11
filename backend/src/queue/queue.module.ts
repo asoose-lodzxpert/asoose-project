@@ -10,6 +10,9 @@ import { BullModule } from '@nestjs/bullmq';
       { name: 'notification' },
       { name: 'assignment-timeout' },
       { name: 'email' },
+      { name: 'scheduled-ride-assignment' },
+      { name: 'scheduled-ride-reminder' },
+      { name: 'scheduled-ride-health' },
     ),
   ],
 })

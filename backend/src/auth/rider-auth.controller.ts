@@ -21,6 +21,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guards';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
+import { ADMIN_ROLES } from '../auth/decorators/admin-roles.constant';
 import { CreateRiderDto } from '../auth/dto/create-rider.dto';
 import { ResetPasswordDto } from '../auth/dto/reset-password.dto';
 import { UpdateProfileDto } from '../auth/dto/update-profile.dto';
@@ -39,7 +40,7 @@ export class RiderAuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Get('me')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
   async getMe(@Req() req) {
     // Get rider id or email from JWT token
     const { id, email } = req.user || {};
@@ -100,7 +101,7 @@ export class RiderAuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Patch('profile')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
   updateProfile(@Body() dto: UpdateProfileDto, @Req() req) {
     return this.riderAuthService.updateRiderProfile(req.user.id, dto);
   }
@@ -133,7 +134,7 @@ export class RiderAuthController {
   @ApiResponse({ status: 200, description: 'Preferences returned' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
   @Get('notifications-preferences')
   async getNotificationsPreferences(@Req() req) {
     const { id } = req.user || {};
@@ -145,7 +146,7 @@ export class RiderAuthController {
   @ApiResponse({ status: 200, description: 'Preferences updated' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
   @Put('notifications-preferences')
   async updateNotificationsPreferences(@Req() req, @Body() body) {
     const { id } = req.user || {};
@@ -157,7 +158,7 @@ export class RiderAuthController {
   @ApiResponse({ status: 200, description: 'Vehicle details updated' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
   @Put('vehicle-details')
   async updateVehicleDetails(@Req() req, @Body() body) {
     const { id } = req.user || {};
@@ -169,7 +170,7 @@ export class RiderAuthController {
   @ApiResponse({ status: 200, description: 'Documents updated' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
   @Put('documents')
   async updateDocuments(@Req() req, @Body() body) {
     const { id } = req.user || {};
@@ -181,7 +182,7 @@ export class RiderAuthController {
   @ApiResponse({ status: 200, description: 'Full rider details returned' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
   @Get('details')
   async getRiderDetails(@Req() req) {
     const { id } = req.user || {};
@@ -193,7 +194,7 @@ export class RiderAuthController {
   @ApiResponse({ status: 200, description: 'OTP sent to registered email' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
   @Post('send-change-password-otp')
   async sendChangePasswordOtp(@Req() req) {
     const { email } = req.user || {};
@@ -206,7 +207,7 @@ export class RiderAuthController {
   @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
   @Post('verify-change-password-otp')
   async verifyChangePasswordOtp(@Req() req, @Body() body: { otp: string }) {
     const { email } = req.user || {};
@@ -220,7 +221,7 @@ export class RiderAuthController {
   @ApiResponse({ status: 400, description: 'Invalid OTP or weak password' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
   @Post('change-password')
   async changePassword(
     @Req() req,
@@ -239,7 +240,7 @@ export class RiderAuthController {
   @ApiResponse({ status: 200, description: 'Push token saved' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
   @Post('push-token')
   async savePushToken(
     @Req() req,
@@ -254,7 +255,7 @@ export class RiderAuthController {
   @ApiResponse({ status: 200, description: 'Push token removed' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
   @Delete('push-token')
   async deletePushToken(@Req() req) {
     const { id } = req.user || {};

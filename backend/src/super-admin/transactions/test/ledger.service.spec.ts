@@ -69,4 +69,33 @@ describe('TransactionLedgerService', () => {
       }),
     );
   });
+
+  it('should update status of existing PENDING transaction to COMPLETED on recordPayment calls', async () => {
+    // 1. Setup mock for upsert
+    mockPrisma.transaction.upsert = jest.fn().mockResolvedValue({ id: 'tx-1', status: 'COMPLETED' });
+
+    const paymentData = {
+      id: 'pay-123',
+      amount: 5000,
+      userId: 'user-1',
+      method: 'CARD',
+      status: 'COMPLETED',
+      description: 'Test Payment',
+    };
+
+    await service.recordPayment(paymentData);
+
+    // 2. Verify upsert was called with update block
+    expect(mockPrisma.transaction.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { paymentId: 'pay-123' },
+        create: expect.objectContaining({
+          status: 'COMPLETED',
+        }),
+        update: expect.objectContaining({
+          status: 'COMPLETED',
+        }),
+      }),
+    );
+  });
 });

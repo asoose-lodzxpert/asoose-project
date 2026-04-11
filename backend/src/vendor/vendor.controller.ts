@@ -16,6 +16,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guards';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
+import { ADMIN_ROLES } from '../auth/decorators/admin-roles.constant';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 @ApiTags('Vendor / Dashboard')
@@ -33,7 +34,7 @@ export class VendorController {
 
   @ApiOperation({ summary: 'Get authenticated vendor profile' })
   @Get('me')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   @UseInterceptors(CacheInterceptor)
   @CacheTTL(120) // Cache for 2 minutes
   async getMe(@Req() req) {
@@ -43,7 +44,7 @@ export class VendorController {
 
   @ApiOperation({ summary: 'Update vendor store profile image' })
   @Patch('update-image')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   async updateProfileImage(
     @Req() req,
     @Body() body: { image: string; type?: string },
@@ -57,7 +58,7 @@ export class VendorController {
 
   @ApiOperation({ summary: 'Get public store details (name, logo, address)' })
   @Get('public')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   @UseInterceptors(CacheInterceptor)
   @CacheTTL(180) // Cache for 3 minutes
   getStorePublic(@Req() req) {
@@ -66,7 +67,7 @@ export class VendorController {
 
   @ApiOperation({ summary: 'Get vendor wallet balance' })
   @Get('balance')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   @UseInterceptors(CacheInterceptor)
   @CacheTTL(30) // Cache for 30 seconds (frequently changes)
   async getStoreBalance(@Req() req) {
@@ -77,7 +78,7 @@ export class VendorController {
     summary: 'Get vendor account status (ACTIVE, PENDING, SUSPENDED)',
   })
   @Get('status')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   @UseInterceptors(CacheInterceptor)
   @CacheTTL(120) // Cache for 2 minutes
   getStatus(@Req() req) {
@@ -88,7 +89,7 @@ export class VendorController {
     summary: 'Get whether the store is currently accepting orders',
   })
   @Get('active-status')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   @UseInterceptors(CacheInterceptor)
   @CacheTTL(60) // Cache for 1 minute
   getActiveStatus(@Req() req) {
@@ -99,7 +100,7 @@ export class VendorController {
     summary: 'Get store sales metrics (total orders, revenue, etc.)',
   })
   @Get('metrics')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   @UseInterceptors(CacheInterceptor)
   @CacheTTL(60) // Cache for 1 minute
   getMetrics(@Req() req) {
@@ -108,7 +109,7 @@ export class VendorController {
 
   @ApiOperation({ summary: 'Check if store is currently online' })
   @Get('is-online')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   @UseInterceptors(CacheInterceptor)
   @CacheTTL(30) // Cache for 30 seconds
   isOnline(@Req() req) {
@@ -117,21 +118,21 @@ export class VendorController {
 
   @ApiOperation({ summary: 'Toggle store between online and offline' })
   @Post('toggle-online')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   toggleOnline(@Req() req) {
     return this.vendorService.toggleStoreOnline(req.user.id);
   }
 
   @ApiOperation({ summary: 'Get all orders for this vendor store' })
   @Get('orders')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   getOrders(@Req() req) {
     return this.vendorService.getStoreOrders(req.user.id);
   }
 
   @ApiOperation({ summary: 'Get all saved bank accounts for vendor' })
   @Get('bank-accounts')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   @UseInterceptors(CacheInterceptor)
   @CacheTTL(300) // Cache for 5 minutes (rarely changes)
   getBankAccounts(@Req() req) {
@@ -140,7 +141,7 @@ export class VendorController {
 
   @ApiOperation({ summary: 'Get list of supported banks' })
   @Get('banks')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   @UseInterceptors(CacheInterceptor)
   @CacheTTL(3600) // Cache for 1 hour
   getBanks() {
@@ -149,7 +150,7 @@ export class VendorController {
 
   @ApiOperation({ summary: 'Verify a bank account number via Paystack' })
   @Post('verify-account')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   verifyAccountNumber(
     @Body() body: { bankCode: string; accountNumber: string },
   ) {
@@ -161,7 +162,7 @@ export class VendorController {
 
   @ApiOperation({ summary: 'Get saved bank account for vendor' })
   @Get('bank-account')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   @UseInterceptors(CacheInterceptor)
   @CacheTTL(300) // Cache for 5 minutes (rarely changes)
   getBankAccount(@Req() req) {
@@ -170,7 +171,7 @@ export class VendorController {
 
   @ApiOperation({ summary: 'Save a new bank account for payouts' })
   @Post('bank-account')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   saveBankAccount(
     @Req() req,
     @Body()
@@ -186,7 +187,7 @@ export class VendorController {
 
   @ApiOperation({ summary: 'Update existing bank account details' })
   @Patch('bank-account')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   updateBankAccount(
     @Req() req,
     @Body()
@@ -201,14 +202,14 @@ export class VendorController {
 
   @ApiOperation({ summary: 'Delete saved bank account' })
   @Delete('bank-account')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   deleteBankAccount(@Req() req) {
     return this.vendorService.deleteBankAccount(req.user.id);
   }
 
   @ApiOperation({ summary: 'Get vendor withdrawal history' })
   @Get('withdrawals')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   @UseInterceptors(CacheInterceptor)
   @CacheTTL(60) // Cache for 1 minute
   getWithdrawals(@Req() req) {
@@ -217,7 +218,7 @@ export class VendorController {
 
   @ApiOperation({ summary: 'Request a payout withdrawal' })
   @Post('withdrawals')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   createWithdrawal(
     @Req() req,
     @Body() body: { amount: number; bankAccountId: string },
@@ -227,7 +228,7 @@ export class VendorController {
 
   @ApiOperation({ summary: 'Submit account deletion request with reasons' })
   @Post('account/deletion-request')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   requestAccountDeletion(
     @Req() req,
     @Body() body: { reasons: string[]; additionalInfo?: string },
@@ -237,21 +238,21 @@ export class VendorController {
 
   @ApiOperation({ summary: 'Check status of pending account deletion request' })
   @Get('account/deletion-status')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   getAccountDeletionStatus(@Req() req) {
     return this.vendorService.getAccountDeletionStatus(req.user.id);
   }
 
   @ApiOperation({ summary: 'Get list of active service cities for vendor selection' })
   @Get('cities')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   getActiveCities() {
     return this.vendorService.getActiveCities();
   }
 
   @ApiOperation({ summary: 'Update the city the vendor store is registered in' })
   @Patch('city')
-  @Roles(UserRole.VENDOR)
+  @Roles(UserRole.VENDOR, ...ADMIN_ROLES)
   updateStoreCity(@Req() req, @Body() body: { cityId: string }) {
     return this.vendorService.updateStoreCity(req.user.id, body.cityId);
   }

@@ -18,6 +18,7 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { ADMIN_ROLES } from '../../auth/decorators/admin-roles.constant';
 import { CreateProductDto, UpdateProductDto } from '../dto/product.dto';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
@@ -28,7 +29,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
   version: '1',
 })
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.VENDOR)
+@Roles(UserRole.VENDOR, ...ADMIN_ROLES)
 export class VendorProductsController {
   private readonly logger = new Logger(VendorProductsController.name);
 

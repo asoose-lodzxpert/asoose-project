@@ -6,6 +6,8 @@ interface RideCardProps {
   date: string;
   total: number;
   description: string;
+  isScheduled?: boolean;
+  scheduledAt?: string;
 }
 
 export const RideCard = ({
@@ -14,6 +16,8 @@ export const RideCard = ({
   date,
   total,
   description,
+  isScheduled,
+  scheduledAt,
 }: RideCardProps) => {
   return (
     <div className="flex flex-col sm:flex-row gap-4 p-4 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:border-yellow-500/30 transition-all cursor-pointer group">
@@ -25,9 +29,16 @@ export const RideCard = ({
       <div className="flex-1">
         <div className="flex justify-between items-start mb-2">
           <div>
-            <span className="text-xs font-bold text-gray-400">
-              RIDE #{id.slice(0, 8).toUpperCase()}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-gray-400">
+                RIDE #{id.slice(0, 8).toUpperCase()}
+              </span>
+              {isScheduled && (
+                <span className="text-[10px] bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 px-2 py-0.5 rounded-full font-black uppercase tracking-tighter">
+                  Scheduled
+                </span>
+              )}
+            </div>
             <h4 className="font-bold text-base">{description}</h4>
           </div>
           <span
@@ -46,10 +57,12 @@ export const RideCard = ({
         <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
           <div className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
-            {date}
+            {isScheduled && scheduledAt 
+              ? new Date(scheduledAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+              : date}
           </div>
           <div className="font-bold text-gray-900 dark:text-gray-200">
-            ₦{total.toLocaleString()}
+            ₦{(total ?? 0).toLocaleString()}
           </div>
         </div>
       </div>
