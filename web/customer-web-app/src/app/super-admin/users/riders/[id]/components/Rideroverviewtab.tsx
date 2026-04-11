@@ -76,7 +76,7 @@ export const RiderOverviewTab = ({
   return (
     <div className="p-6 space-y-6 font-sans">
       {/* 1. Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-[#0F172A] p-5 rounded-xl border border-gray-800 flex items-center justify-between shadow-sm">
           <div>
             <p className="text-gray-500 text-[10px] uppercase font-bold tracking-wider">
@@ -116,6 +116,20 @@ export const RiderOverviewTab = ({
           </div>
           <div className="p-2.5 bg-red-500/10 rounded-lg text-red-500">
             <AlertTriangle className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="bg-[#0F172A] p-5 rounded-xl border border-gray-800 flex items-center justify-between shadow-sm">
+          <div>
+            <p className="text-gray-500 text-[10px] uppercase font-bold tracking-wider">
+              Assigned City
+            </p>
+            <span className="text-xs font-bold text-white mt-1 block truncate">
+              {rider.city?.name || "N/A"}
+            </span>
+          </div>
+          <div className="p-2.5 bg-yellow-500/10 rounded-lg text-yellow-500">
+            <MapPin className="w-5 h-5" />
           </div>
         </div>
       </div>

@@ -73,7 +73,7 @@ export async function getDistanceMeters({
   return await fetchWithAuth(url, { method: "GET" });
 }
 
-export async function fetchActiveLocations(): Promise<{ name: string; state: string }[]> {
+export async function fetchActiveLocations(): Promise<{ id: string; name: string; state: string }[]> {
   const url = `${EXPO_PUBLIC_API_URL}/maps/active-locations`;
   return await fetchWithAuth(url, { method: "GET" });
 }

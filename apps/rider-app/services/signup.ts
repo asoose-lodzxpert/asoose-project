@@ -24,6 +24,7 @@ export async function registerRider(
       role: formData.role, // RIDER or DRIVER
       countryCode: formData.phoneCode,
       phone: formData.phoneNumber,
+      cityId: formData.cityId,
 
       // Vehicle information
       vehicleType: formData.vehicleType,

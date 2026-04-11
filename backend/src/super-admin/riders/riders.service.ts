@@ -250,6 +250,7 @@ export class RidersService {
         vehicle: { include: { documents: true } },
         documents: true,
         bankAccount: true,
+        city: true,
       },
     });
 
@@ -329,6 +330,8 @@ export class RidersService {
         : rider.updatedAt,
       currentLat: rider.currentLat,
       currentLng: rider.currentLng,
+      cityId: rider.cityId,
+      city: rider.city,
       vehicle: rider.vehicle,
       documents,
       performance: {
@@ -497,7 +500,13 @@ export class RidersService {
 
   async update(
     id: string,
-    data: { name?: string; phone?: string; email?: string; image?: string },
+    data: { 
+      name?: string; 
+      phone?: string; 
+      email?: string; 
+      image?: string;
+      cityId?: string;
+    },
     imageFile?: Express.Multer.File,
   ) {
     if (data.email) {
@@ -522,6 +531,7 @@ export class RidersService {
         phone: data.phone,
         email: data.email,
         image: imageUrl,
+        cityId: data.cityId,
       },
     });
   }
@@ -735,6 +745,8 @@ export class RidersService {
       rating: rider.rating || 0,
       walletBalance: rider.walletBalance || 0,
       createdAt: rider.createdAt,
+      cityId: rider.cityId,
+      city: rider.city,
     };
   }
 

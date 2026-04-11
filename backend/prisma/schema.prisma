@@ -419,6 +419,10 @@ model Rider {
   notifications            Notification[]
   notificationsPreferences Json? // Stores notification preferences
 
+  // Location / City
+  cityId    String?
+  city      City?   @relation(fields: [cityId], references: [id])
+
   // Scheduled Ride Relations
   shifts              DriverShift[]
   unavailabilities    DriverUnavailability[]
@@ -426,6 +430,7 @@ model Rider {
   @@index([email])
   @@index([role])
   @@index([status])
+  @@index([cityId])
   @@index([isOnline, currentLat, currentLng])
   @@index([rating])
   @@index([walletBalance])
@@ -1305,6 +1310,7 @@ model City {
   updatedAt DateTime @updatedAt
 
   stores    Store[]
+  riders    Rider[]
 
   @@index([isActive])
   @@index([state])
