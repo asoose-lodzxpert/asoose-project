@@ -76,8 +76,9 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "ASOOSE Rider App needs your location to show your real-time position, match you with nearby orders, and provide accurate navigation. For example, your location is shared with the customer while you are on your way to deliver their order to keep them updated on your arrival.",
-          "locationAlwaysPermission": "ASOOSE Rider App requires background location access to track your position and keep you matched with orders even when the app is in the background. This ensures you can receive delivery opportunities while you are on the move."
+          "locationWhenInUsePermission": "We use your location to show your real-time position on the map, match you with nearby delivery orders, and provide turn-by-turn navigation. For example, when you accept an order, your location is used to guide you to the pickup and delivery address and to update the customer on your arrival time.",
+          "locationAlwaysAndWhenInUsePermission": "We use your location to show your real-time position on the map, match you with nearby delivery orders, and provide navigation. For example, your location is shared with the customer while you are delivering an order so they can track your arrival.",
+          "locationAlwaysPermission": "We use your location in the background to keep tracking your position and send you nearby delivery requests even when the app is not open. For example, you can receive new orders while moving without keeping the app on screen."
         }
       ],
       [
