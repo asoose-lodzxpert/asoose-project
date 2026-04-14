@@ -3,16 +3,9 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useJobs } from "@/context/JobContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import React from "react";
-import {
-  ActivityIndicator,
-  Dimensions,
-  Pressable,
-  StyleSheet,
-  Switch,
-  View,
-} from "react-native";
+import { View, Switch, StyleSheet, Pressable, Dimensions, ActivityIndicator } from "react-native";
 
-import { useConfirm } from "@/hooks/use-confirm";
+import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 import { useRouter } from "expo-router";
 import { ConnectionStatusIndicator } from "@/components/ConnectionStatusIndicator";
 
@@ -21,7 +14,7 @@ const { width } = Dimensions.get("window");
 export default function FloatingHeader() {
   const router = useRouter();
   const { status, goOnline, goOffline, isOnlineLoading } = useJobs();
-  const { confirm, ConfirmModal } = useConfirm();
+  const confirm = useConfirm();
 
   const card = useThemeColor({}, "surfaceCard");
   const border = useThemeColor({}, "borderDefault");
@@ -38,9 +31,8 @@ export default function FloatingHeader() {
         title: "Go Online?",
         message:
           "Are you sure you want to go online and start receiving orders?",
-        confirmText: "Go Online",
-        cancelText: "Cancel",
-        type: "info",
+        confirmLabel: "Go Online",
+        cancelLabel: "Cancel",
       });
       if (ok) goOnline();
     } else {
@@ -48,9 +40,9 @@ export default function FloatingHeader() {
         title: "Go Offline?",
         message:
           "Are you sure you want to go offline and stop receiving orders?",
-        confirmText: "Go Offline",
-        cancelText: "Cancel",
-        type: "warning",
+        confirmLabel: "Go Offline",
+        cancelLabel: "Cancel",
+        variant: "danger"
       });
       if (ok) goOffline();
     }
@@ -96,7 +88,6 @@ export default function FloatingHeader() {
           )}
         </View>
       </View>
-      <ConfirmModal />
     </>
   );
 }

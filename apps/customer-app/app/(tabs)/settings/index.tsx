@@ -266,6 +266,22 @@ export default function SettingsScreen() {
 
           <Pressable
             style={[styles.row, { borderBottomColor: border }]}
+            onPress={() => router.push("/(settings)/scheduled-rides")}
+          >
+            <View
+              style={[styles.iconBox, { backgroundColor: accentBlue + "15" }]}
+            >
+              <IconSymbol name="clock.fill" size={18} color={accentBlue} />
+            </View>
+            <View style={styles.rowTextWrap}>
+              <ThemedText style={styles.rowLabel}>Scheduled Rides</ThemedText>
+              <ThemedText type="caption">Manage upcoming journeys</ThemedText>
+            </View>
+            <IconSymbol name="chevron.right" size={18} color={muted} />
+          </Pressable>
+
+          <Pressable
+            style={[styles.row, { borderBottomColor: border }]}
             onPress={() => router.push("/(delivery)/history")}
           >
             <View

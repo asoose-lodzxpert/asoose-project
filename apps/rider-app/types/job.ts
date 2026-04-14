@@ -56,6 +56,10 @@ export interface IncomingJobOffer {
   stops?: DeliveryStop[];
   storeCount?: number;
   currentStopIndex?: number;
+
+  // Scheduled ride fields
+  isScheduled?: boolean;
+  scheduledAt?: string | Date;
 }
 
 export interface CurrentJob {
@@ -91,4 +95,8 @@ export interface CurrentJob {
   storeCount?: number;
   currentStopIndex?: number;
   orderGroupId?: string;
+
+  // Scheduled ride fields
+  isScheduled?: boolean;
+  scheduledAt?: string | Date;
 }

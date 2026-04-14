@@ -24,7 +24,6 @@ import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ImagePickerModal } from "@/components/ImagePickerModal";
 import { useAuth } from "@/context/AuthContext";
-import { useConfirm } from "@/hooks/use-confirm";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import {
   createProduct,
@@ -60,7 +59,6 @@ interface ModifierGroup {
 export default function AddEditItemScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { confirm, ConfirmModal } = useConfirm();
   const { user } = useAuth();
 
   const itemId = params.id as string | undefined;
@@ -592,7 +590,6 @@ export default function AddEditItemScreen() {
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
-      <ConfirmModal />
       <ImagePickerModal
         visible={isPhotoModalVisible}
         onClose={() => setIsPhotoModalVisible(false)}

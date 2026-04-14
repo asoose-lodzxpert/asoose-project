@@ -21,7 +21,7 @@ import Toast from "react-native-toast-message";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { useConfirm } from "@/hooks/use-confirm";
+import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAuth } from "@/context/AuthContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -77,7 +77,7 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const { confirm, ConfirmModal } = useConfirm();
+  const confirm = useConfirm();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   // Image Picker Modal State
@@ -138,10 +138,8 @@ export default function ProfileScreen() {
       const resultConfirm = await confirm({
         title: "Change profile image?",
         message: "Do you want to update your profile image?",
-        confirmText: "Change",
-        cancelText: "Cancel",
-        type: "info",
-        icon: "camera.fill",
+        confirmLabel: "Change",
+        cancelLabel: "Cancel",
       });
       if (resultConfirm) {
         // Need to pass the uri since selectedImage might not be updated yet
@@ -166,10 +164,8 @@ export default function ProfileScreen() {
       const confirmResult = await confirm({
         title: "Change store banner?",
         message: "Do you want to update your store banner image?",
-        confirmText: "Change",
-        cancelText: "Cancel",
-        type: "info",
-        icon: "camera.fill",
+        confirmLabel: "Change",
+        cancelLabel: "Cancel",
       });
       if (!confirmResult) return;
       setUploadingImage(true);
@@ -376,7 +372,6 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      <ConfirmModal />
       <ImagePickerModal
         visible={isPhotoModalVisible}
         onClose={() => setIsPhotoModalVisible(false)}

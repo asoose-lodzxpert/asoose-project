@@ -1,5 +1,5 @@
 import { ThemedText } from "@/components/themed-text";
-import { useConfirm } from "@/hooks/use-confirm";
+import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { OpenHour } from "@/types/signup";
 import * as Location from "expo-location";
@@ -15,7 +15,7 @@ import { StoreInfo } from "./step3/StoreInfo";
 import { Step3Props } from "./step3/types";
 
 export const Step3StoreSetup: React.FC<Step3Props> = ({ data, onChange }) => {
-  const { confirm, ConfirmModal } = useConfirm();
+  const confirm = useConfirm();
   const mapRef = useRef<MapView | null>(null);
   const isMountedRef = useRef(true);
 
@@ -44,9 +44,8 @@ export const Step3StoreSetup: React.FC<Step3Props> = ({ data, onChange }) => {
       title: "Why We Need Your Location",
       message:
         "ASOOSE Vendor App needs access to your location to help you set your store address. Location is only used when you tap 'Use Current Location' and is not tracked in the background.",
-      confirmText: "Continue",
-      cancelText: "Cancel",
-      type: "info",
+      confirmLabel: "Continue",
+      cancelLabel: "Cancel",
     });
     if (!confirmed) return;
     try {
@@ -144,8 +143,6 @@ export const Step3StoreSetup: React.FC<Step3Props> = ({ data, onChange }) => {
       </View>
 
       <OpenHoursBlock value={openHours} onChange={updateOpenHours} />
-
-      <ConfirmModal />
     </ScrollView>
   );
 };

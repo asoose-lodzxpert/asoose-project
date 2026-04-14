@@ -285,16 +285,30 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
   const acceptJob = async (jobId: string, jobType: JobType) => {
     const previousJob = incomingJob;
     const previousStatus = status;
+    const isScheduled = !!incomingJob?.isScheduled;
+
     try {
-      setStatus("en-route-pickup");
-      setActiveJob(incomingJob as CurrentJob);
-      setIncomingJob(null);
+      if (isScheduled) {
+        // For scheduled rides, we just clear the incoming offer.
+        // The ride will appear in "Upcoming" tab.
+        setIncomingJob(null);
+        setStatus("online-waiting");
+      } else {
+        setStatus("en-route-pickup");
+        setActiveJob(incomingJob as CurrentJob);
+        setIncomingJob(null);
+      }
+      
       await jobsService.acceptJob(jobId, jobType);
-      joinOrderRoom(jobId);
+      
+      if (!isScheduled) {
+        joinOrderRoom(jobId);
+      }
     } catch (error: any) {
       setIncomingJob(previousJob);
       setStatus(previousStatus);
-      setActiveJob(null);
+      if (!isScheduled) setActiveJob(null);
+      
       Toast.show({
         type: "error",
         text1: "Failed to accept job",

@@ -2,7 +2,7 @@ import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAuth } from "@/context/AuthContext";
 import { useJobs } from "@/context/JobContext";
-import { useConfirm } from "@/hooks/use-confirm";
+import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { getEarnings } from "@/services/earnings.service";
 import React, { useEffect, useState } from "react";
@@ -21,7 +21,7 @@ import {
 export default function OnlineWaitingScreen() {
   const { goOffline, activeJob, incomingJob, isOnlineLoading } = useJobs();
   const { user } = useAuth();
-  const { confirm, ConfirmModal } = useConfirm();
+  const confirm = useConfirm();
 
   const primary = useThemeColor({}, "brandPrimary");
   const background = useThemeColor({}, "surfaceBackground");
@@ -98,8 +98,8 @@ export default function OnlineWaitingScreen() {
                 const confirmed = await confirm({
                   title: "Go Offline",
                   message: "Ready to wrap up? You won't receive new requests.",
-                  confirmText: "Go Offline",
-                  cancelText: "Cancel",
+                  confirmLabel: "Go Offline",
+                  cancelLabel: "Cancel",
                 });
                 if (confirmed) goOffline();
               }}
@@ -158,8 +158,6 @@ export default function OnlineWaitingScreen() {
           </View>
         </View>
       </SafeAreaView>
-
-      <ConfirmModal />
     </View>
   );
 }

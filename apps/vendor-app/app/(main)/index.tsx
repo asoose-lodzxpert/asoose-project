@@ -7,7 +7,7 @@ import { RecentOrdersFeed } from "@/components/store/RecentOrdersFeed";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useRouter } from "expo-router";
 import { View } from "react-native";
-import { useConfirm } from "@/hooks/use-confirm"; // <-- import useConfirm
+import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 
 import { StoreMetrics, StoreOrder } from "@/types/store";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -34,7 +34,7 @@ export default function StoreDashboardPage() {
   const router = useRouter();
   const linkColor = useThemeColor({}, "brandPrimary");
 
-  const { confirm, ConfirmModal } = useConfirm(); // <-- useConfirm hook
+  const confirm = useConfirm(); 
 
   // Fetch store public details
   const fetchStore = useCallback(async () => {
@@ -110,10 +110,9 @@ export default function StoreDashboardPage() {
     const result = await confirm({
       title: isOnline ? "Go Offline" : "Go Online",
       message: `Are you sure you want to ${isOnline ? "go offline" : "go online"}?`,
-      confirmText: isOnline ? "Go Offline" : "Go Online",
-      cancelText: "Cancel",
-      type: isOnline ? "warning" : "info",
-      icon: "power",
+      confirmLabel: isOnline ? "Go Offline" : "Go Online",
+      cancelLabel: "Cancel",
+      variant: isOnline ? "danger" : undefined
     });
     if (result) {
       handleConfirmToggle();
@@ -191,7 +190,6 @@ export default function StoreDashboardPage() {
           loading={loadingOrders}
         />
       </View>
-      <ConfirmModal />
     </ThemedView>
   );
 }

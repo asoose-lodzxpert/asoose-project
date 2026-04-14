@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import ProductDetailClient from "./ProductDetailClient";
+import JsonLd from "@/components/JsonLd";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
@@ -54,5 +55,33 @@ export default async function ProductPage({
   const { slug } = await params;
   const product = await getProduct(slug);
   if (!product) notFound();
-  return <ProductDetailClient product={product} />;
+
+  const storeName = product.store?.name ?? "Asoose";
+
+  const jsonLd = {
+    "@context": "https://schema.org/",
+    "@type": "Product",
+    name: product.name,
+    image: product.image || product.images?.[0] || `${SITE_URL}/og-default.png`,
+    description: product.description || `Order ${product.name} from ${storeName} on Asoose.`,
+    sku: product.id,
+    offers: {
+      "@type": "Offer",
+      url: `${SITE_URL}/product/${slug}`,
+      priceCurrency: "NGN", // Assuming NGN based on platform locale
+      price: product.price,
+      availability: (product.stock > 0 || !product.manageStock) ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      seller: {
+        "@type": "Organization",
+        name: storeName
+      }
+    }
+  };
+
+  return (
+    <>
+      <JsonLd data={jsonLd} />
+      <ProductDetailClient product={product} />
+    </>
+  );
 }

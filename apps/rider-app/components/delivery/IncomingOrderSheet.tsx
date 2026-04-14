@@ -13,6 +13,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { router } from "expo-router";
+import Toast from "react-native-toast-message";
 
 const AUTO_DECLINE_TIMEOUT = 90;
 const EXTENSION_TIME = 15;
@@ -77,18 +79,39 @@ export default function IncomingJobSheet() {
 
   const handleAccept = async () => {
     setLoadingAccept(true);
+    const isScheduled = !!incomingJob?.isScheduled;
     try {
       await acceptJob(incomingJob.id, incomingJob.jobType);
+      if (isScheduled) {
+        Toast.show({
+          type: "success",
+          text1: "Scheduled ride accepted",
+          text2: "You can find it in your upcoming rides",
+        });
+        router.push({
+          pathname: "/(tabs)/orders",
+          params: { tab: "upcoming" },
+        });
+      }
     } catch {
       setLoadingAccept(false);
     }
   };
 
-  const badgeLabel = isRide
-    ? "NEW RIDE"
-    : isMultiStop
-      ? "MULTI-STORE"
-      : "NEW DELIVERY";
+  const badgeLabel = incomingJob.isScheduled
+    ? "SCHEDULED"
+    : isRide
+      ? "NEW RIDE"
+      : isMultiStop
+        ? "MULTI-STORE"
+        : "NEW DELIVERY";
+
+  const scheduledTime = incomingJob.scheduledAt
+    ? new Date(incomingJob.scheduledAt).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
 
   return (
     <View style={[styles.wrapper, { backgroundColor: background }]}>
@@ -103,7 +126,7 @@ export default function IncomingJobSheet() {
           >
             <View style={[styles.badgeDot, { backgroundColor: primary }]} />
             <ThemedText style={[styles.badgeText, { color: primary }]}>
-              {badgeLabel}
+              {badgeLabel} {scheduledTime ? `・ ${scheduledTime}` : ""}
             </ThemedText>
           </View>
 

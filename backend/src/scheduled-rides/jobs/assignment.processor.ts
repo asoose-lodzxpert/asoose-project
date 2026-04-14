@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../../notifications/notifications.service';
+import { NotificationsGateway } from '../../notifications/notifications.gateway';
 import { RideStatus, UserRole } from '@prisma/client';
 import { addMinutes } from 'date-fns';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -19,6 +20,7 @@ export class ScheduledRideAssignmentProcessor extends WorkerHost {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly notificationsGateway: NotificationsGateway,
     private readonly tripsCommonService: TripsCommonService,
     @InjectQueue('scheduled-ride-assignment') private readonly assignmentQueue: Queue,
   ) {
@@ -33,6 +35,7 @@ export class ScheduledRideAssignmentProcessor extends WorkerHost {
       where: { id: rideId },
       include: {
         pickupAddress: true,
+        dropoffAddress: true,
         customer: true,
       },
     });
@@ -125,6 +128,23 @@ export class ScheduledRideAssignmentProcessor extends WorkerHost {
       type: 'TRIP',
       metadata: { rideId, type: 'SCHEDULED_RIDE_ASSIGNED' },
     });
+
+    // ── Real-time Socket Emission ──
+    // Emit job.assigned so the app shows the "New Job" sheet immediately
+    try {
+      this.notificationsGateway.emitJobAssigned(bestDriver.id, {
+        id: rideId,
+        jobType: 'ride',
+        pickupAddress: ride.pickupAddress,
+        dropoffAddress: (ride as any).dropoffAddress || {}, // Might need to include more details
+        customerName: ride.customer?.name || 'Customer',
+        earnings: (ride as any).totalFare || (ride as any).scheduledFare || 0,
+        isScheduled: true,
+        scheduledAt: (ride as any).scheduledAt,
+      });
+    } catch (err) {
+      this.logger.error(`Failed to emit job.assigned for scheduled ride ${rideId}: ${err.message}`);
+    }
 
     // 4. Activity Log & Admin Notification
     await this.tripsCommonService.logActivity(ride.customerId, 'SCHEDULED_RIDE_ASSIGNED', {

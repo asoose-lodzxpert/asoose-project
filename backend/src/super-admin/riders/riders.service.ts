@@ -256,6 +256,20 @@ export class RidersService {
 
     if (!rider) throw new NotFoundException('Rider not found');
 
+    const [rides, activityLogs] = await Promise.all([
+      this.prisma.ride.findMany({
+        where: { riderId: id },
+        take: 50,
+        orderBy: { createdAt: 'desc' },
+        include: { pickupAddress: true, dropoffAddress: true, payment: true },
+      }),
+      this.prisma.activityLog.findMany({
+        where: { OR: [{ userId: id }, { target: id }] },
+        take: 100,
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
     // Enrich with Redis state for accurate online/lastSeen
     const redisState = await (
       rider.role === 'DRIVER'
@@ -331,9 +345,11 @@ export class RidersService {
       currentLat: rider.currentLat,
       currentLng: rider.currentLng,
       cityId: rider.cityId,
-      city: rider.city,
-      vehicle: rider.vehicle,
+      city: (rider as any).city,
+      vehicle: (rider as any).vehicle,
       documents,
+      rides,
+      activityLogs,
       performance: {
         completionRate: parseFloat(completionRate.toFixed(1)),
         cancellationRate: parseFloat(cancellationRate.toFixed(1)),

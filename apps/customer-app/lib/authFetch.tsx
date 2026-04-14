@@ -16,7 +16,7 @@ type FetchOpts = RequestInit & { absolute?: boolean };
 
 let refreshPromise: Promise<string | null> | null = null;
 
-export async function request(path: string, opts: FetchOpts = {}) {
+export async function request<T = any>(path: string, opts: FetchOpts = {}): Promise<T> {
   const { absolute = false, headers: incomingHeaders, ...rest } = opts;
   const url = absolute ? path : BACKEND_URL + path.replace(/^\/+/, "");
 
@@ -86,18 +86,18 @@ export async function request(path: string, opts: FetchOpts = {}) {
   return parsed;
 }
 
-export function get(path: string, opts: FetchOpts = {}) {
-  return request(path, { method: "GET", ...opts });
+export function get<T = any>(path: string, opts: FetchOpts = {}) {
+  return request<T>(path, { method: "GET", ...opts });
 }
 
-export function post(path: string, body?: any, opts: FetchOpts = {}) {
+export function post<T = any>(path: string, body?: any, opts: FetchOpts = {}) {
   const payload = body === undefined ? undefined : JSON.stringify(body);
-  return request(path, { method: "POST", body: payload, ...opts });
+  return request<T>(path, { method: "POST", body: payload, ...opts });
 }
 
-export function patch(path: string, body?: any, opts: FetchOpts = {}) {
+export function patch<T = any>(path: string, body?: any, opts: FetchOpts = {}) {
   const payload = body === undefined ? undefined : JSON.stringify(body);
-  return request(path, { method: "PATCH", body: payload, ...opts });
+  return request<T>(path, { method: "PATCH", body: payload, ...opts });
 }
 
 export { BACKEND_URL as backendUrl };

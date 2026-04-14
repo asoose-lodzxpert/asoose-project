@@ -6,6 +6,8 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { driverCancelRide } from "@/services/scheduled-rides.service";
 import Toast from "react-native-toast-message";
+import { router } from "expo-router";
+import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 
 interface UpcomingRideCardProps {
   ride: any;
@@ -17,6 +19,7 @@ export const UpcomingRideCard: React.FC<UpcomingRideCardProps> = ({ ride }) => {
   const primaryText = useThemeColor({}, "textPrimary");
   const brandPrimary = useThemeColor({}, "brandPrimary");
   const danger = useThemeColor({}, "statusError");
+  const confirm = useConfirm();
 
   // Format date in WAT (West Africa Time)
   const now = DateTime.now();
@@ -25,33 +28,30 @@ export const UpcomingRideCard: React.FC<UpcomingRideCardProps> = ({ ride }) => {
   const diffInMinutes = scheduledDate.diff(now, 'minutes').minutes;
   const canCancel = diffInMinutes > 30;
 
-  const handleCancel = () => {
-    Alert.alert(
-      "Cancel Scheduled Ride",
-      "Are you sure you want to decline this scheduled ride? It will be reassigned to another driver.",
-      [
-        { text: "No, Keep it", style: "cancel" },
-        { 
-          text: "Yes, Cancel", 
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await driverCancelRide(ride.id);
-              Toast.show({
-                type: "success",
-                text1: "Ride cancelled successfully",
-              });
-            } catch (error) {
-              Toast.show({
-                type: "error",
-                text1: "Failed to cancel ride",
-                text2: (error as any)?.message || "Please try again later",
-              });
-            }
-          }
-        }
-      ]
-    );
+  const handleCancel = async () => {
+    const res = await confirm({
+      title: "Cancel Scheduled Ride",
+      message: "Are you sure you want to decline this scheduled ride? It will be reassigned to another driver.",
+      confirmLabel: "Yes, Cancel",
+      cancelLabel: "No, Keep it",
+      variant: "danger"
+    });
+    
+    if (res) {
+      try {
+        await driverCancelRide(ride.id);
+        Toast.show({
+          type: "success",
+          text1: "Ride cancelled successfully",
+        });
+      } catch (error) {
+        Toast.show({
+          type: "error",
+          text1: "Failed to cancel ride",
+          text2: (error as any)?.message || "Please try again later",
+        });
+      }
+    }
   };
   const dayStr = scheduledDate.toFormat("ccc, LLL d");
   const timeStr = scheduledDate.toFormat("h:mm a");
@@ -116,7 +116,21 @@ export const UpcomingRideCard: React.FC<UpcomingRideCardProps> = ({ ride }) => {
 
         {/* Action Button */}
         <View style={styles.actions}>
-          {canCancel ? (
+          {diffInMinutes <= 30 ? (
+            <TouchableOpacity 
+              style={[styles.startButton, { backgroundColor: brandPrimary }]} 
+              onPress={() => {
+                 Toast.show({
+                    type: "success",
+                    text1: "Starting ride...",
+                    text2: "Heading to pickup location",
+                 });
+                 router.replace("/(tabs)"); // Home shows active jobs
+              }}
+            >
+              <ThemedText style={[styles.startButtonText, { color: "#FFF" }]}>Start Ride</ThemedText>
+            </TouchableOpacity>
+          ) : canCancel ? (
             <TouchableOpacity 
               style={[styles.cancelButton, { borderColor: danger + "40" }]} 
               onPress={handleCancel}
@@ -276,5 +290,21 @@ const styles = StyleSheet.create({
   lockedText: {
     fontSize: 11,
     fontWeight: "600",
+  },
+  startButton: {
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  startButtonText: {
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: 0.5,
   },
 });

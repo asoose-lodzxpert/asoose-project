@@ -1,7 +1,7 @@
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useJobs } from "@/context/JobContext";
-import { useConfirm } from "@/hooks/use-confirm";
+import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { getEarnings } from "@/services/earnings.service";
 import { getRiderProfile, type RiderProfile } from "@/services/profile.service";
@@ -17,7 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function OfflineScreen() {
   const { goOnline, isOnlineLoading } = useJobs();
-  const { confirm, ConfirmModal } = useConfirm();
+  const confirm = useConfirm();
 
   const primary = useThemeColor({}, "brandPrimary");
   const background = useThemeColor({}, "surfaceBackground");
@@ -130,7 +130,8 @@ export default function OfflineScreen() {
                 const confirmed = await confirm({
                   title: "Go Online",
                   message: "Ready to start receiving requests?",
-                  confirmText: "Go Online",
+                  confirmLabel: "Go Online",
+                  cancelLabel: "Cancel",
                 });
                 if (confirmed) goOnline();
               }}
@@ -155,8 +156,6 @@ export default function OfflineScreen() {
           </View>
         </View>
       </SafeAreaView>
-
-      <ConfirmModal />
     </View>
   );
 }

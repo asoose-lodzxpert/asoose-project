@@ -3,6 +3,7 @@
 import React from "react";
 import { Plus, Minus, Trash2 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { CartItem } from "@/app/main/checkout/types";
 interface CartItemsListProps {
   items: CartItem[];
@@ -64,12 +65,13 @@ export const CartItemsList = ({
               </div>
 
               {/* Image & Name */}
-              <div className="w-14 h-14 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
+              <div className="relative w-14 h-14 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
                 {item.image ? (
-                  <img
+                  <Image
                     src={item.image}
                     alt={item.name}
-                    className="w-full h-full object-cover"
+                    fill
+                    className="object-cover"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-lg">

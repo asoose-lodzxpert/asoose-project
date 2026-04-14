@@ -14,6 +14,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useCart } from "@/context/CartContext";
 import { CheckoutConfirmationModal } from "@/components/checkout/CheckoutConfirmationModal";
+import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 
 export default function CartScreen() {
   const {
@@ -29,6 +30,7 @@ export default function CartScreen() {
     canCheckout,
   } = useCart();
   const router = useRouter();
+  const confirm = useConfirm();
 
   const primary = useThemeColor({}, "brandPrimary");
   const bg = useThemeColor({}, "surfaceBackground");
@@ -106,16 +108,16 @@ export default function CartScreen() {
           </ThemedText>
         </View>
         <Pressable
-          onPress={() =>
-            Alert.alert("Clear Cart", "Remove all items from your cart?", [
-              { text: "Cancel", style: "cancel" },
-              {
-                text: "Clear All",
-                style: "destructive",
-                onPress: clearCart,
-              },
-            ])
-          }
+          onPress={async () => {
+            const res = await confirm({
+              title: "Clear Cart",
+              message: "Remove all items from your cart?",
+              confirmLabel: "Clear All",
+              cancelLabel: "Cancel",
+              variant: "danger"
+            });
+            if (res) clearCart();
+          }}
           style={styles.clearBtn}
           hitSlop={8}
         >

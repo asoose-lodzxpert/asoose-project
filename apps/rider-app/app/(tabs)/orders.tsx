@@ -19,6 +19,7 @@ import { getDriverUpcomingRides } from "@/services/scheduled-rides.service";
 import { UpcomingRideCard } from "@/components/scheduled/UpcomingRideCard";
 import type { CurrentJob } from "@/types/job";
 import Toast from "react-native-toast-message";
+import { useLocalSearchParams } from "expo-router";
 
 /* ---------------------------------- */
 /* Types */
@@ -37,7 +38,8 @@ export default function OrdersScreen() {
   const success = useThemeColor({}, "statusSuccess");
   const danger = useThemeColor({}, "statusError");
 
-  const [activeTab, setActiveTab] = useState<OrderTab>("active");
+  const { tab } = useLocalSearchParams<{ tab?: OrderTab }>();
+  const [activeTab, setActiveTab] = useState<OrderTab>(tab || "active");
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<CurrentJob[]>([]);
@@ -112,6 +114,12 @@ export default function OrdersScreen() {
   );
 
   // Fetch on mount and when tab changes
+  useEffect(() => {
+    if (tab && (tab === "upcoming" || tab === "active" || tab === "completed")) {
+      setActiveTab(tab);
+    }
+  }, [tab]);
+
   useEffect(() => {
     setOrders([]);
     setPagination((prev) => ({ ...prev, page: 1 }));

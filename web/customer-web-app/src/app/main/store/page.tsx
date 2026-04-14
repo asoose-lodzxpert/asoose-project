@@ -32,6 +32,7 @@ import {
   Percent,
   SearchX,
   Package,
+  MapPin,
 } from "lucide-react";
 
 // Components
@@ -347,54 +348,81 @@ function StorePage() {
 
             {/* 3. DYNAMIC VERTICALS */}
             <div className="space-y-10">
-              {verticals.map((section) => (
-                <section
-                  key={section.id}
-                  className="border-t border-gray-100 dark:border-white/5 pt-8 px-4"
-                >
-                  <div className="flex justify-between items-end mb-6">
-                    <div>
-                      <h2 className="text-xl font-black capitalize mb-1">
-                        {section.title}
-                      </h2>
-                      <p className="text-xs text-gray-400 font-medium">
-                        Curated for you
-                      </p>
-                    </div>
-                    <Link
-                      href={`/main/store/category/${section.id}${userLocation ? `?lat=${userLocation.lat}&lng=${userLocation.lng}` : ""}`}
-                      className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center hover:bg-yellow-500 hover:text-black transition-colors"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </Link>
-                  </div>
-
-                  <div className="flex gap-4 overflow-x-auto pb-6 scrollbar-hide snap-x -mx-4 px-4">
-                    {section.vendors.map((vendor) => (
-                      <div
-                        key={vendor.id}
-                        className="min-w-[280px] sm:min-w-[320px] snap-start relative group"
-                      >
-                        <button
-                          onClick={(e) => toggleFavorite(e, vendor.id)}
-                          className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-white hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
-                        >
-                          <Heart
-                            className={`w-4 h-4 ${favorites.includes(vendor.id) ? "fill-red-500 text-red-500" : ""}`}
-                          />
-                        </button>
-
-                        <Link href={`/main/store/${vendor.slug || vendor.id}`}>
-                          <RestaurantCard
-                            {...vendor}
-                            time={vendor.deliveryTime || "30 min"}
-                          />
-                        </Link>
+              {verticals.length > 0 ? (
+                verticals.map((section) => (
+                  <section
+                    key={section.id}
+                    className="border-t border-gray-100 dark:border-white/5 pt-8 px-4"
+                  >
+                    <div className="flex justify-between items-end mb-6">
+                      <div>
+                        <h2 className="text-xl font-black capitalize mb-1">
+                          {section.title}
+                        </h2>
+                        <p className="text-xs text-gray-400 font-medium">
+                          Curated for you
+                        </p>
                       </div>
-                    ))}
+                      <Link
+                        href={`/main/store/category/${section.id}${userLocation ? `?lat=${userLocation.lat}&lng=${userLocation.lng}` : ""}`}
+                        className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center hover:bg-yellow-500 hover:text-black transition-colors"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+
+                    <div className="flex gap-4 overflow-x-auto pb-6 scrollbar-hide snap-x -mx-4 px-4">
+                      {section.vendors.map((vendor) => (
+                        <div
+                          key={vendor.id}
+                          className="min-w-[280px] sm:min-w-[320px] snap-start relative group"
+                        >
+                          <button
+                            onClick={(e) => toggleFavorite(e, vendor.id)}
+                            className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-white hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
+                          >
+                            <Heart
+                              className={`w-4 h-4 ${favorites.includes(vendor.id) ? "fill-red-500 text-red-500" : ""}`}
+                            />
+                          </button>
+
+                          <Link href={`/main/store/${vendor.slug || vendor.id}`}>
+                            <RestaurantCard
+                              {...vendor}
+                              time={vendor.deliveryTime || "30 min"}
+                            />
+                          </Link>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ))
+              ) : (
+                /* EMPTY STATE FOR HOME PAGE */
+                <div className="flex flex-col items-center justify-center py-32 px-4 text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
+                  <div className="w-24 h-24 bg-yellow-500/10 rounded-[2.5rem] flex items-center justify-center mb-6">
+                    <MapPin className="w-10 h-10 text-yellow-500" />
                   </div>
-                </section>
-              ))}
+                  <h3 className="text-2xl font-black mb-2 tracking-tight">Services not available yet</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mx-auto leading-relaxed font-medium">
+                    We haven't reached your current location yet. Stay tuned as we expand to more cities!
+                  </p>
+                  <div className="mt-8 flex flex-col sm:flex-row gap-3">
+                     <button
+                        onClick={() => {
+                            // Trigger the global location modal via store or document event
+                            // Since we don't have a global state for THE MODAL in the store, 
+                            // we can use a custom event or just prompt them to click the header.
+                            const headerBtn = document.querySelector('[aria-label="Change delivery address"]') as HTMLElement;
+                            headerBtn?.click();
+                        }}
+                        className="px-8 py-4 bg-yellow-500 text-black font-bold rounded-2xl hover:bg-yellow-400 hover:scale-105 active:scale-95 transition-all shadow-xl shadow-yellow-500/20"
+                      >
+                        Change Location
+                      </button>
+                  </div>
+                </div>
+              )}
             </div>
           </>
         )}

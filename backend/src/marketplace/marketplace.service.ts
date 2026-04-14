@@ -244,7 +244,7 @@ export class MarketplaceService {
     return titles[slug.toLowerCase()] || slug;
   }
 
-  async search(query: string) {
+  async search(query: string, cityId?: string) {
     const stores = await this.prisma.store.findMany({
       where: {
         status: 'ACTIVE',
@@ -253,6 +253,7 @@ export class MarketplaceService {
         lat: { not: null },
         lng: { not: null },
         name: { contains: query, mode: 'insensitive' },
+        ...(cityId ? { cityId } : {}),
       },
       take: 10,
       include: { openingHours: true },
@@ -261,7 +262,10 @@ export class MarketplaceService {
     const products = await this.prisma.product.findMany({
       where: {
         status: 'ACTIVE',
-        store: { status: 'ACTIVE' },
+        store: { 
+          status: 'ACTIVE',
+          ...(cityId ? { cityId } : {}),
+        },
         OR: [
           { name: { contains: query, mode: 'insensitive' } },
           { category: { name: { contains: query, mode: 'insensitive' } } },

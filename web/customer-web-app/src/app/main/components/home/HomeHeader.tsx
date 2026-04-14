@@ -21,6 +21,8 @@ import {
 import { useTheme } from "next-themes";
 import { useSession } from "next-auth/react";
 import { ApiService } from "@/services/api.service";
+import { LocationPickerModal } from "./LocationPickerModal";
+import { useRideStore } from "@/app/main/ride/store/ride";
 
 const sanitizeInput = (input: string): string => {
   return input.replace(/[<>]/g, "").trim().slice(0, 100);
@@ -36,6 +38,10 @@ function HomeHeaderInner() {
     details: string;
   } | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  
+  const userLocation = useRideStore((state) => state.userLocation);
+  const cityId = useRideStore((state) => state.cityId);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -143,7 +149,7 @@ function HomeHeaderInner() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, [accessToken, userLocation, cityId]); // Re-fetch address info if location changes
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
@@ -189,8 +195,8 @@ function HomeHeaderInner() {
 
           {/* 2. Address (Visible only in Store Section) */}
           {isStoreSection && (
-            <Link
-              href="/main/profile"
+            <button
+              onClick={() => setIsLocationModalOpen(true)}
               className="flex items-center gap-2 sm:gap-3 group min-w-fit hover:bg-gray-50 dark:hover:bg-white/5 p-1.5 sm:p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-500"
               aria-label="Change delivery address"
             >
@@ -230,7 +236,7 @@ function HomeHeaderInner() {
                   />
                 </div>
               </div>
-            </Link>
+            </button>
           )}
         </div>
 
@@ -354,6 +360,11 @@ function HomeHeaderInner() {
           </form>
         </div>
       )}
+
+      <LocationPickerModal 
+        isOpen={isLocationModalOpen} 
+        onClose={() => setIsLocationModalOpen(false)} 
+      />
     </header>
   );
 }
