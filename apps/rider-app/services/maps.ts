@@ -1,4 +1,4 @@
-import { fetchWithAuth } from "@/services/auth-fetch";
+// import { fetchPublic } from "@/services/auth-fetch"; // Removed because it was causing "No access token" error in some contexts
 const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export interface NavigationStep {
@@ -44,7 +44,15 @@ export async function getDirections({
     destLng: destLng.toString(),
   }).toString();
   const url = `${EXPO_PUBLIC_API_URL}/maps/directions?${params}`;
-  return await fetchWithAuth(url, { method: "GET" });
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.message || "Request failed");
+  }
+  return res.json();
 }
 
 /**
@@ -70,10 +78,26 @@ export async function getDistanceMeters({
     destLng: destLng.toString(),
   }).toString();
   const url = `${EXPO_PUBLIC_API_URL}/maps/distance?${params}`;
-  return await fetchWithAuth(url, { method: "GET" });
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.message || "Request failed");
+  }
+  return res.json();
 }
 
-export async function fetchActiveLocations(): Promise<{ name: string; state: string }[]> {
+export async function fetchActiveLocations(): Promise<{ id: string; name: string; state: string }[]> {
   const url = `${EXPO_PUBLIC_API_URL}/maps/active-locations`;
-  return await fetchWithAuth(url, { method: "GET" });
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.message || "Request failed");
+  }
+  return res.json();
 }

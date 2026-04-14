@@ -250,10 +250,25 @@ export class RidersService {
         vehicle: { include: { documents: true } },
         documents: true,
         bankAccount: true,
+        city: true,
       },
     });
 
     if (!rider) throw new NotFoundException('Rider not found');
+
+    const [rides, activityLogs] = await Promise.all([
+      this.prisma.ride.findMany({
+        where: { riderId: id },
+        take: 50,
+        orderBy: { createdAt: 'desc' },
+        include: { pickupAddress: true, dropoffAddress: true, payment: true },
+      }),
+      this.prisma.activityLog.findMany({
+        where: { OR: [{ userId: id }, { target: id }] },
+        take: 100,
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
 
     // Enrich with Redis state for accurate online/lastSeen
     const redisState = await (
@@ -329,8 +344,12 @@ export class RidersService {
         : rider.updatedAt,
       currentLat: rider.currentLat,
       currentLng: rider.currentLng,
-      vehicle: rider.vehicle,
+      cityId: rider.cityId,
+      city: (rider as any).city,
+      vehicle: (rider as any).vehicle,
       documents,
+      rides,
+      activityLogs,
       performance: {
         completionRate: parseFloat(completionRate.toFixed(1)),
         cancellationRate: parseFloat(cancellationRate.toFixed(1)),
@@ -497,7 +516,13 @@ export class RidersService {
 
   async update(
     id: string,
-    data: { name?: string; phone?: string; email?: string; image?: string },
+    data: { 
+      name?: string; 
+      phone?: string; 
+      email?: string; 
+      image?: string;
+      cityId?: string;
+    },
     imageFile?: Express.Multer.File,
   ) {
     if (data.email) {
@@ -522,6 +547,7 @@ export class RidersService {
         phone: data.phone,
         email: data.email,
         image: imageUrl,
+        cityId: data.cityId,
       },
     });
   }
@@ -735,6 +761,8 @@ export class RidersService {
       rating: rider.rating || 0,
       walletBalance: rider.walletBalance || 0,
       createdAt: rider.createdAt,
+      cityId: rider.cityId,
+      city: rider.city,
     };
   }
 

@@ -1,5 +1,6 @@
 import { authConfig, getAccessToken } from "@/services/auth.service";
 import { RideService } from "@/services/ride.service";
+import { ScheduledRideService } from "@/services/scheduled-ride.service";
 import {
   DriverLocation,
   FareEstimate,
@@ -32,19 +33,25 @@ type RideContextType = {
   error: string | null;
   fareEstimate: FareEstimate | null;
   driverLocation: DriverLocation | null;
+  scheduledAt: Date | null;
+  scheduledRides: any[];
 
   // Booking flow
   pickupLocation: Location | null;
   dropoffLocation: Location | null;
   setPickupLocation: (location: Location | null) => void;
   setDropoffLocation: (location: Location | null) => void;
+  setScheduledAt: (date: Date | null) => void;
 
   // Actions
   estimateFare: () => Promise<void>;
   createRide: (notes?: string) => Promise<string | null>;
+  createScheduledRide: (notes?: string) => Promise<boolean>;
   confirmPayment: (rideId: string, method: "CASH" | "CARD") => Promise<void>;
   cancelRide: (reason?: string) => Promise<void>;
+  cancelScheduledRide: (rideId: string) => Promise<void>;
   refreshCurrentRide: () => Promise<void>;
+  fetchScheduledRides: () => Promise<void>;
   resetBooking: () => void;
   /** Fully clears all ride state (ride, driver, route, fare, status). */
   resetRideState: () => void;
@@ -80,6 +87,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
   // Booking state
   const [pickupLocation, setPickupLocation] = useState<Location | null>(null);
   const [dropoffLocation, setDropoffLocation] = useState<Location | null>(null);
+  const [scheduledAt, setScheduledAt] = useState<Date | null>(null);
+  const [scheduledRides, setScheduledRides] = useState<any[]>([]);
 
   const socketRef = useRef<Socket | null>(null);
   const pollingIntervalRef = useRef<number | null>(null);
@@ -273,9 +282,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
       if (event.type === "PAYMENT_CONFIRMED") {
         // Optimistically flip status to PAID so the UI doesn't flash back to
         // AWAITING_PAYMENT if refreshCurrentRide runs before the webhook writes to DB.
-        setCurrentRide((prev) =>
-          prev ? { ...prev, status: "PAID" as any } : prev,
-        );
+        // PAID status).
+        setCurrentRide(currentRideRef.current ? { ...currentRideRef.current, status: "PAID" as any } : null);
         setPageView("DRIVER_ASSIGNED");
         // Delay refresh to give the Paystack webhook enough time to complete its DB write
         setTimeout(() => refreshCurrentRide(), 2000);
@@ -313,9 +321,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       if (event.type === "TRIP_COMPLETED") {
         // Post-ride payment model: optimistically flip status to COMPLETED so the
         // payment prompt appears instantly, then reconcile with the DB.
-        setCurrentRide((prev) =>
-          prev ? { ...prev, status: "COMPLETED" as any } : prev,
-        );
+        setCurrentRide(currentRideRef.current ? { ...currentRideRef.current, status: "COMPLETED" as any } : null);
         setPageView("AWAITING_PAYMENT");
         refreshCurrentRide();
       }
@@ -325,9 +331,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     // Flip status to PAID so the tracking screen auto-navigates to the success receipt.
     socket.on("RIDE_PAYMENT_COMPLETED", (event: any) => {
       if (__DEV__) console.log("[RideContext] Ride payment completed:", event);
-      setCurrentRide((prev) =>
-        prev ? { ...prev, status: "PAID" as any } : prev,
-      );
+      setCurrentRide(currentRideRef.current ? { ...currentRideRef.current, status: "PAID" as any } : null);
       setPageView("COMPLETED");
       // Delay refresh to give the webhook time to settle in the DB.
       setTimeout(() => refreshCurrentRide(), 2000);
@@ -458,7 +462,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         vehicleType: VehicleType.ECONOMY,
       });
 
-      const totalFare = Number(response.economyPrice ?? response.price);
+      const totalFare = Number(response.price || response.economyPrice || 0);
 
       const estimate: FareEstimate = {
         distanceKm: response.distance.meters / 1000,
@@ -473,7 +477,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         },
       };
 
-      if (__DEV__) console.log("Estimate:", estimate, "Options:", options);
+      if (__DEV__) console.log("Estimate:", estimate);
 
       setFareEstimate(estimate);
     } catch (err: any) {
@@ -530,6 +534,101 @@ export function RideProvider({ children }: { children: ReactNode }) {
     },
     [pickupLocation, dropoffLocation, fareEstimate, refreshCurrentRide],
   );
+
+  // Create scheduled ride
+  const createScheduledRide = useCallback(
+    async (notes?: string): Promise<boolean> => {
+      if (!pickupLocation || !dropoffLocation || !scheduledAt) {
+        setError("Missing booking details");
+        return false;
+      }
+
+      if (!fareEstimate) {
+        setError("Please get fare estimate first");
+        return false;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const idempotencyKey = `${Date.now()}_sched_${Math.floor(Math.random() * 100000)}`;
+        await ScheduledRideService.bookRide({
+          scheduledAt: scheduledAt.toISOString(),
+          pickupLocation: {
+            addressText: pickupLocation.address || "Unknown",
+            lat: pickupLocation.latitude,
+            lng: pickupLocation.longitude,
+          },
+          dropoffLocation: {
+            addressText: dropoffLocation.address || "Unknown",
+            lat: dropoffLocation.latitude,
+            lng: dropoffLocation.longitude,
+          },
+          vehicleType: VehicleType.ECONOMY,
+          totalFare: fareEstimate.fareBreakdown.totalFare,
+          distanceKm: fareEstimate.distanceKm,
+          durationMin: fareEstimate.durationMin,
+        }, idempotencyKey);
+
+        Toast.show({
+          type: "success",
+          text1: "Ride Scheduled",
+          text2: "Your ride has been successfully scheduled.",
+        });
+        
+        resetBooking();
+        fetchScheduledRides();
+        return true;
+      } catch (err: any) {
+        setError(err?.message || "Failed to schedule ride");
+        if (__DEV__) console.error("Create scheduled ride error:", err);
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [pickupLocation, dropoffLocation, scheduledAt, fareEstimate],
+  );
+
+  // Fetch scheduled rides
+  const fetchScheduledRides = useCallback(async () => {
+    try {
+      const rides = await ScheduledRideService.getUpcomingRides();
+      setScheduledRides(rides || []);
+    } catch (err) {
+      if (__DEV__) console.error("Failed to fetch scheduled rides:", err);
+    }
+  }, []);
+
+  // Cancel scheduled ride
+  const cancelScheduledRide = useCallback(async (rideId: string) => {
+    try {
+      setLoading(true);
+      await ScheduledRideService.cancelRide(rideId);
+      Toast.show({
+        type: "success",
+        text1: "Ride Cancelled",
+        text2: "Your scheduled ride has been cancelled.",
+      });
+      fetchScheduledRides();
+    } catch (err: any) {
+      Toast.show({
+        type: "error",
+        text1: "Cancellation Failed",
+        text2: err.message,
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchScheduledRides]);
+
+  // Fetch on mount/user change
+  useEffect(() => {
+    if (user?.id) {
+      fetchScheduledRides();
+    }
+  }, [user?.id, fetchScheduledRides]);
 
   // Confirm payment (called after DRIVER_ACCEPTED — transitions ride to PAID)
   const confirmPayment = useCallback(
@@ -590,6 +689,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const resetBooking = useCallback(() => {
     setPickupLocation(null);
     setDropoffLocation(null);
+    setScheduledAt(null);
     setFareEstimate(null);
     setError(null);
     setCurrentRide(null);
@@ -618,15 +718,21 @@ export function RideProvider({ children }: { children: ReactNode }) {
     error,
     fareEstimate,
     driverLocation,
+    scheduledAt,
+    scheduledRides,
     pickupLocation,
     dropoffLocation,
     setPickupLocation,
     setDropoffLocation,
+    setScheduledAt,
     estimateFare,
     createRide,
+    createScheduledRide,
     confirmPayment,
     cancelRide,
+    cancelScheduledRide,
     refreshCurrentRide,
+    fetchScheduledRides,
     resetBooking,
     resetRideState,
     socketConnected,

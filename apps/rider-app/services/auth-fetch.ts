@@ -59,6 +59,25 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
   return res.json();
 }
 
+/**
+ * For unauthenticated requests (e.g. signup, locations list)
+ */
+export async function fetchPublic(url: string, options: RequestInit = {}) {
+  const headers = {
+    ...(options.headers || {}),
+    "Content-Type": "application/json",
+  };
+
+  const res = await fetch(url, { ...options, headers });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.message || "Request failed");
+  }
+
+  return res.json();
+}
+
 export async function fetchCurrentUser() {
   const response = await fetchWithAuth(
     `${process.env.EXPO_PUBLIC_API_URL}/rider/profile/me`,

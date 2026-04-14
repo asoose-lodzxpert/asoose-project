@@ -57,15 +57,6 @@ export class MapsController {
     return result ?? { city: null, message: 'No active service area found for your location.' };
   }
 
-  /**
-   * 🔒 SECURED AUTOCOMPLETE ENDPOINTS
-   * These endpoints are now protected with:
-   * - JWT Authentication (requires logged-in user)
-   * - Strict rate limiting (20 requests per minute per user)
-   * - Input validation (minimum 3 characters)
-   * - Geographic bias to Nigeria only
-   */
-
   @ApiOperation({
     summary: 'Search addresses with autocomplete (rate-limited)',
   })

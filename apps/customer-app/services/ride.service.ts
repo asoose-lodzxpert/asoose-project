@@ -14,6 +14,8 @@ export class RideService {
    */
   static async estimateRide(payload: RideEstimatePayload): Promise<{
     price: any;
+    economyPrice?: any;
+    businessPrice?: any;
     distance: { meters: number; text: string };
     eta: { seconds: number; text: string };
   }> {

@@ -81,9 +81,17 @@ export class MarketplaceController {
   @ApiOperation({ summary: 'Search stores and products by keyword' })
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Get('search')
-  async search(@Query('q') q: string): Promise<SearchResponseDto> {
+  async search(
+    @Query('q') q: string,
+    @Query('cityId') cityId?: string,
+    @Query('lat') lat?: string,
+    @Query('lng') lng?: string,
+    @Request() req?,
+  ): Promise<SearchResponseDto> {
     if (!q) return { stores: [], products: [] };
-    return this.marketplaceService.search(q);
+    const userId = req?.user?.userId || req?.user?.sub || req?.user?.id;
+    const resolvedCityId = await this.resolveCity(cityId, lat, lng, userId);
+    return this.marketplaceService.search(q, resolvedCityId);
   }
 
   @ApiOperation({ summary: 'Get stores and products in a category, filtered by city' })

@@ -3,6 +3,7 @@ import { OpaqueColorValue, type StyleProp, type TextStyle } from "react-native";
 
 export type IconSymbolName =
   | "mappin.and.ellipse"
+  | "mappin.slash"
   | "building.columns.fill"
   | "radio"
   | "map-pin"
@@ -198,6 +199,7 @@ export const MAPPING: Record<
   "xmark.circle.fill": "cancel",
   "checkmark.seal.fill": "verified",
   "mappin.and.ellipse": "my-location",
+  "mappin.slash": "location-off",
   "building.columns.fill": "account-balance",
   location: "location-on",
   "shopping-bag": "shopping-bag",

@@ -28,7 +28,17 @@ function deliveryStatusToJobStatus(status: DeliveryStatus): string {
 }
 
 /** Maps a Prisma RideStatus to the rider-app's JobStatus string */
-function rideStatusToJobStatus(status: RideStatus): string {
+function rideStatusToJobStatus(status: RideStatus, isScheduled = false, scheduledAt: Date | null = null): string {
+  if (isScheduled && status === (RideStatus as any).DRIVER_ACCEPTED) {
+    const now = new Date();
+    const scheduledDate = scheduledAt ? new Date(scheduledAt) : null;
+    // If it's a scheduled ride that hasn't reached the pickup window yet, it's not "active" in the en-route sense
+    // unless the driver has specifically started it (which we'll handle via setStatus or check later)
+    if (scheduledDate && scheduledDate.getTime() - now.getTime() > 30 * 60 * 1000) {
+       return 'online-waiting';
+    }
+  }
+
   switch (status) {
     case RideStatus.REQUESTED:
     case RideStatus.SEARCHING_DRIVER:
@@ -159,7 +169,7 @@ export class JobsService {
           status: { in: activeStatuses },
         },
         include: {
-          customer: { select: { name: true, phone: true } },
+          customer: { select: { id: true, name: true, phone: true } },
           pickupAddress: true,
           dropoffAddress: true,
         },
@@ -171,6 +181,21 @@ export class JobsService {
         return null;
       }
 
+      // ── Scheduled Ride Filtering ──
+      // If it's a scheduled ride in DRIVER_ACCEPTED status, only show as active if it's within 30 minutes of pickup
+      // OR if it has already been started (startedAt is set).
+      if (ride.isScheduled && ride.scheduledAt && ride.status === (RideStatus as any).DRIVER_ACCEPTED) {
+        const now = new Date();
+        const scheduledAt = new Date(ride.scheduledAt);
+        const diffMs = scheduledAt.getTime() - now.getTime();
+        const thirtyMinutes = 30 * 60 * 1000;
+
+        if (!ride.startedAt && diffMs > thirtyMinutes) {
+          this.logger.debug(`Scheduled ride ${ride.id} is too far in future (${Math.round(diffMs / 60000)}m left), skipping activeJob`);
+          return null;
+        }
+      }
+
       this.logger.debug(
         `Active ride found - id=${ride.id}, status=${ride.status}`,
       );
@@ -178,7 +203,7 @@ export class JobsService {
       const result = {
         id: ride.id,
         jobType: 'ride' as const,
-        status: rideStatusToJobStatus(ride.status as RideStatus),
+        status: rideStatusToJobStatus(ride.status as RideStatus, ride.isScheduled, ride.scheduledAt),
         customerName: ride.customer?.name ?? 'Customer',
         customerPhone: ride.customer?.phone ?? undefined,
         pickupAddress: ride.pickupAddress,
@@ -186,6 +211,8 @@ export class JobsService {
         earnings: ride.totalFare ?? ride.baseFare ?? 0,
         startOtp: ride.startOtp ?? undefined,
         distanceKm: ride.distanceKm ?? undefined,
+        isScheduled: ride.isScheduled,
+        scheduledAt: ride.scheduledAt,
       };
 
       this.logger.debug(`Returning ride job ${ride.id}`);
@@ -286,6 +313,7 @@ export class JobsService {
       const acceptable: string[] = [
         'SEARCHING_DRIVER',
         'DRIVER_ASSIGNED', // admin manual assignment
+        (RideStatus as any).DRIVER_ASSIGNED_SCHED, // scheduled ride assignment
       ];
       if (!acceptable.includes(ride.status as string)) {
         this.logger.warn(
@@ -303,7 +331,7 @@ export class JobsService {
       const updateResult = await this.prisma.ride.updateMany({
         where: {
           id: jobId,
-          status: { in: ['SEARCHING_DRIVER', 'DRIVER_ASSIGNED'] as any[] },
+          status: { in: ['SEARCHING_DRIVER', 'DRIVER_ASSIGNED', (RideStatus as any).DRIVER_ASSIGNED_SCHED] as any[] },
         },
         data: {
           status: 'DRIVER_ACCEPTED' as any,

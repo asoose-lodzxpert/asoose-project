@@ -85,6 +85,7 @@ export class RiderAuthService {
         commissionRate,
         currentLat: dto.location?.lat,
         currentLng: dto.location?.lng,
+        cityId: dto.cityId,
 
         // Create vehicle if provided
         ...(dto.vehicleType && {

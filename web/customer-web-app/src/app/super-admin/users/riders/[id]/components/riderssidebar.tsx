@@ -15,6 +15,7 @@ import {
   Loader2,
   Wallet,
   Camera,
+  MapPin,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { AppAlert } from "../../../customers/[id]/alerts";
@@ -46,7 +47,11 @@ export const RiderSidebar: React.FC<RiderSidebarProps> = ({
     name: rider.name,
     email: rider.email,
     phone: rider.phone || "",
+    cityId: rider.cityId || "",
   });
+
+  const [citiesList, setCitiesList] = useState<any[]>([]);
+  const [loadingCities, setLoadingCities] = useState(false);
 
   // Image upload state
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -60,12 +65,29 @@ export const RiderSidebar: React.FC<RiderSidebarProps> = ({
     setImagePreview(URL.createObjectURL(file));
   };
 
+  useEffect(() => {
+    if (isEditing) {
+      setLoadingCities(true);
+      getSession().then(session => {
+        const token = (session as any)?.accessToken;
+        fetch(`${API_URL}/super-admin/cities`, {
+          headers: { Authorization: `Bearer ${token || ""}` },
+        })
+          .then(res => res.json())
+          .then(data => setCitiesList(data))
+          .catch(err => console.error("Failed to fetch cities", err))
+          .finally(() => setLoadingCities(false));
+      });
+    }
+  }, [isEditing]);
+
   // Sync state when prop updates
   useEffect(() => {
     setFormData({
       name: rider.name,
       email: rider.email,
       phone: rider.phone || "",
+      cityId: rider.cityId || "",
     });
   }, [rider]);
 
@@ -336,6 +358,30 @@ export const RiderSidebar: React.FC<RiderSidebarProps> = ({
                 />
               ) : (
                 <span>{rider.phone || "N/A"}</span>
+              )}
+            </div>
+
+            {/* City */}
+            <div className="flex items-center gap-3 text-sm text-gray-300">
+              <MapPin className="w-4 h-4 text-gray-500 shrink-0" />
+              {isEditing ? (
+                <select
+                  value={formData.cityId}
+                  onChange={(e) =>
+                    setFormData({ ...formData, cityId: e.target.value })
+                  }
+                  className="bg-[#0F172A] border-b border-gray-600 text-white w-full focus:border-yellow-500 focus:outline-none py-0.5 text-xs"
+                  disabled={loadingCities}
+                >
+                  <option value="">Select City</option>
+                  {citiesList.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.state})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span>{rider.city?.name || "No City Assigned"}</span>
               )}
             </div>
 

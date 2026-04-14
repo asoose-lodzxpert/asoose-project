@@ -15,14 +15,17 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { getAllJobs } from "@/services/orders.service";
+import { getDriverUpcomingRides } from "@/services/scheduled-rides.service";
+import { UpcomingRideCard } from "@/components/scheduled/UpcomingRideCard";
 import type { CurrentJob } from "@/types/job";
 import Toast from "react-native-toast-message";
+import { useLocalSearchParams } from "expo-router";
 
 /* ---------------------------------- */
 /* Types */
 /* ---------------------------------- */
 
-type OrderTab = "active" | "completed";
+type OrderTab = "upcoming" | "active" | "completed";
 
 /* ---------------------------------- */
 /* Main Component */
@@ -35,7 +38,8 @@ export default function OrdersScreen() {
   const success = useThemeColor({}, "statusSuccess");
   const danger = useThemeColor({}, "statusError");
 
-  const [activeTab, setActiveTab] = useState<OrderTab>("active");
+  const { tab } = useLocalSearchParams<{ tab?: OrderTab }>();
+  const [activeTab, setActiveTab] = useState<OrderTab>(tab || "active");
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<CurrentJob[]>([]);
@@ -63,6 +67,14 @@ export default function OrdersScreen() {
       }
 
       try {
+        if (activeTab === "upcoming") {
+          const data = await getDriverUpcomingRides();
+          if (gen !== fetchGenRef.current) return;
+          setOrders(data);
+          setPagination({ page: 1, limit: 10, total: data.length, totalPages: 1 });
+          return;
+        }
+
         let statusFilter: string | undefined;
         if (activeTab === "active") {
           statusFilter = "ACCEPTED,PICKED_UP,IN_PROGRESS";
@@ -102,6 +114,12 @@ export default function OrdersScreen() {
   );
 
   // Fetch on mount and when tab changes
+  useEffect(() => {
+    if (tab && (tab === "upcoming" || tab === "active" || tab === "completed")) {
+      setActiveTab(tab);
+    }
+  }, [tab]);
+
   useEffect(() => {
     setOrders([]);
     setPagination((prev) => ({ ...prev, page: 1 }));
@@ -206,14 +224,14 @@ export default function OrdersScreen() {
   return (
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
       <ThemedText type="subtitle" style={styles.pageTitle}>
-        Orders
+        Ride History
       </ThemedText>
 
-      {/* Custom Order Tabs (no pending tab) */}
+      {/* Custom Order Tabs */}
       <OrderTabs
         active={activeTab}
         onChange={setActiveTab}
-        tabs={["active", "completed"]}
+        tabs={["upcoming", "active", "completed"]}
       />
 
       <ScrollView
@@ -241,12 +259,16 @@ export default function OrdersScreen() {
         ) : (
           <View style={styles.cardsList}>
             {orders.map((order) => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                getStatusColor={getStatusColor}
-                getStatusLabel={getStatusLabel}
-              />
+              activeTab === "upcoming" ? (
+                <UpcomingRideCard key={order.id} ride={order} />
+              ) : (
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  getStatusColor={getStatusColor}
+                  getStatusLabel={getStatusLabel}
+                />
+              )
             ))}
             {loadingMore && (
               <View style={{ paddingVertical: 16, alignItems: "center" }}>

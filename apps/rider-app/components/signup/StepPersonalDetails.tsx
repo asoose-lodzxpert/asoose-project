@@ -26,7 +26,7 @@ export function StepPersonalDetails({ data, onChange }: Props) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Dynamic Locations
-  const [activeZones, setActiveZones] = useState<{ name: string; state: string }[]>([]);
+  const [activeZones, setActiveZones] = useState<{ id: string; name: string; state: string }[]>([]);
   const [loadingLocations, setLoadingLocations] = useState(true);
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export function StepPersonalDetails({ data, onChange }: Props) {
     if (!selectedState) return [];
     return activeZones
       .filter(z => z.state === selectedState)
-      .map(z => ({ label: z.name, value: z.name }));
+      .map(z => ({ label: z.name, value: z.name, id: z.id }));
   }, [selectedState, activeZones]);
 
   return (
@@ -245,7 +245,11 @@ export function StepPersonalDetails({ data, onChange }: Props) {
       <CustomDropdown
         data={cities}
         value={data.city}
-        onChange={(v) => onChange("city", v as string)}
+        onChange={(v) => {
+          const selected = cities.find(c => c.value === v);
+          onChange("city", v as string);
+          onChange("cityId", selected?.id || null);
+        }}
         placeholder="Select city"
         containerStyle={{ flex: 2, marginTop: 20 }}
         label="Choose your city / region"

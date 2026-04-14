@@ -18,7 +18,7 @@ import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { LocationDisclosureModal } from "@/components/LocationDisclosureModal";
 import { useAuth } from "@/context/AuthContext";
-import { useConfirm } from "@/hooks/use-confirm";
+import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import Toast from "react-native-toast-message";
 import { useRouter } from "expo-router";
@@ -41,7 +41,7 @@ export default function LoginScreen() {
     enableBiometrics,
     isBiometricEnabled,
   } = useAuth();
-  const { confirm, ConfirmModal } = useConfirm();
+  const confirm = useConfirm();
   const router = useRouter();
 
   const primary = useThemeColor({}, "brandPrimary");
@@ -101,10 +101,8 @@ export default function LoginScreen() {
           title: "Enable Biometric Login?",
           message:
             "Would you like to enable biometric authentication for faster login in the future?",
-          confirmText: "Yes",
-          cancelText: "No",
-          type: "info",
-          icon: "touchid",
+          confirmLabel: "Yes",
+          cancelLabel: "No",
         });
         if (wantsBiometric) {
           try {
@@ -148,10 +146,8 @@ export default function LoginScreen() {
           title: "Enable Biometric Login?",
           message:
             "Would you like to enable biometric authentication for faster login in the future?",
-          confirmText: "Yes",
-          cancelText: "No",
-          type: "info",
-          icon: "touchid",
+          confirmLabel: "Yes",
+          cancelLabel: "No",
         });
         if (wantsBiometric) {
           try {
@@ -209,7 +205,6 @@ export default function LoginScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ConfirmModal />
       <LocationDisclosureModal
         visible={showLocationDisclosure}
         onAccept={handleLocationDisclosureAccepted}

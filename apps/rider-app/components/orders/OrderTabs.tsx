@@ -3,7 +3,7 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import React from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
-export type OrderTab = "pending" | "active" | "completed";
+export type OrderTab = "upcoming" | "active" | "completed";
 
 interface OrderTabsProps<T extends OrderTab = OrderTab> {
   active: T;
@@ -20,7 +20,7 @@ export const OrderTabs = <T extends OrderTab = OrderTab>({
   const inactive = useThemeColor({}, "textSecondary");
 
   const allTabs: { key: OrderTab; label: string }[] = [
-    { key: "pending", label: "Pending" },
+    { key: "upcoming", label: "Upcoming" },
     { key: "active", label: "Active" },
     { key: "completed", label: "History" },
   ];

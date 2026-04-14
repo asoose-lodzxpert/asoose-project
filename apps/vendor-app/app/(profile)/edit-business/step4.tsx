@@ -16,7 +16,7 @@ import { CustomDropdown } from "@/components/CustomDropdown";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useConfirm } from "@/hooks/use-confirm";
+import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import {
   deleteBankAccount,
@@ -40,7 +40,7 @@ interface Bank {
 
 export default function Step4BankAccountScreen() {
   const router = useRouter();
-  const { confirm, ConfirmModal } = useConfirm();
+  const confirm = useConfirm();
   const primary = useThemeColor({}, "brandPrimary");
   const borderColor = useThemeColor({}, "borderDefault");
   const surfaceCard = useThemeColor({}, "surfaceCard");
@@ -156,9 +156,9 @@ export default function Step4BankAccountScreen() {
         title: "Update Bank Account",
         message:
           "Are you sure you want to update your bank account information?",
-        confirmText: "Update",
-        cancelText: "Cancel",
-        type: "warning",
+        confirmLabel: "Update",
+        cancelLabel: "Cancel",
+        variant: "danger"
       });
 
       if (!confirmed) return;
@@ -190,9 +190,9 @@ export default function Step4BankAccountScreen() {
       title: "Delete Bank Account",
       message:
         "Are you sure you want to remove this bank account? This action cannot be undone.",
-      confirmText: "Delete",
-      cancelText: "Cancel",
-      type: "danger",
+      confirmLabel: "Delete",
+      cancelLabel: "Cancel",
+      variant: "danger",
     });
 
     if (!confirmed) return;
@@ -545,7 +545,6 @@ export default function Step4BankAccountScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <ConfirmModal />
       <Toast />
     </ThemedView>
   );

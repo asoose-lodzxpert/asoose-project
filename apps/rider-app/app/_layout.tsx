@@ -4,6 +4,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Toast from "react-native-toast-message";
 
 import { AuthProvider } from "@/context/AuthContext";
+import ConfirmProvider from "@/components/ui/ConfirmDialogProvider";
 import { JobsProvider } from "@/context/JobContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import { NotificationPreferencesProvider } from "@/context/NotificationPreferencesContext";
@@ -43,12 +44,14 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthProvider>
-        <AuthDependentProviders>
-          <RootNavigator />
-          <Toast config={toastConfig} />
-        </AuthDependentProviders>
-      </AuthProvider>
+      <ConfirmProvider>
+        <AuthProvider>
+          <AuthDependentProviders>
+            <RootNavigator />
+            <Toast config={toastConfig} />
+          </AuthDependentProviders>
+        </AuthProvider>
+      </ConfirmProvider>
     </GestureHandlerRootView>
   );
 }

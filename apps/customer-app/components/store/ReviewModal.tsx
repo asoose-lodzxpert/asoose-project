@@ -7,7 +7,6 @@ import {
   TextInput,
   ActivityIndicator,
   ScrollView,
-  Alert,
 } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -19,6 +18,7 @@ import {
   reportContent,
 } from "@/services/review.service";
 import type { CreateReviewDto } from "@/types/marketplace";
+import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 
 type ReviewModalProps = {
   visible: boolean;
@@ -39,6 +39,8 @@ export function ReviewModal({
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reportVisible, setReportVisible] = useState(false);
+  const confirm = useConfirm();
 
   const primary = useThemeColor({}, "brandPrimary");
   const textColor = useThemeColor({}, "textPrimary");
@@ -46,35 +48,32 @@ export function ReviewModal({
   const cardBg = useThemeColor({}, "surfaceCard");
   const borderColor = useThemeColor({}, "borderDefault");
 
+  const reasons = [
+    "Spam or fake listing",
+    "Offensive or inappropriate content",
+    "Misleading information",
+    "Fraudulent activity",
+    "Other",
+  ];
+
   const handleReport = () => {
-    const reasons = [
-      "Spam or fake listing",
-      "Offensive or inappropriate content",
-      "Misleading information",
-      "Fraudulent activity",
-      "Other",
-    ];
-    Alert.alert(
-      "Report This Store",
-      "Please select a reason for your report. Our moderation team will review it within 24 hours.",
-      [
-        ...reasons.map((reason) => ({
-          text: reason,
-          onPress: async () => {
-            try {
-              const res = await reportContent("STORE", storeId, reason);
-              Alert.alert("Report Submitted", res.message);
-            } catch {
-              Alert.alert(
-                "Error",
-                "Could not submit report. Please try again.",
-              );
-            }
-          },
-        })),
-        { text: "Cancel", style: "cancel" },
-      ],
-    );
+    setReportVisible(true);
+  };
+
+  const handleSelectReason = async (reason: string) => {
+    setReportVisible(false);
+    try {
+      const res = await reportContent("STORE", storeId, reason);
+      confirm({ title: "Report Submitted", message: res.message, hideCancel: true, confirmLabel: "OK" });
+    } catch {
+      confirm({
+        title: "Error",
+        message: "Could not submit report. Please try again.",
+        hideCancel: true,
+        confirmLabel: "OK",
+        variant: "danger"
+      });
+    }
   };
 
   const handleSubmit = async () => {
@@ -236,6 +235,33 @@ export function ReviewModal({
           </ScrollView>
         </ThemedView>
       </View>
+
+      {/* Report Reason Selection Modal */}
+      <Modal visible={reportVisible} animationType="fade" transparent onRequestClose={() => setReportVisible(false)}>
+        <View style={styles.overlay}>
+          <ThemedView style={[styles.container, { backgroundColor: cardBg }]}>
+            <ThemedText style={styles.title}>Report This Store</ThemedText>
+            <ThemedText style={[styles.label, { color: mutedColor, marginBottom: 16, marginTop: 8 }]}>
+              Please select a reason for your report.
+            </ThemedText>
+            {reasons.map((reason) => (
+              <TouchableOpacity
+                key={reason}
+                style={[styles.reasonButton, { borderBottomColor: borderColor }]}
+                onPress={() => handleSelectReason(reason)}
+              >
+                <ThemedText style={{ fontSize: 16 }}>{reason}</ThemedText>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => setReportVisible(false)}
+            >
+              <ThemedText style={[styles.cancelButtonText, { color: primary }]}>Cancel</ThemedText>
+            </TouchableOpacity>
+          </ThemedView>
+        </View>
+      </Modal>
     </Modal>
   );
 }
@@ -345,5 +371,18 @@ const styles = StyleSheet.create({
   reportLinkText: {
     fontSize: 13,
     textDecorationLine: "underline",
+  },
+  reasonButton: {
+    paddingVertical: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  cancelButton: {
+    paddingVertical: 16,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });

@@ -7,12 +7,10 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import BottomOverlay from "@/components/delivery/BottomOverlay";
 import FloatingHeader from "@/components/delivery/FloatingHeader";
 import MapCanvas, { MapCanvasHandle } from "@/components/delivery/MapCanvas";
-import { useConfirm } from "@/hooks/use-confirm";
 
 export default function HomeScreen() {
   const background = useThemeColor({}, "surfaceBackground");
   const mapRef = useRef<MapCanvasHandle>(null);
-  const { ConfirmModal } = useConfirm();
 
   const loading = false;
 
@@ -39,7 +37,6 @@ export default function HomeScreen() {
           onAnimateToDropoff={() => mapRef.current?.animateToDropoff()}
         />
       </View>
-      <ConfirmModal />
     </ThemedView>
   );
 }

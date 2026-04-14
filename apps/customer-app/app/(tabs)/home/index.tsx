@@ -14,6 +14,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import type { IconSymbolName } from "@/components/ui/icon-symbol";
 import { useHomeContext } from "@/context/HomeContext";
+import { useLocation } from "@/context/LocationContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import type { Banner, StoreFilterSlug } from "@/types/home";
 import { useFocusEffect } from "@react-navigation/native";
@@ -82,6 +83,7 @@ export default function HomeScreen() {
     category,
     setCategory,
   } = useHomeContext();
+  const { city } = useLocation();
 
   const [refreshing, setRefreshing] = useState(false);
   const hasLoaded = useRef(false);
@@ -219,9 +221,25 @@ export default function HomeScreen() {
         onEndReachedThreshold={0.4}
         ListEmptyComponent={
           !initialStoreLoading && !storeLoading ? (
-            <View style={{ paddingVertical: 40 }}>
-              <ThemedText style={{ textAlign: "center" }}>
-                {"No stores available yet."}
+            <View style={{ paddingVertical: 60, alignItems: "center", paddingHorizontal: 32 }}>
+              <View style={{ 
+                width: 80, 
+                height: 80, 
+                borderRadius: 40, 
+                backgroundColor: `${primary}15`, 
+                alignItems: "center", 
+                justifyContent: "center",
+                marginBottom: 20
+              }}>
+                <IconSymbol name="mappin.slash" size={40} color={primary} />
+              </View>
+              <ThemedText style={{ fontSize: 20, fontWeight: "800", textAlign: "center", marginBottom: 8 }}>
+                Services not available yet
+              </ThemedText>
+              <ThemedText style={{ textAlign: "center", color: "#6B7280", lineHeight: 20 }}>
+                {city?.name 
+                  ? `We haven't reached ${city.name} yet. Stay tuned as we expand to more cities!`
+                  : "We haven't reached your current location yet. Stay tuned as we expand!"}
               </ThemedText>
             </View>
           ) : null

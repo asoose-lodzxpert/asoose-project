@@ -113,4 +113,9 @@ export class CreateRiderDto {
   @IsOptional()
   @IsObject()
   location?: { lat: number; lng: number };
+
+  @ApiPropertyOptional({ example: 'uuid-of-city' })
+  @IsOptional()
+  @IsString()
+  cityId?: string;
 }

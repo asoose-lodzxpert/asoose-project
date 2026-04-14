@@ -5,7 +5,8 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { SignupForm, VehicleType } from "@/types/signup";
 import * as ImagePicker from "expo-image-picker";
 import React, { useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 
 type Props = {
   data: SignupForm;
@@ -135,6 +136,7 @@ export function StepVehicleInfo({ data, onChange }: Props) {
   const textSecondary = useThemeColor({}, "textSecondary");
   const success = useThemeColor({}, "statusSuccess");
   const danger = useThemeColor({}, "statusError");
+  const confirm = useConfirm();
 
   const [uploading, setUploading] = useState<string | null>(null);
 
@@ -154,10 +156,13 @@ export function StepVehicleInfo({ data, onChange }: Props) {
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert(
-          "Permission Required",
-          "Please allow access to your photo library to upload documents.",
-        );
+        await confirm({
+          title: "Permission Required",
+          message: "Please allow access to your photo library to upload documents.",
+          hideCancel: true,
+          confirmLabel: "OK",
+          variant: "danger"
+        });
         setUploading(null);
         return;
       }
@@ -183,7 +188,13 @@ export function StepVehicleInfo({ data, onChange }: Props) {
       onChange("documents", { ...data.documents, [key]: asset.uri });
       setUploading(null);
     } catch {
-      Alert.alert("Error", "Failed to pick image. Please try again.");
+      await confirm({
+        title: "Error",
+        message: "Failed to pick image. Please try again.",
+        hideCancel: true,
+        confirmLabel: "OK",
+        variant: "danger"
+      });
       setUploading(null);
     }
   };

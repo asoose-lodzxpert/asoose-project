@@ -23,6 +23,7 @@ export interface SignupForm {
   language: string | null;
   state: string | null;
   city: string | null;
+  cityId: string | null;
 
   // Step 2 - Vehicle Info
   vehicleType: VehicleType;

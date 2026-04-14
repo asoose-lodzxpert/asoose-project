@@ -13,7 +13,7 @@ import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { useConfirm } from "@/hooks/use-confirm";
+import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 import { requestAccountDeletion } from "@/services/account.service";
 import { useAuth } from "@/context/AuthContext";
 
@@ -43,7 +43,7 @@ export default function DeleteAccountScreen() {
 
   const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
   const [additionalInfo, setAdditionalInfo] = useState("");
-  const { confirm, ConfirmModal } = useConfirm();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1); // 1: Info, 2: Reasons, 3: Confirm
 
@@ -401,10 +401,9 @@ export default function DeleteAccountScreen() {
                 title: "Request Account Deletion",
                 message:
                   "Are you absolutely sure you want to request account deletion? This action cannot be undone once approved by admin.",
-                confirmText: "Delete Account",
-                cancelText: "Cancel",
-                type: "danger",
-                icon: "trash.fill",
+                confirmLabel: "Delete Account",
+                cancelLabel: "Cancel",
+                variant: "danger"
               });
               if (result) {
                 await handleSubmitDeletion();
@@ -422,8 +421,6 @@ export default function DeleteAccountScreen() {
           </Pressable>
         )}
       </View>
-
-      <ConfirmModal />
 
       <Toast />
     </ThemedView>

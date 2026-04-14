@@ -1,7 +1,7 @@
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useConfirm } from "@/hooks/use-confirm";
+import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { deleteAccount } from "@/services/delete-account.service";
 import { useRouter } from "expo-router";
@@ -30,7 +30,7 @@ export default function DeleteAccountScreen() {
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [loading, setLoading] = useState(false);
-  const { confirm, ConfirmModal } = useConfirm();
+  const confirm = useConfirm();
 
   const handleDelete = async () => {
     setLoading(true);
@@ -38,7 +38,13 @@ export default function DeleteAccountScreen() {
       await deleteAccount(selectedReason || "No reason provided");
       setStep(3);
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to delete account");
+      await confirm({
+        title: "Error",
+        message: error.message || "Failed to delete account",
+        hideCancel: true,
+        confirmLabel: "OK",
+        variant: "danger"
+      });
     } finally {
       setLoading(false);
     }
@@ -135,8 +141,9 @@ export default function DeleteAccountScreen() {
                   title: "Final Confirmation",
                   message:
                     "This action cannot be undone. Do you want to proceed?",
-                  confirmText: "Delete Account",
-                  cancelText: "Cancel",
+                  confirmLabel: "Delete Account",
+                  cancelLabel: "Cancel",
+                  variant: "danger"
                 });
                 if (confirmed) handleDelete();
               }}
@@ -188,7 +195,6 @@ export default function DeleteAccountScreen() {
           </View>
         )}
       </ScrollView>
-      <ConfirmModal />
     </ThemedView>
   );
 }

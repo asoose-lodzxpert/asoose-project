@@ -23,7 +23,7 @@ import { StoreInfo } from "@/components/signup/step3/StoreInfo";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useConfirm } from "@/hooks/use-confirm"; // Updated to use the hook
+import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { OpenHour, SignupStep3Data } from "@/types/signup";
 
@@ -31,7 +31,7 @@ export default function EditStoreDetailsScreen() {
   const router = useRouter();
   const isMountedRef = useRef(true);
   const mapRef = useRef<MapView | null>(null);
-  const { confirm, ConfirmModal } = useConfirm();
+  const confirm = useConfirm();
 
   const [locating, setLocating] = useState(false);
   const primary = useThemeColor({}, "brandPrimary");
@@ -109,8 +109,8 @@ export default function EditStoreDetailsScreen() {
       title: "Update Store Location",
       message:
         "Do you want to update your store location to your current location?",
-      confirmText: "Update",
-      type: "warning",
+      confirmLabel: "Update",
+      variant: "danger"
     });
     if (!confirmed) return;
 
@@ -240,7 +240,6 @@ export default function EditStoreDetailsScreen() {
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
-      <ConfirmModal />
       <Toast />
     </ThemedView>
   );

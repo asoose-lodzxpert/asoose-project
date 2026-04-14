@@ -40,6 +40,7 @@ export default function SignupScreen() {
     language: null,
     state: null,
     city: null,
+    cityId: null,
 
     vehicleType: null,
     make: "",

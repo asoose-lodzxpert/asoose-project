@@ -6,6 +6,7 @@ import Toast from "react-native-toast-message";
 // Components & Context
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { toastConfig } from "@/components/ThemedToast";
+import ConfirmProvider from "@/components/ui/ConfirmDialogProvider";
 import { AuthProvider } from "@/context/AuthContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import { NotificationPreferencesProvider } from "@/context/NotificationPreferencesContext";
@@ -54,18 +55,20 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ErrorBoundary>
-        <AuthProvider>
-          <BalanceProvider>
-            <NotificationProvider>
-              <NotificationPreferencesProvider>
-                <RootNavigator />
-                <Toast config={toastConfig} />
-              </NotificationPreferencesProvider>
-            </NotificationProvider>
-          </BalanceProvider>
-        </AuthProvider>
-      </ErrorBoundary>
+      <ConfirmProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <BalanceProvider>
+              <NotificationProvider>
+                <NotificationPreferencesProvider>
+                  <RootNavigator />
+                  <Toast config={toastConfig} />
+                </NotificationPreferencesProvider>
+              </NotificationProvider>
+            </BalanceProvider>
+          </AuthProvider>
+        </ErrorBoundary>
+      </ConfirmProvider>
     </GestureHandlerRootView>
   );
 }

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Plus } from "lucide-react";
+import Image from "next/image";
 import { useCartStore } from "@/store/useCartStore";
 import { useParams } from "next/navigation";
 import { toast } from "react-toastify";
@@ -44,7 +45,7 @@ export const MenuItem = ({
       {/* Image */}
       <div className="w-24 h-24 bg-gray-100 dark:bg-white/5 rounded-xl flex-shrink-0 overflow-hidden relative">
         {image ? (
-          <img src={image} alt={name} className="w-full h-full object-cover" />
+          <Image src={image} alt={name} fill className="object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">
             No Img

@@ -4,8 +4,10 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -30,6 +32,9 @@ export default function RideBookingScreen() {
     error,
     estimateFare,
     createRide,
+    createScheduledRide,
+    scheduledAt,
+    setScheduledAt,
     resetBooking,
   } = useRide();
 
@@ -38,6 +43,7 @@ export default function RideBookingScreen() {
   const danger = useThemeColor({}, "statusError");
   const surface = useThemeColor({}, "surfaceBackground");
   const card = useThemeColor({}, "surfaceCard");
+  const border = useThemeColor({}, "borderDefault");
   const textSecondary = useThemeColor({}, "textSecondary");
 
   const [estimating, setEstimating] = useState(false);
@@ -117,11 +123,45 @@ export default function RideBookingScreen() {
       return;
     }
 
+    if (scheduledAt) {
+        const success = await createScheduledRide();
+        if (success) {
+            router.replace("/(tabs)/home");
+        }
+        return;
+    }
+
     const rideId = await createRide();
 
     if (rideId) {
       router.push("/ride/payment");
     }
+  };
+
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [datePickerMode, setDatePickerMode] = useState<"date" | "time">("date");
+
+  const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (event.type === "dismissed") {
+      setShowDatePicker(false);
+      return;
+    }
+
+    const currentDate = selectedDate || scheduledAt || new Date(Date.now() + 60 * 60 * 1000);
+    
+    if (datePickerMode === "date") {
+      setDatePickerMode("time");
+      setScheduledAt(currentDate);
+    } else {
+      setShowDatePicker(false);
+      setScheduledAt(currentDate);
+      setDatePickerMode("date");
+    }
+  };
+
+  const handleOpenPicker = () => {
+    setDatePickerMode("date");
+    setShowDatePicker(true);
   };
 
   const canBook =
@@ -206,6 +246,27 @@ export default function RideBookingScreen() {
           durationMin={fareEstimate?.durationMin}
         />
 
+        {/* Selected Schedule Time */}
+        {scheduledAt && (
+          <View style={[styles.scheduledCard, { backgroundColor: `${primary}10`, borderColor: primary }]}>
+            <View style={styles.scheduledInfo}>
+              <IconSymbol name="clock" size={20} color={primary} />
+              <View>
+                <ThemedText style={styles.scheduledLabel}>Scheduled for</ThemedText>
+                <ThemedText style={styles.scheduledTime}>
+                  {scheduledAt.toLocaleString([], {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
+                </ThemedText>
+              </View>
+            </View>
+            <Pressable onPress={() => setScheduledAt(null)} style={styles.clearScheduled}>
+                <IconSymbol name="x" size={16} color={primary} />
+            </Pressable>
+          </View>
+        )}
+
         {/* Fare Estimate */}
         {estimating && (
           <View style={[styles.estimatingCard, { backgroundColor: card }]}>
@@ -230,30 +291,58 @@ export default function RideBookingScreen() {
 
       {/* Book Button */}
       <View style={[styles.footer, { backgroundColor: surface }]}>
-        <Pressable
-          onPress={handleBookRide}
-          disabled={!canBook}
-          style={[
-            styles.bookButton,
-            {
-              backgroundColor: canBook ? primary : textSecondary,
-            },
-          ]}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color={textOnPrimary} />
-          ) : (
-            <>
-              <ThemedText
-                type="defaultSemiBold"
-                style={[styles.bookButtonText, { color: textOnPrimary }]}
-              >
-                Book Ride
-              </ThemedText>
-              <IconSymbol name="arrow.right" size={20} color={textOnPrimary} />
-            </>
-          )}
-        </Pressable>
+        <View style={styles.footerRow}>
+          <Pressable
+            onPress={handleOpenPicker}
+            disabled={!pickupLocation || !dropoffLocation}
+            style={[
+              styles.scheduleButton,
+              {
+                backgroundColor: card,
+                borderColor: border,
+              },
+            ]}
+          >
+             <IconSymbol name="clock" size={24} color={scheduledAt ? primary : textSecondary} />
+          </Pressable>
+
+          <Pressable
+            onPress={handleBookRide}
+            disabled={!canBook}
+            style={[
+              styles.bookButton,
+              {
+                backgroundColor: canBook ? primary : textSecondary,
+                flex: 1,
+              },
+            ]}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color={textOnPrimary} />
+            ) : (
+              <>
+                <ThemedText
+                  type="defaultSemiBold"
+                  style={[styles.bookButtonText, { color: textOnPrimary }]}
+                >
+                  {scheduledAt ? "Schedule Ride" : "Book Ride"}
+                </ThemedText>
+                <IconSymbol name="arrow.right" size={20} color={textOnPrimary} />
+              </>
+            )}
+          </Pressable>
+        </View>
+
+        {showDatePicker && (
+          <DateTimePicker
+            value={scheduledAt || new Date(Date.now() + 60 * 60 * 1000)}
+            mode={datePickerMode}
+            is24Hour={false}
+            display={Platform.OS === "ios" ? "spinner" : "default"}
+            onChange={onDateChange}
+            minimumDate={new Date(Date.now() + 30 * 60 * 1000)} // At least 30 mins in future
+          />
+        )}
       </View>
     </ThemedView>
   );
@@ -318,6 +407,19 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "rgba(0,0,0,0.05)",
   },
+  footerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  scheduleButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   bookButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -328,5 +430,33 @@ const styles = StyleSheet.create({
   },
   bookButtonText: {
     fontSize: 16,
+  },
+  scheduledCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+    borderWidth: 1,
+  },
+  scheduledInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  scheduledLabel: {
+    fontSize: 10,
+    textTransform: "uppercase",
+    fontWeight: "800",
+    opacity: 0.6,
+  },
+  scheduledTime: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  clearScheduled: {
+    padding: 4,
   },
 });
