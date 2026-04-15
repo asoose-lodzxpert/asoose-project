@@ -11,7 +11,7 @@ import { TransactionLedgerService } from '../transactions/transaction-ledger.ser
 import { TripsService } from 'src/users/trips/trips.service';
 import { NotificationsGateway } from 'src/notifications/notifications.gateway';
 import { NotificationsService } from 'src/notifications/notifications.service';
-// ✅ Type-safe query fragments for performance
+
 const rideListInclude = {
   include: {
     customer: { select: { id: true, name: true, image: true } },
@@ -59,14 +59,11 @@ export class RidesService {
     private notificationsService: NotificationsService,
   ) {}
 
-  // 📋 1. List All Rides (Paginated & Filtered)
   async findAll(query: RideFilterDto) {
     const { search, status, from, to, page = 1, limit = 10 } = query;
     const skip = (Number(page) - 1) * Number(limit);
 
-    // Build Search Query
     const where: Prisma.RideWhereInput = {
-      // Show all rides for admin, not just paid ones
       ...(search && {
         OR: [
           { id: { contains: search, mode: 'insensitive' } },
@@ -108,7 +105,6 @@ export class RidesService {
     };
   }
 
-  // 🔍 2. Get Single Ride Details
   async findOne(id: string) {
     const ride = await this.prisma.ride.findUnique({
       where: { id },
@@ -122,7 +118,6 @@ export class RidesService {
     return this.transformRideForDetail(ride);
   }
 
-  // ✅ 3. Complete Ride (Triggers Ledger Recording)
   async completeRide(id: string) {
     const ride = await this.prisma.ride.findUnique({
       where: { id },
@@ -141,17 +136,14 @@ export class RidesService {
       throw new BadRequestException('Ride has no assigned rider');
     }
 
-    // ✅ FIX: Capture rider here so TS knows it's not null inside transaction
     const rider = ride.rider;
 
     return this.prisma.$transaction(async (tx) => {
-      // 1. Calculate fees (if not already set)
       const totalFare = ride.totalFare || 0;
-      const platformFeeRate = 0.2; // 20% platform fee
+      const platformFeeRate = 0.2;
       const platformFee = ride.platformFee || totalFare * platformFeeRate;
       const driverFee = ride.driverFee || totalFare - platformFee;
 
-      // 2. Update ride status and fees
       const updatedRide = await tx.ride.update({
         where: { id },
         data: {
@@ -162,7 +154,6 @@ export class RidesService {
         },
       });
 
-      // 3. Record payment in ledger (if payment exists and is completed)
       if (ride.payment && ride.payment.status === 'COMPLETED') {
         await this.ledgerService.recordPayment({
           id: ride.payment.id,
@@ -173,17 +164,15 @@ export class RidesService {
           status: ride.payment.status,
         });
 
-        // 4. Record ride earnings (platform fee + driver earnings)
         await this.ledgerService.recordRideEarnings({
           id: ride.id,
-          riderId: rider.id, // ✅ Use captured 'rider'
+          riderId: rider.id,
           totalFare,
           platformFee,
           driverFee,
         });
       }
 
-      // 5. Log activity
       await tx.activityLog.create({
         data: {
           userId: 'SYSTEM',
@@ -198,7 +187,6 @@ export class RidesService {
         },
       });
 
-      // ── Push & Persistent Notifications for Customer ──
       try {
         await this.notificationsService.create({
           userId: ride.customer.id,
@@ -211,7 +199,6 @@ export class RidesService {
         this.logger.error('Failed to send admin completeRide push to customer', e);
       }
 
-      // ── Push & Persistent Notifications for Rider ──
       try {
         await this.notificationsService.createForRider({
           riderId: rider.id,
@@ -228,7 +215,6 @@ export class RidesService {
     });
   }
 
-  // 🚫 4. Cancel Ride (With Refund Handling)
   async cancel(id: string, adminUserId?: string, reason?: string) {
     const ride = await this.prisma.ride.findUnique({
       where: { id },
@@ -253,8 +239,12 @@ export class RidesService {
       );
     }
 
+    const customerId = ride.customer.id;
+    const rideId = ride.id;
+    const paymentId = ride.payment?.id;
+    const paymentAmount = ride.payment?.amount;
+
     return this.prisma.$transaction(async (tx) => {
-      // 1. Cancel the ride
       await tx.ride.update({
         where: { id },
         data: {
@@ -265,24 +255,20 @@ export class RidesService {
         },
       });
 
-      // 2. Process refund if payment was completed
-      if (ride.payment && ride.payment.status === 'COMPLETED') {
-        // Update payment status to refunded
+      if (paymentId && ride.payment?.status === 'COMPLETED') {
         await tx.payment.update({
-          where: { id: ride.payment.id },
+          where: { id: paymentId },
           data: { status: 'REFUNDED' },
         });
 
-        // Record refund in ledger
         await this.ledgerService.recordRefund({
-          id: ride.payment.id,
-          amount: ride.payment.amount,
-          userId: ride.customer.id,
-          rideId: ride.id,
+          id: paymentId,
+          amount: paymentAmount || 0,
+          userId: customerId,
+          rideId: rideId,
         });
       }
 
-      // 3. Log activity
       await tx.activityLog.create({
         data: {
           userId: adminUserId || 'SUPER_ADMIN',
@@ -296,11 +282,11 @@ export class RidesService {
       });
     });
 
-    // ── NEW: Push & Persistent Notifications for Customer ──
     try {
-      if (ride) {
+      const customerId = ride?.customer?.id;
+      if (customerId) {
         await this.notificationsService.create({
-          userId: ride.customer.id,
+          userId: customerId as string,
           title: '⚠️ Ride Cancelled',
           message: `Your ride was cancelled by admin. Reason: ${reason || 'N/A'}.`,
           type: 'RIDE',
@@ -311,11 +297,11 @@ export class RidesService {
       this.logger.error('Failed to send admin cancel push to customer', e);
     }
 
-    // ── NEW: Push & Persistent Notifications for Rider ──
-    if (ride?.riderId) {
+    const riderId = ride?.riderId;
+    if (riderId) {
       try {
         await this.notificationsService.createForRider({
-          riderId: ride.riderId,
+          riderId: riderId as string,
           title: '⚠️ Trip Cancelled',
           message: `Trip was cancelled by admin. Reason: ${reason || 'N/A'}.`,
           type: 'RIDE',
@@ -327,7 +313,6 @@ export class RidesService {
     }
   }
 
-  // 💰 5. Process Ride Refund (Partial or Full)
   async refundRide(
     id: string,
     refundAmount?: number,
@@ -352,7 +337,6 @@ export class RidesService {
       throw new BadRequestException('Can only refund completed payments');
     }
 
-    // ✅ FIX: Capture payment here so TS ensures it's not null inside transaction
     const payment = ride.payment;
 
     const amountToRefund = refundAmount || payment.amount;
@@ -362,9 +346,8 @@ export class RidesService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      // 1. Update payment status
       await tx.payment.update({
-        where: { id: payment.id }, // ✅ Use captured 'payment'
+        where: { id: payment.id },
         data: {
           status:
             amountToRefund === payment.amount
@@ -373,15 +356,13 @@ export class RidesService {
         },
       });
 
-      // 2. Record refund in ledger
       await this.ledgerService.recordRefund({
-        id: payment.id, // ✅ Use captured 'payment'
+        id: payment.id,
         amount: amountToRefund,
         userId: ride.customer.id,
         rideId: ride.id,
       });
 
-      // 3. Log activity
       await tx.activityLog.create({
         data: {
           userId: adminUserId || 'ADMIN',
@@ -396,8 +377,6 @@ export class RidesService {
       });
     });
   }
-
-  // 🛠️ Transformers
 
   private transformRideForList = (ride: RideWithListRelations) => {
     const isScheduled = ride.isScheduled || ride.status === 'SCHEDULED' || ride.status === 'DRIVER_ASSIGNED_SCHED';
@@ -515,7 +494,6 @@ export class RidesService {
   }
 
   async manualAssignDriver(rideId: string, riderId: string, adminId: string) {
-    // 1. Fetch Ride & Rider
     const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
     if (!ride) throw new NotFoundException('Ride not found');
 
@@ -524,7 +502,6 @@ export class RidesService {
     });
     if (!rider) throw new NotFoundException('Rider not found');
 
-    // 2. Validate Ride State
     if (ride.riderId) {
       throw new BadRequestException(
         'Ride already has a driver. Unassign first.',
@@ -544,19 +521,15 @@ export class RidesService {
       );
     }
 
-    // 3. Validate Rider Eligibility
     if (rider.status !== 'ACTIVE') {
       throw new BadRequestException('Rider account is not ACTIVE.');
     }
-    // Note: We allow offline assignment in emergencies, but warn in UI.
-    // Strict enforcement can be toggled here.
 
-    // 4. Perform Assignment — fetch full ride data needed for socket payload
     const updatedRide = await this.prisma.ride.update({
       where: { id: rideId },
       data: {
         riderId: riderId,
-        status: 'DRIVER_ASSIGNED' as any, // Driver manually assigned by admin
+        status: 'DRIVER_ASSIGNED' as any,
         acceptedAt: new Date(),
       },
       include: {
@@ -567,7 +540,6 @@ export class RidesService {
       },
     });
 
-    // 5. Audit Log
     await this.prisma.activityLog.create({
       data: {
         userId: adminId,
@@ -582,9 +554,7 @@ export class RidesService {
       },
     });
 
-    // 6. Notify Driver and Customer via WebSocket (Best Effort)
     try {
-      // Build job offer payload for the driver
       const driverJobPayload = {
         id: updatedRide.id,
         jobType: 'ride' as const,
@@ -600,13 +570,11 @@ export class RidesService {
         assignedByAdmin: true,
       };
 
-      // Emit job assignment to driver
       this.notificationsGateway.emitJobAssigned(riderId, driverJobPayload);
       this.logger.log(
         `[manualAssignDriver] Emitted job.assigned to driver ${riderId} for ride ${rideId}`,
       );
 
-      // Emit driver-assigned notification to customer
       if (updatedRide.customer?.id) {
         this.notificationsGateway.server
           .to(`user_${updatedRide.customer.id}`)
@@ -625,7 +593,6 @@ export class RidesService {
         );
       }
 
-      // ── Push & Persistent Notification for Rider ──
       try {
         await this.notificationsService.createForRider({
           riderId: riderId,
@@ -638,12 +605,11 @@ export class RidesService {
         this.logger.error('Failed to send manualAssignDriver push to rider', e);
       }
 
-      // ── Push & Persistent Notification for Customer ──
       if (updatedRide.customer?.id) {
         try {
           await this.notificationsService.create({
             userId: updatedRide.customer.id,
-            title: '🚕 Driver Assigned',
+            title: '收 Driver Assigned',
             message: 'An administrator has assigned a driver to your ride request.',
             type: 'RIDE',
             metadata: { rideId, type: 'DRIVER_ASSIGNED' },
@@ -653,7 +619,6 @@ export class RidesService {
         }
       }
     } catch (e) {
-      // Non-fatal — DB update succeeded; socket failure is logged
       this.logger.error(
         `[manualAssignDriver] Socket notification failed for ride ${rideId}`,
         e,
@@ -663,7 +628,6 @@ export class RidesService {
     return { success: true, message: 'Driver assigned successfully' };
   }
 
-  // 🔄 Retry Matching — clears rider, returns ride to SEARCHING so the matching engine tries again
   async retryMatching(rideId: string, adminId: string) {
     const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
     if (!ride) throw new NotFoundException(`Ride #${rideId} not found`);
@@ -708,7 +672,6 @@ export class RidesService {
     return { success: true, message: 'Ride returned to matching queue' };
   }
 
-  // ❌ Unassign Driver — removes current driver and returns ride to SEARCHING
   async unassignDriver(rideId: string, adminId: string) {
     const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
     if (!ride) throw new NotFoundException(`Ride #${rideId} not found`);
