@@ -170,7 +170,8 @@ function HomeHeaderInner() {
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#0a0a0a]/90 backdrop-blur-xl border-b border-gray-100 dark:border-white/5 transition-colors duration-300">
+    <>
+      <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#0a0a0a]/90 backdrop-blur-xl border-b border-gray-100 dark:border-white/5 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-6">
         {/* LEFT: Branding OR Address */}
         <div className="flex items-center gap-6">
@@ -361,11 +362,13 @@ function HomeHeaderInner() {
         </div>
       )}
 
+      </header>
+
       <LocationPickerModal 
         isOpen={isLocationModalOpen} 
         onClose={() => setIsLocationModalOpen(false)} 
       />
-    </header>
+    </>
   );
 }
 
