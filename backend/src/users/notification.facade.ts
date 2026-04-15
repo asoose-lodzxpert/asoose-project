@@ -77,45 +77,16 @@ export class NotificationFacade {
         metadata,
       });
 
-      // 3. Push Notification — send to all available channels (Expo + FCM)
-      let expoToken: string | null | undefined = null;
-      let fcmToken: string | null | undefined = null;
+      // 3. Push Notification — send to all available tokens in PushToken table
+      const where: any = {};
+      if (role === 'VENDOR') where.vendorId = recipientId;
+      else if (role === 'RIDER') where.riderId = recipientId;
+      else where.userId = recipientId;
 
-      if (role === 'VENDOR') {
-        const vendor = await this.prisma.vendor.findUnique({
-          where: { id: recipientId },
-          select: { fcmToken: true, expoPushToken: true },
-        });
-        expoToken = vendor?.expoPushToken;
-        fcmToken = vendor?.fcmToken;
-      } else if (role === 'RIDER') {
-        const rider = await this.prisma.rider.findUnique({
-          where: { id: recipientId },
-          select: { fcmToken: true, expoPushToken: true },
-        });
-        expoToken = rider?.expoPushToken;
-        fcmToken = rider?.fcmToken;
-      } else {
-        const user = await this.prisma.user.findUnique({
-          where: { id: recipientId },
-          select: { fcmToken: true, expoPushToken: true },
-        });
-        expoToken = user?.expoPushToken;
-        fcmToken = user?.fcmToken;
-      }
-
+      const tokens = await this.prisma.pushToken.findMany({ where });
       const pushMeta = { ...metadata, notificationId: notification.id };
-      if (expoToken) {
-        await this.expoPushService.sendToDevice(
-          expoToken,
-          title,
-          message,
-          pushMeta,
-        );
-      }
-      if (fcmToken) {
-        await this.fcmService.sendToDevice(fcmToken, title, message, pushMeta);
-      }
+
+      await this._sendPushToTokens(tokens, title, message, pushMeta, role);
 
       return notification;
     } catch (error: any) {
@@ -225,40 +196,39 @@ export class NotificationFacade {
   ) {
     if (!riderId) return;
     try {
-      const rider = await this.prisma.rider.findUnique({
-        where: { id: riderId },
-        select: {
-          fcmToken: true,
-          expoPushToken: true,
-          email: true,
-          name: true,
-        },
+      const tokens = await this.prisma.pushToken.findMany({
+        where: { riderId },
+        select: { token: true, platform: true },
       });
 
-      if (!rider) {
-        this.logger.warn(`Cannot notify rider ${riderId}: record not found`);
-        return;
-      }
+      if (tokens.length === 0) return;
 
-      // Send to both Expo and FCM channels if both are available
-      if (rider.expoPushToken) {
-        await this.expoPushService.sendToDevice(
-          rider.expoPushToken,
-          title,
-          message,
-          metadata,
-        );
-      }
-      if (rider.fcmToken) {
-        await this.fcmService.sendToDevice(
-          rider.fcmToken,
-          title,
-          message,
-          metadata,
-        );
-      }
+      await this._sendPushToTokens(tokens, title, message, metadata, 'RIDER');
     } catch (error: any) {
       this.logger.error(`Failed to notify rider ${riderId}`, error.stack);
+    }
+  }
+
+  private async _sendPushToTokens(
+    tokens: { token: string; platform: string }[],
+    title: string,
+    message: string,
+    metadata?: any,
+    role: 'USER' | 'VENDOR' | 'RIDER' = 'USER',
+  ) {
+    const channelId = role === 'RIDER' ? (metadata?.type === 'NEW_JOB' ? 'new-job' : 'trip-updates') : 'default';
+
+    for (const t of tokens) {
+      const isExpo = t.platform === 'expo' || t.token.startsWith('ExponentPushToken[');
+      try {
+        if (isExpo) {
+          await this.expoPushService.sendToDevice(t.token, title, message, metadata, channelId);
+        } else {
+          await this.fcmService.sendToDevice(t.token, title, message, metadata);
+        }
+      } catch (e) {
+        this.logger.warn(`Push failed for token ${t.token}: ${e.message}`);
+      }
     }
   }
 }

@@ -337,7 +337,7 @@ export default function CheckoutScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: background }]}>
-      <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+      <SafeAreaView style={{ flex: 1 }} edges={["bottom", "left", "right"]}>
         {/* Header */}
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={styles.iconBtn}>
@@ -618,6 +618,14 @@ export default function CheckoutScreen() {
                 <ActivityIndicator color="#fff" size="small" />
                 <ThemedText style={styles.payText}>Calculating...</ThemedText>
               </View>
+            ) : items.some(i => i.available === false) ? (
+              <View style={styles.payButtonContent}>
+                <ThemedText style={styles.payText}>Items Unavailable</ThemedText>
+              </View>
+            ) : !selectedAddress ? (
+              <View style={styles.payButtonContent}>
+                <ThemedText style={styles.payText}>Select Address</ThemedText>
+              </View>
             ) : (
               <View style={styles.payButtonContent}>
                 <ThemedText style={styles.payText}>
@@ -705,7 +713,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 18, fontWeight: "700" },
   iconBtn: { padding: 8 },
-  scrollContent: { padding: 20 },
+  scrollContent: { padding: 20, paddingTop: 12 },
   section: { marginBottom: 24 },
   sectionLabel: {
     fontSize: 12,

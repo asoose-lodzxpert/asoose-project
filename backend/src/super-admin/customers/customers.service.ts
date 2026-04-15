@@ -4,7 +4,7 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service'; // Changed to relative path for safety
+import { PrismaService } from '../../prisma/prisma.service'; 
 import { UserStatus, UserRole, Prisma, OrderStatus } from '@prisma/client';
 import { UserAccountNotificationsService } from 'src/users/notifications/user-account-notifications.service';
 import { ResendService } from 'src/mail/resend.service';
@@ -289,8 +289,12 @@ export class CustomersService {
         where: { id: customerId },
         data: {
           status: targetStatus,
-          fcmToken: null, // Revoke access
         },
+      });
+
+      // Revoke access by removing all tokens
+      await tx.pushToken.deleteMany({
+        where: { userId: customerId },
       });
 
       await tx.activityLog.create({
@@ -331,12 +335,7 @@ export class CustomersService {
       // We continue here so the message is at least saved to the dashboard history
     }
 
-    try {
-      // 2. Persist to Dashboard History & Activity Log
-      // NOTE: Prisma transactions will FAIL with 500 (Foreign Key Constraint)
-      // if the adminId (from req.user.id or "SYSTEM") does not exist in the User table.
-      // In super-admin routes, the User SHOULD exist unless it's a seed script / or misconfigured.
-      
+    try {      
       const adminExists = await this.prisma.user.findUnique({ where: { id: adminId }, select: { id: true } });
 
       await this.prisma.$transaction(async (tx) => {
@@ -368,9 +367,6 @@ export class CustomersService {
       });
     } catch (dbError: any) {
       this.logger.error(`Failed to persist admin message in database: ${dbError.message}`);
-      // If persistence fails, we've already tried email, but we don't want to throw 500 
-      // if the email went out or if it's just an audit failure.
-      // However, we throw here to let the controller/filter handle the response if critical.
       throw dbError; 
     }
 

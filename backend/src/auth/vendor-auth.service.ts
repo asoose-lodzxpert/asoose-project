@@ -535,10 +535,16 @@ export class VendorAuthService {
   // ---------------- PUSH TOKENS ----------------
   async savePushToken(vendorId: string, token: string, platform: string) {
     try {
+      // Determine actual platform if it's an Expo token
+      let actualPlatform = platform;
+      if (token.startsWith('ExponentPushToken[') || token.startsWith('ExpoPushToken[')) {
+        actualPlatform = 'expo';
+      }
+
       await this.prisma.pushToken.upsert({
         where: { token },
-        update: { vendorId, platform },
-        create: { token, vendorId, platform },
+        update: { vendorId, platform: actualPlatform },
+        create: { token, vendorId, platform: actualPlatform },
       });
       return { message: 'Push token saved successfully' };
     } catch (error) {

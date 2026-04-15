@@ -1,11 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { NotificationsGateway } from '../notifications.gateway';
-import { JOB_EVENTS } from '../../matching/events/event-types';
+import { NotificationsService } from '../notifications.service';
+import { JOB_EVENTS, NOTIFICATION_EVENTS } from '../../matching/events/event-types';
 import type {
   JobAssignedEvent,
   JobUpdatedEvent,
   JobCancelledEvent,
+  SendPushNotificationEvent,
 } from '../../matching/events/event-types';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
@@ -24,6 +26,7 @@ export class RiderJobEventsListener {
   constructor(
     private readonly gateway: NotificationsGateway,
     private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   @OnEvent(JOB_EVENTS.ASSIGNED)
@@ -80,6 +83,9 @@ export class RiderJobEventsListener {
                 store: {
                   include: { vendor: { select: { phone: true } } },
                 },
+                items: {
+                  include: { product: true },
+                },
               },
             },
           },
@@ -103,6 +109,22 @@ export class RiderJobEventsListener {
       this.gateway.server
         .to(`user_${recipientId}`)
         .emit('job.assigned', jobData);
+
+      // ── NEW: Push Notification for Rider/Driver ──
+      try {
+        await this.notificationsService.createForRider({
+          riderId: recipientId,
+          title: payload.jobType === 'ride' ? '🛵 New Ride Ping!' : '📦 New Delivery Ping!',
+          message: payload.jobType === 'ride' 
+            ? 'A new ride is available nearby. Tap to view.' 
+            : 'A new delivery is available. Tap to view.',
+          type: payload.jobType === 'ride' ? 'RIDE' : 'DELIVERY',
+          category: 'job',
+          metadata: { jobId: payload.jobId, jobType: payload.jobType, type: 'JOB_ASSIGNED' },
+        });
+      } catch (err) {
+        this.logger.error(`Failed to send push for job.assigned: ${err.message}`);
+      }
 
       // Join rider/driver to the job room so they receive granular order_update events.
       // Uses adapter-aware socketsJoin — works across horizontally-scaled instances.
@@ -137,7 +159,7 @@ export class RiderJobEventsListener {
   }
 
   @OnEvent(JOB_EVENTS.CANCELLED)
-  handleJobCancelled(payload: JobCancelledEvent) {
+  async handleJobCancelled(payload: JobCancelledEvent) {
     const recipientId = payload.driverId || (payload as any).riderId;
 
     if (!recipientId) {
@@ -186,6 +208,19 @@ export class RiderJobEventsListener {
       timestamp: payload.timestamp,
     });
 
+    // ── NEW: Push Notification for Rider/Driver ──
+    try {
+      await this.notificationsService.createForRider({
+        riderId: recipientId,
+        title: '⚠️ Trip Cancelled',
+        message: `The trip ${payload.jobId.slice(0, 8)} has been cancelled by ${payload.cancelledBy}.`,
+        type: payload.jobType === 'ride' ? 'RIDE' : 'DELIVERY',
+        metadata: { jobId: payload.jobId, type: 'JOB_CANCELLED', cancelledBy: payload.cancelledBy },
+      });
+    } catch (err) {
+      this.logger.error(`Failed to send rider cancel push: ${err.message}`);
+    }
+
     // If the system cancelled a job that had a driver AND we know the customer,
     // notify the customer too so their app clears the ride state.
     if (payload.cancelledBy === 'system' && payload.customerId) {
@@ -201,6 +236,48 @@ export class RiderJobEventsListener {
           cancelledBy: 'system',
           timestamp: payload.timestamp,
         });
+
+      // ── NEW: Push Notification for Customer ──
+      try {
+        await this.notificationsService.create({
+          userId: payload.customerId,
+          title: '⚠️ Ride Cancelled',
+          message: `Your ride was cancelled by the system. Reason: ${payload.reason || 'No drivers available'}.`,
+          type: 'RIDE',
+          metadata: { rideId: payload.jobId, type: 'RIDE_CANCELLED' },
+        });
+      } catch (err) {
+        this.logger.error(`Failed to send system cancel push: ${err.message}`);
+      }
+    }
+  }
+
+  @OnEvent(NOTIFICATION_EVENTS.SEND_PUSH)
+  async handleSendPush(payload: SendPushNotificationEvent) {
+    this.logger.log(`Handling internal push request: ${payload.title}`);
+    const recipientId = payload.userId || payload.driverId;
+    if (!recipientId) return;
+
+    try {
+      if (payload.driverId) {
+        await this.notificationsService.createForRider({
+          riderId: payload.driverId,
+          title: payload.title,
+          message: payload.body,
+          type: (payload.data?.type as string) || 'SYSTEM',
+          metadata: payload.data,
+        });
+      } else if (payload.userId) {
+        await this.notificationsService.create({
+          userId: payload.userId,
+          title: payload.title,
+          message: payload.body,
+          type: (payload.data?.type as string) || 'SYSTEM',
+          metadata: payload.data,
+        });
+      }
+    } catch (err) {
+      this.logger.error(`Failed to dispatch internal push: ${err.message}`);
     }
   }
 }

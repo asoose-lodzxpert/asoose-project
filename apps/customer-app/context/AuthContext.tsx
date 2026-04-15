@@ -226,9 +226,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const enableBiometrics = useCallback(
     async (email: string, password: string) => {
+      // REQUIRE biometric verification BEFORE enabling
+      const authResult = await biometric.authenticate(
+        "Confirm your biometric identity to enable fast login",
+      );
+
+      if (!authResult.success) {
+        throw new Error(authResult.error || "Biometric verification failed");
+      }
+
       const success = await biometric.saveCredentials(email, password);
       if (!success) {
-        throw new Error("Failed to enable biometric authentication");
+        throw new Error("Failed to save biometric credentials");
       }
     },
     [biometric],

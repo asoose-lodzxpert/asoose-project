@@ -45,6 +45,12 @@ export interface IncomingJobOffer {
 
   // Order items (what is being picked up)
   orderItems?: string[];
+  itemDetails?: {
+    name: string;
+    quantity: number;
+    price: number;
+    image?: string;
+  }[];
 
   // Package handling flags
   isFragile?: boolean;
@@ -83,6 +89,15 @@ export interface CurrentJob {
 
   packageDetails?: string; // delivery
   startOtp?: string; // ride
+
+  // Order items
+  orderItems?: string[];
+  itemDetails?: {
+    name: string;
+    quantity: number;
+    price: number;
+    image?: string;
+  }[];
 
   status: string;
 

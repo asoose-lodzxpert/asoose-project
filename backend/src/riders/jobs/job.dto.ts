@@ -23,6 +23,13 @@ export interface JobSummaryDto {
    * Values: incoming-job | en-route-pickup | at-pickup | en-route-dropoff | confirm-job | online-waiting
    */
   status: string;
+  orderItems?: string[];
+  itemDetails?: {
+    name: string;
+    quantity: number;
+    price: number;
+    image?: string;
+  }[];
 }
 
 // Status mapping from DB → frontend JobStatus
@@ -84,6 +91,14 @@ export function rideToJobSummary(ride: any): JobSummaryDto {
 
 // Mapper: Delivery → JobSummaryDto
 export function deliveryToJobSummary(delivery: any): JobSummaryDto {
+  const orderItems = delivery.order?.items?.map((i: any) => i.nameSnap) || [];
+  const itemDetails = delivery.order?.items?.map((i: any) => ({
+    name: i.nameSnap,
+    quantity: i.quantity,
+    price: i.price,
+    image: i.product?.image || i.product?.images?.[0],
+  })) || [];
+
   return {
     id: delivery.id,
     jobType: 'delivery',
@@ -101,5 +116,7 @@ export function deliveryToJobSummary(delivery: any): JobSummaryDto {
     packageDetails: delivery.packageDetails,
     deliveryOtp: delivery.deliveryOtp,
     status: mapBackendStatusToFrontend(delivery.status, 'delivery'),
+    orderItems,
+    itemDetails,
   };
 }

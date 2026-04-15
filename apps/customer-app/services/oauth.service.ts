@@ -69,6 +69,7 @@ export async function signInWithGoogle(): Promise<OAuthResponse> {
   try {
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
     const result = await GoogleSignin.signIn();
+    if (__DEV__) console.log("[GoogleSignIn] Result:", JSON.stringify(result, null, 2));
 
     if (result.type === "cancelled") {
       throw new Error("Google Sign-In was cancelled");
@@ -92,6 +93,7 @@ export async function signInWithGoogle(): Promise<OAuthResponse> {
 
     return response;
   } catch (error: any) {
+    if (__DEV__) console.error("[GoogleSignIn] Detailed Error:", error);
     if (error.code === statusCodes.SIGN_IN_CANCELLED) {
       throw new Error("Google Sign-In was cancelled");
     }

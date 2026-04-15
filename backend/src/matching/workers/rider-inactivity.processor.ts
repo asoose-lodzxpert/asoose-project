@@ -177,27 +177,25 @@ export class RiderInactivityProcessor extends WorkerHost {
   /** Send a push notification to an inactive rider asking them to confirm they are still online. */
   private async sendInactivityPing(riderId: string): Promise<void> {
     try {
-      const rider = await this.prisma.rider.findUnique({
-        where: { id: riderId },
-        select: { expoPushToken: true, fcmToken: true },
+      const tokens = await this.prisma.pushToken.findMany({
+        where: { riderId: riderId },
+        select: { token: true, platform: true },
       });
-      if (!rider) return;
+
+      if (tokens.length === 0) return;
 
       const title = 'Are you still online?';
       const body =
         "We haven't received a location update from you. Open the app to keep your status active.";
       const data = { type: 'INACTIVITY_PING' };
 
-      if (rider.expoPushToken) {
-        await this.expoPushService.sendToDevice(
-          rider.expoPushToken,
-          title,
-          body,
-          data,
-        );
-      }
-      if (rider.fcmToken) {
-        await this.fcmService.sendToDevice(rider.fcmToken, title, body, data);
+      for (const t of tokens) {
+        const isExpo = t.platform === 'expo' || t.token.startsWith('ExponentPushToken[');
+        if (isExpo) {
+          await this.expoPushService.sendToDevice(t.token, title, body, data, 'trip-updates');
+        } else {
+          await this.fcmService.sendToDevice(t.token, title, body, data);
+        }
       }
     } catch (err) {
       this.logger.error(

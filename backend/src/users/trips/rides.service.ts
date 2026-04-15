@@ -717,43 +717,60 @@ export class RidesService {
       // - If the driver already accepted: riderId is set in the DB.
       // - If the driver was locked by matching but hasn't accepted yet:
       //   riderId is null in DB but pendingDriver key exists in Redis.
-      const assignedDriverId =
-        existingRide.riderId ??
-        (await this.driverStateService
-          .getPendingDriverForRide(rideId)
-          .catch(() => null));
-
-      if (assignedDriverId) {
-        // Notify driver — they may be showing the incoming job offer
-        this.notificationsGateway.server
-          .to(`user_${assignedDriverId}`)
-          .emit('RIDE_CANCELLED', cancelPayload);
-        this.logger.log(
-          `[cancelRide] Notified driver ${assignedDriverId} of customer cancellation`,
-        );
-
-        // Reset driver's Redis state so they become available for new matches
-        try {
-          await this.driverStateService.releaseDriver(assignedDriverId, rideId);
-        } catch (redisErr) {
-          // Non-fatal — DB cancel succeeded; log and continue
-          this.logger.error(
-            `[cancelRide] Failed to release driver ${assignedDriverId} from Redis`,
-            redisErr,
-          );
-        }
-      }
     } catch (e) {
       this.logger.error('Socket error cancelRide', e);
     }
 
-    // Emit event so rider-dispatch.listener can create a dispute if payment was made
+    const assignedDriverId =
+      existingRide.riderId ??
+      (await this.driverStateService
+        .getPendingDriverForRide(rideId)
+        .catch(() => null));
+
+    // ── OLD SOCKET Logic (Driver) ──
+    if (assignedDriverId) {
+      try {
+        this.notificationsGateway.server
+          .to(`user_${assignedDriverId}`)
+          .emit('RIDE_CANCELLED', cancelPayload);
+      } catch (e) {
+        this.logger.error('Socket error cancelRide driver', e);
+      }
+    }
+
+    // ── NEW: Push & Persistent Notification for Customer ──
+    try {
+      await this.notificationsService.create({
+        userId,
+        title: '🏁 Ride Cancelled',
+        message: 'Your ride request has been cancelled.',
+        type: 'RIDE',
+        metadata: { rideId, type: 'RIDE_CANCELLED', reason },
+      });
+    } catch (e) {
+      this.logger.error('Failed to send cancelRide push to customer', e);
+    }
+
+    // ── NEW: Admin Notification ──
+    try {
+      await this.notificationsService.createForAdmin({
+        title: 'Ride Cancelled by Customer',
+        message: `Ride ${rideId.slice(0, 8)} was cancelled by the customer. Reason: ${reason || 'N/A'}.`,
+        type: 'RIDE',
+        metadata: { rideId, customerId: userId, riderId: assignedDriverId, reason },
+      });
+    } catch (e) {
+      this.logger.error('Failed to send cancelRide admin notification', e);
+    }
+
+    // Emit event for listeners (like RiderJobEventsListener for rider push)
     this.eventBus.emit('job.cancelled', {
       jobId: rideId,
       jobType: 'ride',
       cancelledBy: 'customer' as const,
       reason,
       customerId: userId,
+      driverId: assignedDriverId || undefined, // CRITICAL: ensures listener can notify driver
     });
 
     await this.common.logActivity(userId, 'RIDE_CANCELLED', { rideId, reason });
