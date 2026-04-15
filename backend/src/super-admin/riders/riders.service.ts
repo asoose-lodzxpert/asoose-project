@@ -472,16 +472,20 @@ export class RidersService {
 
     if (!rider) throw new NotFoundException('Rider not found');
 
+    const riderId = rider.id;
+    const riderName = rider.name;
+    const riderEmail = rider.email;
+
     await this.prisma.rider.delete({
-      where: { id },
+      where: { id: riderId },
     });
 
     await this.logService.record({
       userId: adminId,
       action: 'RIDER_DELETED',
-      target: rider.name,
+      target: riderName,
       details: `Rider account deleted`,
-      metadata: { riderId: id, email: rider.email },
+      metadata: { riderId: riderId, email: riderEmail },
     });
 
     return { success: true };
