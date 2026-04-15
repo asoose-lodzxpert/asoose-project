@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { FcmService } from 'src/libs/fcm/fcm.service';
 import { UserRole } from '@prisma/client';
+import { ExpoPushService } from 'src/libs/expo/expo-push.service';
 
 /** High-priority event types the super-admin monitors */
 export const ADMIN_PRIORITY_TYPES = ['ORDER', 'RIDE', 'DELIVERY'];
@@ -21,6 +22,7 @@ export class AdminNotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly fcm: FcmService,
+    private readonly expo: ExpoPushService,
   ) { }
 
   async getAll(adminId: string, page = 1, type?: string) {
@@ -132,43 +134,46 @@ export class AdminNotificationsService {
    * registered a web/device push token.
    */
   async testPushToAllAdmins(title: string, message: string) {
-    const admins = await this.prisma.user.findMany({
+    const adminTokens = await this.prisma.pushToken.findMany({
       where: {
-        role: { in: ADMIN_ROLES },
-        fcmToken: { not: null },
-        status: 'ACTIVE',
+        user: {
+          role: { in: ADMIN_ROLES },
+          status: 'ACTIVE',
+        },
       },
-      select: { id: true, name: true, fcmToken: true, role: true },
+      select: {
+        token: true,
+        platform: true,
+        user: { select: { id: true, name: true, role: true } },
+      },
     });
 
-    const tokens = admins.map((a) => a.fcmToken!).filter(Boolean);
-
-    if (!tokens.length) {
+    if (!adminTokens.length) {
       return {
         success: false,
-        adminsFound: admins.length,
         tokensFound: 0,
-        message:
-          'No admin push tokens registered. Open the admin panel in a browser ' +
-          'that has granted notification permission to register a token.',
+        message: 'No admin push tokens registered.',
       };
     }
 
-    await this.fcm.sendToDevices(tokens, title, message, {
+    const data = {
       type: 'ADMIN_TEST',
       url: '/super-admin/notifications',
       sound: 'notification',
-    });
+    };
 
-    this.logger.log(
-      `Test push sent to ${tokens.length} admin device(s) (${admins.map((a) => a.name).join(', ')})`,
-    );
+    await this._sendPushToTokens(adminTokens, title, message, data);
+
+    const recipients = Array.from(new Set(adminTokens.map(t => t.user?.id).filter(Boolean)))
+      .map(id => {
+        const t = adminTokens.find(at => at.user?.id === id);
+        return { id, name: t?.user?.name, role: t?.user?.role };
+      });
 
     return {
       success: true,
-      adminsFound: admins.length,
-      tokensFound: tokens.length,
-      recipients: admins.map((a) => ({ id: a.id, name: a.name, role: a.role })),
+      tokensFound: adminTokens.length,
+      recipients,
     };
   }
 
@@ -180,21 +185,41 @@ export class AdminNotificationsService {
     body: string,
     data?: Record<string, string>,
   ) {
-    const tokens = await this.prisma.user
-      .findMany({
-        where: {
+    const tokens = await this.prisma.pushToken.findMany({
+      where: {
+        user: {
           role: { in: ADMIN_ROLES },
-          fcmToken: { not: null },
           status: 'ACTIVE',
         },
-        select: { fcmToken: true },
-      })
-      .then((rows) => rows.map((r) => r.fcmToken!).filter(Boolean));
+      },
+      select: { token: true, platform: true },
+    });
 
     if (tokens.length) {
-      await this.fcm.sendToDevices(tokens, title, body, data);
+      await this._sendPushToTokens(tokens, title, body, data);
     }
 
     return tokens.length;
+  }
+
+  private async _sendPushToTokens(
+    tokens: { token: string; platform: string }[],
+    title: string,
+    message: string,
+    metadata?: any,
+  ) {
+    const expoTokens = tokens
+      .filter(t => t.platform === 'expo' || t.token.startsWith('ExponentPushToken['))
+      .map(t => t.token);
+    const fcmTokens = tokens
+      .filter(t => t.platform !== 'expo' && !t.token.startsWith('ExponentPushToken['))
+      .map(t => t.token);
+
+    if (expoTokens.length > 0) {
+      await this.expo.sendToMultipleDevices(expoTokens, title, message, metadata).catch(e => this.logger.error('Expo push error', e));
+    }
+    if (fcmTokens.length > 0) {
+      await this.fcm.sendToDevices(fcmTokens, title, message, metadata).catch(e => this.logger.error('FCM push error', e));
+    }
   }
 }

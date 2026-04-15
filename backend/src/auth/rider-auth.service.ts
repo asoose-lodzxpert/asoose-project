@@ -435,7 +435,9 @@ export class RiderAuthService {
 
   // ============== PUSH TOKEN ==============
   async savePushToken(riderId: string, token: string, platform: string) {
-    const isExpoToken = token.startsWith('ExponentPushToken[');
+    const isExpoToken =
+      token.startsWith('ExponentPushToken[') ||
+      token.startsWith('ExpoPushToken[');
     const effectivePlatform = isExpoToken ? 'expo' : platform;
 
     try {

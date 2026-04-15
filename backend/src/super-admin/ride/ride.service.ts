@@ -10,6 +10,7 @@ import { Prisma, RideStatus } from '@prisma/client';
 import { TransactionLedgerService } from '../transactions/transaction-ledger.service';
 import { TripsService } from 'src/users/trips/trips.service';
 import { NotificationsGateway } from 'src/notifications/notifications.gateway';
+import { NotificationsService } from 'src/notifications/notifications.service';
 // ✅ Type-safe query fragments for performance
 const rideListInclude = {
   include: {
@@ -55,6 +56,7 @@ export class RidesService {
     private ledgerService: TransactionLedgerService,
     private tripsService: TripsService,
     private notificationsGateway: NotificationsGateway,
+    private notificationsService: NotificationsService,
   ) {}
 
   // 📋 1. List All Rides (Paginated & Filtered)
@@ -196,6 +198,32 @@ export class RidesService {
         },
       });
 
+      // ── Push & Persistent Notifications for Customer ──
+      try {
+        await this.notificationsService.create({
+          userId: ride.customer.id,
+          title: '🏁 Ride Completed',
+          message: 'Your ride has been completed. Thank you for riding with us!',
+          type: 'RIDE',
+          metadata: { rideId: id, type: 'RIDE_COMPLETED' },
+        });
+      } catch (e) {
+        this.logger.error('Failed to send admin completeRide push to customer', e);
+      }
+
+      // ── Push & Persistent Notifications for Rider ──
+      try {
+        await this.notificationsService.createForRider({
+          riderId: rider.id,
+          title: '💰 Ride Completed',
+          message: 'Ride completed! Earnings processed.',
+          type: 'RIDE',
+          metadata: { rideId: id, type: 'RIDE_COMPLETED' },
+        });
+      } catch (e) {
+        this.logger.error('Failed to send admin completeRide push to rider', e);
+      }
+
       return updatedRide;
     });
   }
@@ -267,6 +295,36 @@ export class RidesService {
         },
       });
     });
+
+    // ── NEW: Push & Persistent Notifications for Customer ──
+    try {
+      if (ride) {
+        await this.notificationsService.create({
+          userId: ride.customer.id,
+          title: '⚠️ Ride Cancelled',
+          message: `Your ride was cancelled by admin. Reason: ${reason || 'N/A'}.`,
+          type: 'RIDE',
+          metadata: { rideId: id, type: 'RIDE_CANCELLED' },
+        });
+      }
+    } catch (e) {
+      this.logger.error('Failed to send admin cancel push to customer', e);
+    }
+
+    // ── NEW: Push & Persistent Notifications for Rider ──
+    if (ride?.riderId) {
+      try {
+        await this.notificationsService.createForRider({
+          riderId: ride.riderId,
+          title: '⚠️ Trip Cancelled',
+          message: `Trip was cancelled by admin. Reason: ${reason || 'N/A'}.`,
+          type: 'RIDE',
+          metadata: { rideId: id, type: 'RIDE_CANCELLED' },
+        });
+      } catch (e) {
+        this.logger.error('Failed to send admin cancel push to rider', e);
+      }
+    }
   }
 
   // 💰 5. Process Ride Refund (Partial or Full)
@@ -565,6 +623,34 @@ export class RidesService {
         this.logger.log(
           `[manualAssignDriver] Emitted DRIVER_ASSIGNED to customer ${updatedRide.customer.id} for ride ${rideId}`,
         );
+      }
+
+      // ── Push & Persistent Notification for Rider ──
+      try {
+        await this.notificationsService.createForRider({
+          riderId: riderId,
+          title: '🛵 New Ride Assigned!',
+          message: 'You have been manually assigned to a ride by admin. Tap to view.',
+          type: 'RIDE',
+          metadata: { rideId, type: 'DRIVER_ASSIGNED' },
+        });
+      } catch (e) {
+        this.logger.error('Failed to send manualAssignDriver push to rider', e);
+      }
+
+      // ── Push & Persistent Notification for Customer ──
+      if (updatedRide.customer?.id) {
+        try {
+          await this.notificationsService.create({
+            userId: updatedRide.customer.id,
+            title: '🚕 Driver Assigned',
+            message: 'An administrator has assigned a driver to your ride request.',
+            type: 'RIDE',
+            metadata: { rideId, type: 'DRIVER_ASSIGNED' },
+          });
+        } catch (e) {
+          this.logger.error('Failed to send manualAssignDriver push to customer', e);
+        }
       }
     } catch (e) {
       // Non-fatal — DB update succeeded; socket failure is logged

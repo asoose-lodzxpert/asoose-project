@@ -14,6 +14,7 @@ import { useJobs } from "@/context/JobContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { resolveAddress } from "@/utils/address";
 import CancelJobModal from "@/components/delivery/CancelJobModal";
+import JobItemDetailsModal from "./JobItemDetailsModal";
 
 const RIDE_OTP_LENGTH = 6;
 
@@ -24,6 +25,7 @@ export default function AtPickupScreen() {
   const [otp, setOtp] = useState("");
   const [otpError, setOtpError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [detailsVisible, setDetailsVisible] = useState(false);
 
   const colors = {
     bg: useThemeColor({}, "surfaceBackground"),
@@ -53,6 +55,7 @@ export default function AtPickupScreen() {
       : "Confirm Pickup";
 
   const canConfirm = isRide ? otp.trim().length === RIDE_OTP_LENGTH : true;
+  const deliveryId = activeJob.id.split("-")[0].toUpperCase();
 
   const handleConfirm = async () => {
     if (isRide && otp.trim().length !== RIDE_OTP_LENGTH) {
@@ -87,8 +90,8 @@ export default function AtPickupScreen() {
           <View style={[styles.dot, { backgroundColor: colors.success }]} />
           <ThemedText style={styles.statusText}>
             {isMultiStop
-              ? `Stop ${currentStopIndex + 1}/${activeJob.stops?.length}`
-              : "At Pickup"}
+              ? `Stop ${currentStopIndex + 1}/${activeJob.stops?.length} • #${deliveryId}`
+              : `At Pickup • #${deliveryId}`}
           </ThemedText>
         </View>
         <ThemedText style={[styles.instruction, { color: colors.muted }]}>
@@ -134,6 +137,32 @@ export default function AtPickupScreen() {
           </Pressable>
         )}
       </View>
+
+      {!isRide && (
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 12 }]}>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+             <IconSymbol name="shippingbox" size={16} color={colors.muted} />
+             <ThemedText style={{ fontSize: 13, color: colors.text, flex: 1 }} numberOfLines={3}>
+               {activeJob.orderItems?.length
+                 ? activeJob.orderItems.join(", ")
+                 : activeJob.packageDetails || "Package pickup"}
+             </ThemedText>
+          </View>
+          <Pressable 
+            style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.primary + '10' }}
+            onPress={() => setDetailsVisible(true)}
+          >
+            <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Details</ThemedText>
+          </Pressable>
+        </View>
+      )}
+
+      <JobItemDetailsModal
+        visible={detailsVisible}
+        onClose={() => setDetailsVisible(false)}
+        items={activeJob.itemDetails}
+        packageDetails={activeJob.packageDetails}
+      />
 
       {/* OTP entry — rides only */}
       {isRide && (

@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import Toast from "react-native-toast-message";
+import JobItemDetailsModal from "./JobItemDetailsModal";
 
 const AUTO_DECLINE_TIMEOUT = 90;
 const EXTENSION_TIME = 15;
@@ -36,6 +37,7 @@ export default function IncomingJobSheet() {
   const [timer, setTimer] = useState(AUTO_DECLINE_TIMEOUT);
   const [canExtend, setCanExtend] = useState(true);
   const [loadingAccept, setLoadingAccept] = useState(false);
+  const [detailsVisible, setDetailsVisible] = useState(false);
 
   // Keep a stable ref so the interval closure always calls the latest declineJob
   // without declineJob being in the deps (which would reset the timer on every render).
@@ -98,13 +100,15 @@ export default function IncomingJobSheet() {
     }
   };
 
+  const deliveryId = incomingJob.id.split("-")[0].toUpperCase();
+
   const badgeLabel = incomingJob.isScheduled
-    ? "SCHEDULED"
+    ? `SCHEDULED #${deliveryId}`
     : isRide
-      ? "NEW RIDE"
+      ? `RIDE #${deliveryId}`
       : isMultiStop
-        ? "MULTI-STORE"
-        : "NEW DELIVERY";
+        ? `MULTI-STORE #${deliveryId}`
+        : `DELIVERY #${deliveryId}`;
 
   const scheduledTime = incomingJob.scheduledAt
     ? new Date(incomingJob.scheduledAt).toLocaleTimeString([], {
@@ -340,25 +344,43 @@ export default function IncomingJobSheet() {
         {/* Order items summary */}
         {!isRide &&
           !isMultiStop &&
-          incomingJob.orderItems &&
-          incomingJob.orderItems.length > 0 && (
+          (incomingJob.orderItems?.length || incomingJob.packageDetails ? (
             <View
               style={[
                 styles.itemsCard,
                 { backgroundColor: card, borderColor: border },
               ]}
             >
-              <IconSymbol name="shippingbox" size={14} color={textMuted} />
-              <ThemedText
-                style={[styles.itemsText, { color: textMuted }]}
-                numberOfLines={2}
+              <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <IconSymbol name="shippingbox" size={14} color={textMuted} />
+                <ThemedText
+                  style={[styles.itemsText, { color: textMuted }]}
+                  numberOfLines={2}
+                >
+                  {incomingJob.orderItems?.length
+                    ? incomingJob.orderItems.length === 1
+                      ? incomingJob.orderItems[0]
+                      : `${incomingJob.orderItems[0]} + ${incomingJob.orderItems.length - 1} more`
+                    : incomingJob.packageDetails}
+                </ThemedText>
+              </View>
+              <Pressable
+                style={[styles.detailsLink, { backgroundColor: primary + "10" }]}
+                onPress={() => setDetailsVisible(true)}
               >
-                {incomingJob.orderItems.length === 1
-                  ? incomingJob.orderItems[0]
-                  : `${incomingJob.orderItems[0]} + ${incomingJob.orderItems.length - 1} more`}
-              </ThemedText>
+                <ThemedText style={[styles.detailsLinkText, { color: primary }]}>
+                  Details
+                </ThemedText>
+              </Pressable>
             </View>
-          )}
+          ) : null)}
+
+        <JobItemDetailsModal
+          visible={detailsVisible}
+          onClose={() => setDetailsVisible(false)}
+          items={incomingJob.itemDetails}
+          packageDetails={incomingJob.packageDetails}
+        />
 
         {/* Stats row */}
         <View style={styles.stats}>
@@ -549,4 +571,13 @@ const styles = StyleSheet.create({
   },
   declineBtn: { borderWidth: 1 },
   actionBtnLabel: { fontSize: 15, fontWeight: "700" },
+  detailsLink: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  detailsLinkText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
 });

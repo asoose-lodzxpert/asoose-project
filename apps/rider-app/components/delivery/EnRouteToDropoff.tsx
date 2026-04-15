@@ -10,6 +10,7 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { resolveAddress } from "@/utils/address";
 import { getDirections, getDistanceMeters } from "@/services/maps";
 import CancelJobModal from "@/components/delivery/CancelJobModal";
+import JobItemDetailsModal from "./JobItemDetailsModal";
 
 export default function EnRouteToDropoff({
   onAnimateToDropoff,
@@ -31,6 +32,7 @@ export default function EnRouteToDropoff({
   const [distance, setDistance] = useState<number | null>(null);
   const [eta, setEta] = useState("");
   const [cancelVisible, setCancelVisible] = useState(false);
+  const [detailsVisible, setDetailsVisible] = useState(false);
 
   useEffect(() => {
     let sub: Location.LocationSubscription | null = null;
@@ -79,6 +81,8 @@ export default function EnRouteToDropoff({
   // const canArrive = __DEV__ || (distance !== null && distance <= 50);
   const canArrive = true;
   const dropoff = resolveAddress(activeJob.dropoffAddress);
+  const deliveryId = activeJob.id.split("-")[0].toUpperCase();
+  const isRide = activeJob.jobType === "ride";
 
   return (
     <View
@@ -90,7 +94,7 @@ export default function EnRouteToDropoff({
       <View style={styles.header}>
         <View style={styles.statusGroup}>
           <View style={[styles.dot, { backgroundColor: colors.danger }]} />
-          <ThemedText style={styles.statusText}>En Route</ThemedText>
+          <ThemedText style={styles.statusText}>En Route • #{deliveryId}</ThemedText>
         </View>
         <ThemedText style={[styles.etaText, { color: colors.muted }]}>
           {distance ? `${(distance / 1000).toFixed(1)}km` : ""}{" "}
@@ -134,6 +138,32 @@ export default function EnRouteToDropoff({
           </Pressable>
         )}
       </View>
+
+      {!isRide && (
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 12, marginTop: -4 }]}>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <IconSymbol name="shippingbox" size={16} color={colors.muted} />
+            <ThemedText style={{ fontSize: 13, color: colors.text, flex: 1 }} numberOfLines={2}>
+              {activeJob.orderItems?.length
+                ? activeJob.orderItems.join(", ")
+                : activeJob.packageDetails || "Package dropoff"}
+            </ThemedText>
+          </View>
+          <Pressable 
+            style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.danger + '10' }}
+            onPress={() => setDetailsVisible(true)}
+          >
+            <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.danger }}>Details</ThemedText>
+          </Pressable>
+        </View>
+      )}
+
+      <JobItemDetailsModal
+        visible={detailsVisible}
+        onClose={() => setDetailsVisible(false)}
+        items={activeJob.itemDetails}
+        packageDetails={activeJob.packageDetails}
+      />
 
       <View style={styles.footer}>
         <Pressable

@@ -9,6 +9,7 @@ import { RideStatus, DeliveryStatus } from '@prisma/client';
 import { AppLogger } from 'src/libs/logger/app-logger.service';
 import { TransactionLedgerService } from 'src/super-admin/transactions/transaction-ledger.service';
 import { NotificationsGateway } from '../../notifications/notifications.gateway';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { DriverStateService } from '../../matching/driver-state/driver-state.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
@@ -65,6 +66,7 @@ export class JobsService {
     private readonly logger: AppLogger,
     private readonly transactionLedger: TransactionLedgerService,
     private readonly notificationsGateway: NotificationsGateway,
+    private readonly notificationsService: NotificationsService,
     private readonly driverStateService: DriverStateService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
@@ -94,7 +96,12 @@ export class JobsService {
           customer: { select: { name: true, phone: true } },
           pickupAddress: true,
           dropoffAddress: true,
-          order: { include: { store: { include: { vendor: true } } } },
+          order: {
+            include: {
+              store: { include: { vendor: true } },
+              items: { include: { product: true } },
+            },
+          },
         },
         orderBy: { assignedAt: 'desc' },
       });
@@ -112,6 +119,15 @@ export class JobsService {
 
       const stops = (delivery as any).stops as any[] | null;
       const isMultiStop = stops && stops.length > 1;
+
+      const orderItems = delivery.order?.items?.map((i: any) => i.nameSnap) || [];
+      const itemDetails =
+        delivery.order?.items?.map((i: any) => ({
+          name: i.nameSnap,
+          quantity: i.quantity,
+          price: i.price,
+          image: i.product?.image || i.product?.images?.[0],
+        })) || [];
 
       const result = {
         id: delivery.id,
@@ -142,6 +158,8 @@ export class JobsService {
         stops: stops ?? null,
         currentStopIndex: (delivery as any).currentStopIndex ?? 0,
         orderGroupId: (delivery as any).orderGroupId ?? null,
+        orderItems,
+        itemDetails,
       };
 
       this.logger.debug(`Returning delivery job ${delivery.id}`);
@@ -377,6 +395,39 @@ export class JobsService {
             e,
           );
         }
+
+        // ── Push & Persistent Notification for Customer ──
+        try {
+          await this.notificationsService.create({
+            userId: updatedRide.customerId,
+            title: '🛵 Ride Accepted!',
+            message: `${updatedRide.rider.name} has accepted your ride and is on the way.`,
+            type: 'RIDE',
+            metadata: {
+              rideId: updatedRide.id,
+              type: 'DRIVER_ACCEPTED',
+              driverId: updatedRide.rider.id,
+            },
+          });
+        } catch (e) {
+          this.logger.error('Failed to send acceptJob push to customer', e);
+        }
+
+        // ── Admin Notification ──
+        try {
+          await this.notificationsService.createForAdmin({
+            title: 'Ride Accepted',
+            message: `Driver ${updatedRide.rider.name} accepted ride ${updatedRide.id.slice(0, 8)}.`,
+            type: 'RIDE',
+            metadata: {
+              rideId: updatedRide.id,
+              riderId: updatedRide.rider.id,
+              customerId: updatedRide.customerId,
+            },
+          });
+        } catch (e) {
+          this.logger.error('Failed to send acceptJob admin notification', e);
+        }
       }
 
       return updatedRide;
@@ -597,6 +648,34 @@ export class JobsService {
         } catch (e) {
           this.logger.error('Socket emit DRIVER_ARRIVED failed', e);
         }
+
+        // ── Push & Persistent Notification for Customer ──
+        try {
+          await this.notificationsService.create({
+            userId: ride.customerId,
+            title: '🛵 Driver Arrived!',
+            message: 'Your driver has arrived at the pickup location.',
+            type: 'RIDE',
+            metadata: { rideId: jobId, type: 'DRIVER_ARRIVED' },
+          });
+        } catch (e) {
+          this.logger.error('Failed to send arriveAtPickup push to customer', e);
+        }
+
+        // ── Admin Notification ──
+        try {
+          await this.notificationsService.createForAdmin({
+            title: 'Driver Arrived',
+            message: `Driver assigned to ride ${jobId.slice(0, 8)} has arrived at pickup.`,
+            type: 'RIDE',
+            metadata: { rideId: jobId, riderId },
+          });
+        } catch (e) {
+          this.logger.error(
+            'Failed to send arriveAtPickup admin notification',
+            e,
+          );
+        }
       }
 
       return { id: ride.id, status: ride.status };
@@ -800,6 +879,31 @@ export class JobsService {
         );
       } catch (e) {
         this.logger.error('Socket emit TRIP_STARTED failed', e);
+      }
+
+      // ── Push & Persistent Notification for Customer ──
+      try {
+        await this.notificationsService.create({
+          userId: ride.customerId,
+          title: '🚕 Trip Started',
+          message: 'Your trip has started. Have a safe ride!',
+          type: 'RIDE',
+          metadata: { rideId: jobId, type: 'TRIP_STARTED' },
+        });
+      } catch (e) {
+        this.logger.error('Failed to send confirmPickup push to customer', e);
+      }
+
+      // ── Admin Notification ──
+      try {
+        await this.notificationsService.createForAdmin({
+          title: 'Trip Started',
+          message: `Trip for ride ${jobId.slice(0, 8)} has started.`,
+          type: 'RIDE',
+          metadata: { rideId: jobId, riderId },
+        });
+      } catch (e) {
+        this.logger.error('Failed to send confirmPickup admin notification', e);
       }
 
       return startedRide;
@@ -1019,6 +1123,45 @@ export class JobsService {
         this.logger.error('Socket emit TRIP_COMPLETED failed', e);
       }
 
+      // ── Push & Persistent Notification for Customer ──
+      try {
+        await this.notificationsService.create({
+          userId: ride.customerId,
+          title: '🏁 Trip Completed',
+          message:
+            'You have arrived at your destination! Thank you for riding with us.',
+          type: 'RIDE',
+          metadata: { rideId: jobId, type: 'TRIP_COMPLETED' },
+        });
+      } catch (e) {
+        this.logger.error('Failed to send completeJob push to customer', e);
+      }
+
+      // ── Push & Persistent Notification for Rider ──
+      try {
+        await this.notificationsService.createForRider({
+          riderId,
+          title: '💰 Ride Completed',
+          message: `Trip completed! Earnings for ride ${jobId.slice(0, 8)} have been added to your wallet.`,
+          type: 'RIDE',
+          metadata: { rideId: jobId, type: 'TRIP_COMPLETED' },
+        });
+      } catch (e) {
+        this.logger.error('Failed to send completeJob push to rider', e);
+      }
+
+      // ── Admin Notification ──
+      try {
+        await this.notificationsService.createForAdmin({
+          title: 'Ride Completed',
+          message: `Ride ${jobId.slice(0, 8)} has been successfully completed by driver ${riderId}.`,
+          type: 'RIDE',
+          metadata: { rideId: jobId, riderId },
+        });
+      } catch (e) {
+        this.logger.error('Failed to send completeJob admin notification', e);
+      }
+
       return completedRide;
     }
 
@@ -1211,10 +1354,37 @@ export class JobsService {
       this.eventEmitter.emit('job.cancelled', {
         jobId,
         jobType: 'ride',
-        cancelledBy: 'driver' as const,
-        reason: reason || 'Driver cancelled',
-        customerId: ride.customerId,
+        cancelledBy: 'driver',
+        reason,
+        timestamp: Date.now(),
       });
+
+      // ── Push & Persistent Notifications for Customer ──
+      if (ride.customerId) {
+        try {
+          await this.notificationsService.create({
+            userId: ride.customerId,
+            title: '⚠️ Ride Cancelled',
+            message: `Your ride has been cancelled by the driver. Reason: ${reason || 'No reason provided'}.`,
+            type: 'RIDE',
+            metadata: { rideId: jobId, type: 'RIDE_CANCELLED', reason },
+          });
+        } catch (e) {
+          this.logger.error('Failed to send cancelJob push to customer', e);
+        }
+      }
+
+      // ── Admin Notification ──
+      try {
+        await this.notificationsService.createForAdmin({
+          title: 'Ride Cancelled by Driver',
+          message: `Ride ${jobId.slice(0, 8)} cancelled by driver ${riderId}. Reason: ${reason || 'N/A'}.`,
+          type: 'RIDE',
+          metadata: { rideId: jobId, riderId, reason },
+        });
+      } catch (e) {
+        this.logger.error('Failed to send cancelJob admin notification', e);
+      }
 
       return { message: 'Ride cancelled' };
     }

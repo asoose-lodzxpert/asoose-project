@@ -83,29 +83,30 @@ export class AdminAuditService {
    * Find roles designated as super admins and fetch their tokens for pushes
    */
   private async dispatchPushToAdmins(payload: AdminActionEvent) {
-    const admins = await this.prisma.user.findMany({
+    const adminTokens = await this.prisma.pushToken.findMany({
       where: {
-        role: { in: ['SUPER_ADMIN', 'ADMIN_MANAGER', 'ADMIN_SUPPORT'] },
-        status: 'ACTIVE',
-        OR: [{ expoPushToken: { not: null } }, { fcmToken: { not: null } }],
+        user: {
+          role: { in: ['SUPER_ADMIN', 'ADMIN_MANAGER', 'ADMIN_SUPPORT'] },
+          status: 'ACTIVE',
+        },
       },
-      select: { expoPushToken: true, fcmToken: true },
+      select: { token: true, platform: true },
     });
 
-    for (const admin of admins) {
+    for (const t of adminTokens) {
       try {
-        if (admin.expoPushToken) {
+        const isExpo = t.platform === 'expo' || t.token.startsWith('ExponentPushToken[');
+        if (isExpo) {
           await this.expoPushService.sendToDevice(
-            admin.expoPushToken,
+            t.token,
             payload.title,
             payload.message,
             payload.metadata,
-            'default', // Default channel ID
+            'default',
           );
-        }
-        if (admin.fcmToken) {
+        } else {
           await this.fcmService.sendToDevice(
-            admin.fcmToken,
+            t.token,
             payload.title,
             payload.message,
             payload.metadata,

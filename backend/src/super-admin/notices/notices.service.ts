@@ -72,37 +72,21 @@ export class NoticesService {
   async testBroadcastAll(title: string, message: string) {
     let sent = 0;
 
-    // Users
-    const users = await this.prisma.user.findMany({
-      select: { fcmToken: true, expoPushToken: true },
-      where: {
-        OR: [{ fcmToken: { not: null } }, { expoPushToken: { not: null } }],
-      },
+    const tokens = await this.prisma.pushToken.findMany({
+      select: { token: true, platform: true, riderId: true, userId: true, vendorId: true },
     });
-    for (const u of users) {
-      sent += await this._sendPush(u.fcmToken, u.expoPushToken, title, message);
-    }
 
-    // Riders & Drivers
-    const riders = await this.prisma.rider.findMany({
-      select: { fcmToken: true, expoPushToken: true },
-      where: {
-        OR: [{ fcmToken: { not: null } }, { expoPushToken: { not: null } }],
-      },
-    });
-    for (const r of riders) {
-      sent += await this._sendPush(r.fcmToken, r.expoPushToken, title, message);
-    }
-
-    // Vendors
-    const vendors = await this.prisma.vendor.findMany({
-      select: { fcmToken: true, expoPushToken: true },
-      where: {
-        OR: [{ fcmToken: { not: null } }, { expoPushToken: { not: null } }],
-      },
-    });
-    for (const v of vendors) {
-      sent += await this._sendPush(v.fcmToken, v.expoPushToken, title, message);
+    for (const t of tokens) {
+      const channelId = (t.riderId) ? 'rides' : 'default';
+      const isExpo = t.platform === 'expo' || t.token.startsWith('ExponentPushToken[') || t.token.startsWith('ExpoPushToken[');
+      
+      if (isExpo) {
+        await this.expo.sendToDevice(t.token, title, message, {}, channelId);
+        sent++;
+      } else {
+        await this.fcm.sendToDevice(t.token, title, message, {});
+        sent++;
+      }
     }
 
     return { sent, title, message };
@@ -113,16 +97,24 @@ export class NoticesService {
   // ─────────────────────────────────────────────────────────────────────────
   async testAdminPush(title: string, message: string) {
     let sent = 0;
-    const admins = await this.prisma.user.findMany({
+    const adminTokens = await this.prisma.pushToken.findMany({
       where: {
-        role: { in: ['SUPER_ADMIN', 'ADMIN'] as any[] },
-        OR: [{ fcmToken: { not: null } }, { expoPushToken: { not: null } }],
+        user: {
+          role: { in: ['SUPER_ADMIN', 'ADMIN'] as any[] },
+        },
       },
-      select: { fcmToken: true, expoPushToken: true },
+      select: { token: true, platform: true },
     });
 
-    for (const a of admins) {
-      sent += await this._sendPush(a.fcmToken, a.expoPushToken, title, message);
+    for (const t of adminTokens) {
+      const isExpo = t.platform === 'expo' || t.token.startsWith('ExponentPushToken[') || t.token.startsWith('ExpoPushToken[');
+      if (isExpo) {
+        await this.expo.sendToDevice(t.token, title, message, {});
+        sent++;
+      } else {
+        await this.fcm.sendToDevice(t.token, title, message, {});
+        sent++;
+      }
     }
     return { sent, title, message };
   }
@@ -136,63 +128,55 @@ export class NoticesService {
     const sendPush = channels === 'push' || channels === 'both';
     const sendEmail = channels === 'email' || channels === 'both';
 
-    let fcmToken: string | null = null;
-    let expoToken: string | null = null;
     let email: string | null = null;
     let name: string | null = null;
 
     if (entityType === 'USER') {
       const rec = await this.prisma.user.findUnique({
         where: { id: entityId },
-        select: {
-          fcmToken: true,
-          expoPushToken: true,
-          email: true,
-          name: true,
-        },
+        select: { email: true, name: true },
       });
-      fcmToken = rec?.fcmToken ?? null;
-      expoToken = rec?.expoPushToken ?? null;
       email = rec?.email ?? null;
       name = rec?.name ?? null;
     } else if (entityType === 'RIDER' || entityType === 'DRIVER') {
       const rec = await this.prisma.rider.findUnique({
         where: { id: entityId },
-        select: {
-          fcmToken: true,
-          expoPushToken: true,
-          email: true,
-          name: true,
-        },
+        select: { email: true, name: true },
       });
-      fcmToken = rec?.fcmToken ?? null;
-      expoToken = rec?.expoPushToken ?? null;
       email = rec?.email ?? null;
       name = rec?.name ?? null;
     } else if (entityType === 'VENDOR') {
       const rec = await this.prisma.vendor.findUnique({
         where: { id: entityId },
-        select: {
-          fcmToken: true,
-          expoPushToken: true,
-          email: true,
-          name: true,
-        },
+        select: { email: true, name: true },
       });
-      fcmToken = rec?.fcmToken ?? null;
-      expoToken = rec?.expoPushToken ?? null;
       email = rec?.email ?? null;
       name = rec?.name ?? null;
     }
 
-    let pushSent = false;
-    let emailQueued = false;
-
+    let pushSentCount = 0;
     if (sendPush) {
-      const count = await this._sendPush(fcmToken, expoToken, title, message);
-      pushSent = count > 0;
+      const where: any = {};
+      if (entityType === 'USER') where.userId = entityId;
+      else if (entityType === 'RIDER' || entityType === 'DRIVER') where.riderId = entityId;
+      else if (entityType === 'VENDOR') where.vendorId = entityId;
+
+      const tokens = await this.prisma.pushToken.findMany({ where });
+      const channelId = (entityType === 'RIDER' || entityType === 'DRIVER') ? 'rides' : 'default';
+
+      for (const t of tokens) {
+        const isExpo = t.platform === 'expo' || t.token.startsWith('ExponentPushToken[') || t.token.startsWith('ExpoPushToken[');
+        if (isExpo) {
+          await this.expo.sendToDevice(t.token, title, message, {}, channelId);
+          pushSentCount++;
+        } else {
+          await this.fcm.sendToDevice(t.token, title, message, {});
+          pushSentCount++;
+        }
+      }
     }
 
+    let emailQueued = false;
     if (sendEmail && email) {
       await this.emailProducer.sendAdminNoticeEmail(
         email,
@@ -203,7 +187,7 @@ export class NoticesService {
       emailQueued = true;
     }
 
-    return { pushSent, emailQueued, entityId, entityType };
+    return { pushSent: pushSentCount > 0, pushCount: pushSentCount, emailQueued, entityId, entityType };
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -229,89 +213,62 @@ export class NoticesService {
               : ['USER', 'RIDER', 'DRIVER', 'VENDOR'];
 
     for (const type of types) {
-      if (type === 'USER') {
-        const records = await this.prisma.user.findMany({
-          select: {
-            fcmToken: true,
-            expoPushToken: true,
-            email: true,
-            name: true,
-          },
-        });
-        await this._inBatches(records, 50, async (rec) => {
-          if (sendPush)
-            pushCount += await this._sendPush(
-              rec.fcmToken,
-              rec.expoPushToken,
-              title,
-              message,
-            );
-          if (sendEmail && rec.email) {
-            await this.emailProducer.sendAdminNoticeEmail(
-              rec.email,
-              rec.name ?? 'User',
-              title,
-              message,
-            );
-            emailCount++;
+      // 1. Handle Push
+      if (sendPush) {
+        const where: any = {};
+        if (type === 'USER') where.userId = { not: null };
+        else if (type === 'RIDER' || type === 'DRIVER') {
+          where.rider = { role: type === 'DRIVER' ? UserRole.DRIVER : UserRole.RIDER };
+        }
+        else if (type === 'VENDOR') where.vendorId = { not: null };
+
+        const tokens = await this.prisma.pushToken.findMany({ where });
+        const channelId = (type === 'RIDER' || type === 'DRIVER') ? 'rides' : 'default';
+
+        for (const t of tokens) {
+          const isExpo = t.platform === 'expo' || t.token.startsWith('ExponentPushToken[') || t.token.startsWith('ExpoPushToken[');
+          try {
+            if (isExpo) {
+              await this.expo.sendToDevice(t.token, title, message, {}, channelId);
+              pushCount++;
+            } else {
+              await this.fcm.sendToDevice(t.token, title, message, {});
+              pushCount++;
+            }
+          } catch (e) {
+            this.logger.warn(`Failed broadcast push to token ${t.token}: ${e.message}`);
           }
-        });
-      } else if (type === 'RIDER' || type === 'DRIVER') {
-        const roleFilter = type === 'DRIVER' ? UserRole.DRIVER : UserRole.RIDER;
-        const records = await this.prisma.rider.findMany({
-          where: { role: roleFilter },
-          select: {
-            fcmToken: true,
-            expoPushToken: true,
-            email: true,
-            name: true,
-          },
-        });
-        await this._inBatches(records, 50, async (rec) => {
-          if (sendPush)
-            pushCount += await this._sendPush(
-              rec.fcmToken,
-              rec.expoPushToken,
-              title,
-              message,
-            );
-          if (sendEmail && rec.email) {
-            await this.emailProducer.sendAdminNoticeEmail(
-              rec.email,
-              rec.name ?? 'User',
-              title,
-              message,
-            );
-            emailCount++;
-          }
-        });
-      } else if (type === 'VENDOR') {
-        const records = await this.prisma.vendor.findMany({
-          select: {
-            fcmToken: true,
-            expoPushToken: true,
-            email: true,
-            name: true,
-          },
-        });
-        await this._inBatches(records, 50, async (rec) => {
-          if (sendPush)
-            pushCount += await this._sendPush(
-              rec.fcmToken,
-              rec.expoPushToken,
-              title,
-              message,
-            );
-          if (sendEmail && rec.email) {
-            await this.emailProducer.sendAdminNoticeEmail(
-              rec.email,
-              rec.name ?? 'User',
-              title,
-              message,
-            );
-            emailCount++;
-          }
-        });
+        }
+      }
+
+      // 2. Handle Email
+      if (sendEmail) {
+        if (type === 'USER') {
+          const records = await this.prisma.user.findMany({ select: { email: true, name: true } });
+          await this._inBatches(records, 50, async (rec) => {
+            if (rec.email) {
+              await this.emailProducer.sendAdminNoticeEmail(rec.email, rec.name ?? 'User', title, message);
+              emailCount++;
+            }
+          });
+        } else if (type === 'RIDER' || type === 'DRIVER') {
+          const roleFilter = type === 'DRIVER' ? UserRole.DRIVER : UserRole.RIDER;
+          const records = await this.prisma.rider.findMany({ where: { role: roleFilter }, select: { email: true, name: true } });
+          await this._inBatches(records, 50, async (rec) => {
+            if (rec.email) {
+              await this.emailProducer.sendAdminNoticeEmail(rec.email, rec.name ?? 'User', title, message);
+              emailCount++;
+            }
+          });
+        } else if (type === 'VENDOR') {
+          const records = await this.prisma.vendor.findMany({ select: { email: true, name: true } });
+          await this._inBatches(records, 50, async (rec) => {
+            if (rec.email) {
+              await this.emailProducer.sendAdminNoticeEmail(rec.email, rec.name ?? 'User', title, message);
+              emailCount++;
+            }
+          });
+        }
       }
     }
 
@@ -405,11 +362,12 @@ export class NoticesService {
     expoToken: string | null | undefined,
     title: string,
     body: string,
+    channelId = 'default',
   ): Promise<number> {
     let count = 0;
     try {
       if (expoToken) {
-        await this.expo.sendToDevice(expoToken, title, body, {});
+        await this.expo.sendToDevice(expoToken, title, body, {}, channelId);
         count++;
       }
       if (fcmToken) {

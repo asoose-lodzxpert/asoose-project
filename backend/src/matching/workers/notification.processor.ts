@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { FcmService } from '../../libs/fcm/fcm.service';
 import { ExpoPushService } from '../../libs/expo/expo-push.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import {
   JOB_TYPES,
   QUEUE_NAMES,
@@ -17,6 +18,7 @@ export class NotificationProcessor extends WorkerHost {
   private readonly logger = new Logger(NotificationProcessor.name);
 
   constructor(
+    private readonly prisma: PrismaService,
     private readonly fcmService: FcmService,
     private readonly expoPushService: ExpoPushService,
   ) {
@@ -43,42 +45,68 @@ export class NotificationProcessor extends WorkerHost {
   }
 
   private async handlePushNotification(data: SendPushNotificationJobData) {
-    const { title, body, data: payload, fcmToken, expoPushToken } = data;
+    const { title, body, data: payload, userId, driverId, vendorId, fcmToken, expoPushToken } = data;
 
-    const sent = { fcm: false, expo: false };
+    const tokens: { token: string; platform: string }[] = [];
 
-    // Try FCM token first
-    if (fcmToken) {
-      try {
-        await this.fcmService.sendToDevice(fcmToken, title, body, payload);
-        sent.fcm = true;
-        this.logger.debug(`FCM notification sent: "${title}"`);
-      } catch (err) {
-        this.logger.error(`FCM send failed: ${err?.message}`, err?.stack);
-      }
+    // 1. Fetch tokens from database if IDs are provided
+    if (userId || driverId || vendorId) {
+      const where: any = {};
+      if (userId) where.userId = userId;
+      else if (driverId) where.riderId = driverId;
+      else if (vendorId) where.vendorId = vendorId;
+
+      const dbTokens = await this.prisma.pushToken.findMany({
+        where,
+        select: { token: true, platform: true },
+      });
+      tokens.push(...dbTokens);
     }
 
-    // Try Expo token
-    if (expoPushToken) {
-      try {
-        await this.expoPushService.sendToDevice(
-          expoPushToken,
-          title,
-          body,
-          payload,
-        );
-        sent.expo = true;
-        this.logger.debug(`Expo notification sent: "${title}"`);
-      } catch (err) {
-        this.logger.error(`Expo send failed: ${err?.message}`, err?.stack);
-      }
+    // 2. Add individual tokens if provided (legacy/direct support)
+    if (fcmToken && !tokens.some(t => t.token === fcmToken)) {
+      tokens.push({ token: fcmToken, platform: 'fcm' });
+    }
+    if (expoPushToken && !tokens.some(t => t.token === expoPushToken)) {
+      tokens.push({ token: expoPushToken, platform: 'expo' });
     }
 
-    if (!fcmToken && !expoPushToken) {
-      this.logger.warn(`Notification job has no token — title: "${title}"`);
+    if (tokens.length === 0) {
+      this.logger.warn(`Notification job has no tokens to target — title: "${title}"`);
+      return { sent: 0 };
     }
 
-    return sent;
+    const channelId = this.resolveChannel(payload?.type || payload?.category || 'default');
+    
+    // 3. Send to tokens
+    const expoTokens = tokens
+      .filter(t => t.platform === 'expo' || t.token.startsWith('ExponentPushToken['))
+      .map(t => t.token);
+    const fcmTokens = tokens
+      .filter(t => t.platform !== 'expo' && !t.token.startsWith('ExponentPushToken['))
+      .map(t => t.token);
+
+    let sentCount = 0;
+    if (expoTokens.length > 0) {
+      await this.expoPushService.sendToMultipleDevices(expoTokens, title, body, payload, channelId)
+        .then(() => sentCount += expoTokens.length)
+        .catch(err => this.logger.error(`Expo push failed: ${err.message}`));
+    }
+
+    if (fcmTokens.length > 0) {
+      await this.fcmService.sendToDevices(fcmTokens, title, body, payload)
+        .then(() => sentCount += fcmTokens.length)
+        .catch(err => this.logger.error(`FCM push failed: ${err.message}`));
+    }
+
+    return { sent: sentCount, tokenCount: tokens.length };
+  }
+
+  private resolveChannel(type: string): string {
+    const t = (type || '').toUpperCase();
+    if (t === 'NEW_JOB' || t === 'JOB') return 'new-job';
+    if (t === 'RIDE_UPDATE' || t === 'TRIP') return 'trip-updates';
+    return 'default';
   }
 
   private async handleSms(data: SendSMSJobData) {

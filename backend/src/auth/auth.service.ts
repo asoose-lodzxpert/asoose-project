@@ -666,11 +666,16 @@ export class AuthService {
   }
 
   async savePushToken(userId: string, token: string, platform: string) {
+    const isExpoToken =
+      token.startsWith('ExponentPushToken[') ||
+      token.startsWith('ExpoPushToken[');
+    const effectivePlatform = isExpoToken ? 'expo' : platform;
+
     try {
       await this.prisma.pushToken.upsert({
         where: { token },
-        update: { userId, platform },
-        create: { token, userId, platform },
+        update: { userId, platform: effectivePlatform },
+        create: { token, userId, platform: effectivePlatform },
       });
 
       return { success: true, message: 'Push token saved' };

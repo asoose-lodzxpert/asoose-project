@@ -898,9 +898,12 @@ export class RidersService {
         data: {
           status: targetStatus,
           isOnline: false, // Force offline immediately
-          fcmToken: null, // Revoke Push Notification Access
-          // expoPushToken: null // If using Expo, clear this too
         },
+      });
+
+      // 1b. Revoke Push Notification Access (remove from central table)
+      await tx.pushToken.deleteMany({
+        where: { riderId },
       });
 
       // 2. Log High-Priority Audit Event

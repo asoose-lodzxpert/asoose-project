@@ -84,11 +84,10 @@ export class NotificationsService {
   private resolveChannelId(type: string): string {
     const t = (type || 'SYSTEM').toUpperCase();
     if (t === 'ORDER') return 'orders';
-    if (t === 'RIDE') return 'rides';
+    if (t === 'RIDE' || t === 'RIDE_UPDATE' || t === 'TRIP') return 'trip-updates';
     if (t === 'DELIVERY') return 'deliveries';
     if (t === 'PAYOUT' || t === 'PAYMENT') return 'payouts';
-    if (t === 'JOB' || t === 'NEW_JOB') return 'new-job';
-    if (t === 'TRIP') return 'trip-updates';
+    if (t === 'JOB' || t === 'NEW_JOB' || t === 'NEW_RIDE' || t === 'RIDE_REQUESTED') return 'new-job';
     return 'default';
   }
 

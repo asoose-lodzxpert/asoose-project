@@ -176,6 +176,7 @@ export class JobEventsService {
           dropoffContactPhone: data.dropoffContactPhone,
           recipientName: data.recipientName,
           orderItems: data.orderItems,
+          itemDetails: data.itemDetails,
           isFragile: data.isFragile,
           isPerishable: data.isPerishable,
           containsLiquid: data.containsLiquid,

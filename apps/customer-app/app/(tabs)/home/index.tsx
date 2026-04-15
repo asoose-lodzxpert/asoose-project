@@ -12,7 +12,7 @@ import { SkeletonCard } from "@/components/home/SkeletonCard";
 import { VendorCard } from "@/components/home/VendorCard";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import type { IconSymbolName } from "@/components/ui/icon-symbol";
+import { IconSymbol, type IconSymbolName } from "@/components/ui/icon-symbol";
 import { useHomeContext } from "@/context/HomeContext";
 import { useLocation } from "@/context/LocationContext";
 import { useThemeColor } from "@/hooks/use-theme-color";

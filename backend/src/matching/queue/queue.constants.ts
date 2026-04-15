@@ -61,6 +61,7 @@ export interface CheckInactivityJobData {
 export interface SendPushNotificationJobData {
   userId?: string;
   driverId?: string;
+  vendorId?: string;
   expoPushToken?: string;
   fcmToken?: string;
   title: string;
