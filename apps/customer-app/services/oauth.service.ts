@@ -103,7 +103,13 @@ export async function signInWithGoogle(): Promise<OAuthResponse> {
     if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
       throw new Error("Google Play Services not available");
     }
-    if (__DEV__) console.error("Google Sign-In error:", error);
+    
+    // Extract and re-throw meaningful message for UI
+    const finalMsg = error?.message || "Google Login failed";
+    import("react-native-toast-message").then(Toast => {
+       Toast.default.show({ type: 'error', text1: 'Google Error', text2: finalMsg });
+    });
+
     throw error;
   }
 }

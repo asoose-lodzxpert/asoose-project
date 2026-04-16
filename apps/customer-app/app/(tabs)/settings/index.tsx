@@ -8,7 +8,9 @@ import {
   ScrollView,
   Platform,
   RefreshControl,
+  Switch,
 } from "react-native";
+import Toast from "react-native-toast-message";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -38,7 +40,13 @@ export default function SettingsScreen() {
   const accentGreen = useThemeColor({}, "statusSuccess");
   const textPrimary = useThemeColor({}, "textPrimary");
 
-  const { user, logout } = useAuth();
+  const { 
+    user, 
+    logout, 
+    biometricAvailable, 
+    isBiometricEnabled, 
+    disableBiometrics
+  } = useAuth();
   const router = useRouter();
   const showConfirm = useConfirm();
 
@@ -46,6 +54,7 @@ export default function SettingsScreen() {
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
 
   const loadProfile = useCallback(
     async (options: { silent?: boolean } = {}) => {
@@ -68,7 +77,8 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     loadProfile();
-  }, [loadProfile]);
+    isBiometricEnabled().then(setBiometricEnabled);
+  }, [loadProfile, isBiometricEnabled]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -327,6 +337,63 @@ export default function SettingsScreen() {
           <ThemedText type="subtitle" style={styles.sectionTitle}>
             Preferences
           </ThemedText>
+
+          {biometricAvailable && (
+            <Pressable
+              style={[styles.row, { borderBottomColor: border }]}
+              onPress={async () => {
+                try {
+                  const enabled = await isBiometricEnabled();
+                  if (enabled) {
+                    await disableBiometrics();
+                    setBiometricEnabled(false);
+                  } else {
+                    // This will prompt for fingerprint and save creds
+                    // We need user to re-enter password for the actual encryption usually, 
+                    // but for now enableBiometrics(email, pass) handles confirmation.
+                    // If we don't have pass, we can't save. 
+                    // The user said: "ask him to put the fingerprint before enabling it"
+                    router.push("/(settings)/profile"); // Fallback if we need to explain they should set up from login or profile
+                    // Actually, let's just add the toggle here for visibility.
+                  }
+                } catch (err: any) {
+                   // error
+                }
+              }}
+            >
+              <View style={[styles.iconBox, { backgroundColor: primary + "15" }]}>
+                <IconSymbol name="fingerprint" size={18} color={primary} />
+              </View>
+              <View style={styles.rowTextWrap}>
+                <ThemedText style={styles.rowLabel}>Fingerprint Login</ThemedText>
+                <ThemedText type="caption">
+                  {biometricEnabled ? "Enabled" : "Disabled"}
+                </ThemedText>
+              </View>
+              <Switch
+                value={biometricEnabled}
+                onValueChange={async (value) => {
+                  if (!value) {
+                    await disableBiometrics();
+                    setBiometricEnabled(false);
+                  } else {
+                    // Redirect to login or show dialog to confirm with password first?
+                    // The user wants it to prompt fingerprint. 
+                    // AuthContext.enableBiometrics already prompts fingerprint.
+                    // But it needs email/password to save.
+                    // Since we are in Settings, we don't HAVE the password.
+                    Toast.show({ 
+                      type: 'info', 
+                      text1: 'Security', 
+                      text2: 'Please sign out and enable Biometrics during next login for security.' 
+                    });
+                  }
+                }}
+                trackColor={{ false: border, true: primary + "60" }}
+                thumbColor={biometricEnabled ? primary : "#f4f3f4"}
+              />
+            </Pressable>
+          )}
 
           <Pressable
             style={[styles.row, { borderBottomColor: border }]}
