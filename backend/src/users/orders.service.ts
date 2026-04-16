@@ -169,13 +169,15 @@ export class OrdersService {
         throw new BadRequestException('Invalid delivery address');
       }
 
-      // ── Service Boundary guard ─────────────────────────────────────
       if (store.cityId) {
         const userCity = await this.mapsService.getCityByCoords(
           address.lat,
           address.lng,
         );
-        if (store.cityId !== userCity?.id) {
+        // Only block if we definitively found a city and it's different.
+        // If userCity is null (e.g. no ServiceZone configured for that city yet), 
+        // we allow it to avoid blocking orders in newly supported areas.
+        if (userCity && store.cityId !== userCity.id) {
           throw new BadRequestException(
             `"${store.name}" does not deliver to your current city.`,
           );
@@ -357,7 +359,7 @@ export class OrdersService {
               dropoffAddress.lat,
               dropoffAddress.lng,
             );
-            if (storeAvail.cityId !== userCity?.id) {
+            if (userCity && storeAvail.cityId !== userCity.id) {
               throw new BadRequestException(
                 `"${storeAvail.name}" does not deliver to your current city.`,
               );
@@ -1314,7 +1316,7 @@ export class OrdersService {
               dropoffAddress.lat,
               dropoffAddress.lng,
             );
-            if (storeAvail.cityId !== userCity?.id) {
+            if (userCity && storeAvail.cityId !== userCity.id) {
               throw new BadRequestException(
                 `"${storeAvail.name}" does not deliver to your current city.`,
               );

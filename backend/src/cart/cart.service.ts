@@ -189,10 +189,10 @@ export class CartService {
       const unitPrice = product.price + modifierAddon;
       const lineTotal = unitPrice * itemDto.quantity;
 
-      // Check availability based on city
-      const isAvailableInLocation = resolvedCityId && product.store.cityId 
+      // Check availability based on city - Only block if we have BOTH IDs and they differ
+      const isAvailableInLocation = (resolvedCityId && product.store.cityId) 
         ? product.store.cityId === resolvedCityId 
-        : true; // Default to true if city can't be resolved or check omitted
+        : true;
 
       group.items.push({
         ...product,
