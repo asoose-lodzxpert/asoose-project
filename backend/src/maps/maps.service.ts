@@ -459,6 +459,30 @@ export class MapsService {
     return null;
   }
 
+  /**
+   * Helper to get distance in meters between two points.
+   * Leverages the Directions API logic and returns only the distance value.
+   */
+  async getDistance(
+    originLat: string,
+    originLng: string,
+    destLat: string,
+    destLng: string,
+  ): Promise<number> {
+    const res = await this.getDirections(
+      originLat,
+      originLng,
+      destLat,
+      destLng,
+    );
+
+    if (res.error || !res.distance) {
+      throw new BadRequestException(res.error || 'Could not calculate distance');
+    }
+
+    return res.distance.value;
+  }
+
   /** Ray-Casting point-in-polygon test */
   private pointInPolygon(lat: number, lng: number, polygon: { lat: number; lng: number }[]): boolean {
     let inside = false;

@@ -169,4 +169,25 @@ export class MapsController {
 
     return this.mapsService.getStaticMapUrl(markers, path, center, zoom, size);
   }
+
+  @ApiOperation({ summary: 'Calculate distance in meters between two points' })
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @Get('distance')
+  async getDistance(
+    @Query('originLat') originLat: string,
+    @Query('originLng') originLng: string,
+    @Query('destLat') destLat: string,
+    @Query('destLng') destLng: string,
+  ) {
+    if (!originLat || !originLng || !destLat || !destLng) {
+      throw new BadRequestException('Missing required coordinate parameters');
+    }
+    const distanceMeters = await this.mapsService.getDistance(
+      originLat,
+      originLng,
+      destLat,
+      destLng,
+    );
+    return { distance: distanceMeters };
+  }
 }

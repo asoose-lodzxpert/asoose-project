@@ -421,58 +421,48 @@ export default function VendorDetailPage() {
 
     setIsSaving(true);
     try {
-      const hasImages = logoFile || bannerFile;
+      // Use multipart/form-data ALWAYS to ensure consistent backend payload handling
+      // (The backend route uses FileFieldsInterceptor which behaves best with standard FormData)
+      const session = await getSession();
+      const token = (session as any)?.accessToken;
 
-      if (hasImages) {
-        // Use multipart/form-data when images are attached
-        const session = await getSession();
-        const token = (session as any)?.accessToken;
+      const payload = new FormData();
+      payload.append("storeName", formData.storeName);
+      payload.append("ownerName", formData.ownerName);
+      payload.append("phone", formData.phone);
+      payload.append("email", formData.email);
+      payload.append("address", formData.address);
+      payload.append("commissionRate", String(formData.commissionRate));
 
-        const payload = new FormData();
-        payload.append("storeName", formData.storeName);
-        payload.append("ownerName", formData.ownerName);
-        payload.append("phone", formData.phone);
-        payload.append("email", formData.email);
-        payload.append("address", formData.address);
-        payload.append("commissionRate", String(formData.commissionRate));
-        if (formData.storeType) {
-          payload.append("storeType", formData.storeType);
-        }
-        if (formData.cityId) {
-          payload.append("cityId", formData.cityId);
-        }
-        if (addressCoords) {
-          payload.append("lat", String(addressCoords.lat));
-          payload.append("lng", String(addressCoords.lng));
-        }
-        if (logoFile) payload.append("logo", logoFile);
-        if (bannerFile) payload.append("banner", bannerFile);
+      if (formData.storeType) {
+        payload.append("storeType", formData.storeType);
+      }
+      if (formData.cityId) {
+        payload.append("cityId", formData.cityId);
+      }
+      if (addressCoords) {
+        payload.append("lat", String(addressCoords.lat));
+        payload.append("lng", String(addressCoords.lng));
+      }
+      if (logoFile) payload.append("logo", logoFile);
+      if (bannerFile) payload.append("banner", bannerFile);
 
-        const API_URL =
-          process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
-        const res = await fetch(
-          `${API_URL}/super-admin/vendors/${vendor?.id}`,
-          {
-            method: "PATCH",
-            headers: { Authorization: `Bearer ${token || ""}` },
-            body: payload,
-          },
-        );
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.message || "Could not save changes.");
-        }
-      } else {
-        // JSON path (no images)
-        await fetcher(`/super-admin/vendors/${vendor?.id}`, {
+      const API_URL = (
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1"
+      ).replace(/\/$/, "");
+
+      const res = await fetch(
+        `${API_URL}/super-admin/vendors/${vendor?.id}`,
+        {
           method: "PATCH",
-          body: JSON.stringify({
-            ...formData,
-            ...(addressCoords
-              ? { lat: addressCoords.lat, lng: addressCoords.lng }
-              : {}),
-          }),
-        });
+          headers: { Authorization: `Bearer ${token || ""}` },
+          body: payload,
+        },
+      );
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Could not save changes.");
       }
 
       mutateVendor();
