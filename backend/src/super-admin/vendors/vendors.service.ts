@@ -460,7 +460,7 @@ export class StoresService {
             : undefined,
         logo: logoUrl,
         banner: bannerUrl,
-        cityId: dto.cityId || undefined,
+        city: dto.cityId ? { connect: { id: dto.cityId } } : undefined,
         vendor:
           dto.ownerName || dto.phone || dto.email || vendorImageUrl
             ? {
