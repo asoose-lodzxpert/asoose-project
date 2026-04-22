@@ -422,6 +422,7 @@ export class StoresService {
       }
     }
 
+    // Upload logo / banner if provided
     let logoUrl: string | undefined;
     let bannerUrl: string | undefined;
     let vendorImageUrl: string | undefined;
