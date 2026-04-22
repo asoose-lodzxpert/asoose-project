@@ -14,14 +14,16 @@ export const OrderDetailsCard = ({
   details,
   financialBreakdown,
 }: OrderDetailsProps) => {
-  const action = (
-    <Link
-      href={`/super-admin/orders/${details.orderId}`}
-      className="text-yellow-500 hover:text-yellow-400 text-sm font-medium flex items-center gap-2"
-    >
-      View Order <ExternalLink className="w-3 h-3" />
-    </Link>
-  );
+  // Since details.orderId might be undefined for group orders, use 'details.orderId || #'
+  const action =
+    details.type === "GROUP_ORDER" ? null : (
+      <Link
+        href={`/super-admin/orders/${details.orderId}`}
+        className="text-yellow-500 hover:text-yellow-400 text-sm font-medium flex items-center gap-2"
+      >
+        View Order <ExternalLink className="w-3 h-3" />
+      </Link>
+    );
 
   return (
     <SectionCard
@@ -32,22 +34,71 @@ export const OrderDetailsCard = ({
     >
       <div className="space-y-6">
         {/* Header Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <p className="text-gray-400 text-xs">Order ID</p>
-            <p className="text-white font-mono text-sm">{details.orderId}</p>
+        {details.type === "SINGLE_ORDER" || !details.type ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <p className="text-gray-400 text-xs">Order ID</p>
+              <p className="text-white font-mono text-sm">{details.orderId}</p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-gray-400 text-xs">Vendor</p>
+              <p className="text-white font-medium">{details.vendor}</p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-gray-400 text-xs">Commission Rate</p>
+              <p className="text-orange-500 font-medium">
+                {details.commissionRate}%
+              </p>
+            </div>
           </div>
-          <div className="space-y-2">
-            <p className="text-gray-400 text-xs">Vendor</p>
-            <p className="text-white font-medium">{details.vendor}</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <p className="text-gray-400 text-xs">Group ID</p>
+              <p className="text-white font-mono text-sm text-truncate">
+                {details.groupId}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-gray-400 text-xs">Type</p>
+              <p className="text-white font-medium">Multi-Vendor Order</p>
+            </div>
           </div>
-          <div className="space-y-2">
-            <p className="text-gray-400 text-xs">Commission Rate</p>
-            <p className="text-orange-500 font-medium">
-              {details.commissionRate}%
-            </p>
+        )}
+
+        {/* Sub-Orders for Group Orders */}
+        {details.type === "GROUP_ORDER" && details.subOrders && (
+          <div className="border-t border-gray-700 pt-6">
+            <h4 className="text-white font-medium mb-4">Sub-Orders</h4>
+            <div className="space-y-2">
+              {details.subOrders.map((subOrder, idx) => (
+                <div
+                  key={idx}
+                  className="flex justify-between items-center p-3 bg-[#0F172A] rounded-lg"
+                >
+                  <div>
+                    <p className="text-white font-medium text-sm">
+                      {subOrder.store}
+                    </p>
+                    <p className="text-gray-400 text-xs">
+                      Commission: {subOrder.commissionRate}%
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-white font-bold">
+                      <Currency amount={subOrder.total} />
+                    </p>
+                    {(subOrder.deliveryFee ?? 0) > 0 && (
+                      <p className="text-blue-400 text-xs">
+                        Delivery: <Currency amount={subOrder.deliveryFee} />
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Items List */}
         <div className="border-t border-gray-700 pt-6">
@@ -88,31 +139,69 @@ export const OrderDetailsCard = ({
           <div className="border-t border-gray-700 pt-6">
             <h4 className="text-white font-medium mb-4">Financial Breakdown</h4>
             <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Subtotal</span>
-                {/* ✅ Fixed: Formatted subtotal */}
-                <span className="text-white">
-                  <Currency amount={details.subtotal} />
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">
-                  Platform Commission ({details.commissionRate}%)
-                </span>
-                {/* ✅ Fixed: Formatted commission */}
-                <span className="text-orange-500">
-                  -<Currency amount={financialBreakdown.platformCommission} />
-                </span>
-              </div>
-              <div className="flex justify-between pt-3 border-t border-gray-700">
-                <span className="text-gray-300 font-medium">
-                  Vendor Receives
-                </span>
-                <span className="text-green-500 font-bold text-lg">
-                  {/* ✅ Fixed: Formatted vendor amount */}
-                  <Currency amount={financialBreakdown.vendorReceives} />
-                </span>
-              </div>
+              {(details.type === "SINGLE_ORDER" || !details.type) && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Subtotal</span>
+                    {/* ✅ Fixed: Formatted subtotal */}
+                    <span className="text-white">
+                      <Currency amount={details.subtotal} />
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">
+                      Platform Commission ({details.commissionRate}%)
+                    </span>
+                    {/* ✅ Fixed: Formatted commission */}
+                    <span className="text-orange-500">
+                      -<Currency amount={financialBreakdown.platformCommission} />
+                    </span>
+                  </div>
+                </>
+              )}
+
+              {/* Delivery Fee */}
+              {financialBreakdown.deliveryFee !== undefined &&
+                financialBreakdown.deliveryFee > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Delivery Fee</span>
+                    <span className="text-blue-400">
+                      <Currency amount={financialBreakdown.deliveryFee} />
+                    </span>
+                  </div>
+                )}
+
+              {/* Vendor Receives (Single Order) */}
+              {(details.type === "SINGLE_ORDER" || !details.type) && (
+                <div className="flex justify-between pt-3 border-t border-gray-700">
+                  <span className="text-gray-300 font-medium">
+                    Vendor Receives
+                  </span>
+                  <span className="text-green-500 font-bold text-lg">
+                    {/* ✅ Fixed: Formatted vendor amount */}
+                    <Currency amount={financialBreakdown.vendorReceives} />
+                  </span>
+                </div>
+              )}
+
+              {/* Customer Paid (Group Order) */}
+              {details.type === "GROUP_ORDER" && (
+                <div className="flex justify-between pt-3 border-t border-gray-700">
+                  <span className="text-gray-300 font-medium">
+                    Total Customer Paid
+                  </span>
+                  <span className="text-green-500 font-bold text-lg">
+                    <Currency amount={financialBreakdown.customerPaid} />
+                  </span>
+                </div>
+              )}
+
+              {/* Note for Group Orders */}
+              {financialBreakdown.note && (
+                <p className="text-gray-400 text-xs pt-3 border-t border-gray-700 italic">
+                  {financialBreakdown.note}
+                </p>
+              )}
             </div>
           </div>
         )}

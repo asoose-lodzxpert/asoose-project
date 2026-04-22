@@ -25,11 +25,11 @@ export interface TransactionDetail {
     failureReason?: string;
   };
   orderDetails?: {
-    orderId: string;
-    vendor: string;
+    orderId?: string;
+    vendor?: string;
     vendorAddress?: string;
-    commissionRate: number;
-    commissionAmount: number;
+    commissionRate?: number;
+    commissionAmount?: number;
     items: Array<{
       name: string;
       qty: number;
@@ -38,8 +38,19 @@ export interface TransactionDetail {
       image?: string;
       options?: any;
     }>;
-    subtotal: number;
+    subtotal?: number;
+    deliveryFee?: number;
     total: number;
+    type?: string;
+    groupId?: string;
+    subOrders?: Array<{
+      orderId: string;
+      store: string;
+      total: number;
+      commissionRate: number;
+      deliveryFee?: number;
+    }>;
+    totalDeliveryFees?: number;
   };
   rideDetails?: {
     rideId: string;
@@ -80,8 +91,10 @@ export interface TransactionDetail {
     customerPaid?: number;
     platformCommission?: number;
     platformFee?: number;
+    deliveryFee?: number;
     vendorReceives?: number;
     driverReceives?: number;
+    note?: string;
   };
   recentActivity?: {
     period: string;

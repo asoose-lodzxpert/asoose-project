@@ -150,7 +150,7 @@ export class DeliveriesService {
   async findAll(params: DeliveryFilterDto) {
     this.logger.debug(`findAll deliveries - params: ${JSON.stringify(params)}`);
 
-    const { status, riderId, from, to, page = 1, limit = 10 } = params;
+    const { search, status, riderId, from, to, page = 1, limit = 10 } = params;
     const skip = (page - 1) * limit;
 
     const where: any = {
@@ -164,6 +164,32 @@ export class DeliveriesService {
 
     if (status && status !== 'All') where.status = status;
     if (riderId) where.riderId = riderId;
+
+    // ✅ Enhanced: Support searching by full ID, partial ID, or shortened format (track#XYZ, del#XYZ)
+    if (search) {
+      const searchUpper = search.trim().toUpperCase();
+      
+      // Check if it's a shortened format search (track#XYZ, del#XYZ)
+      const isShortFormat = /^(TRACK#|DEL#)/.test(searchUpper);
+      
+      if (isShortFormat) {
+        // Extract the short ID portion (e.g., "440000" from "track#440000")
+        const shortIdPart = searchUpper.replace(/^(TRACK#|DEL#)/, '');
+        // Search for delivery IDs ending with the short ID
+        where.id = {
+          endsWith: shortIdPart,
+          mode: 'insensitive'
+        };
+      } else {
+        // Search for full UUID or partial UUID match
+        where.OR = [
+          { id: { contains: searchUpper, mode: 'insensitive' } },
+          { customer: { name: { contains: search, mode: 'insensitive' } } },
+          { recipientName: { contains: search, mode: 'insensitive' } },
+          { senderName: { contains: search, mode: 'insensitive' } },
+        ];
+      }
+    }
 
     if (from && to) {
       where.createdAt = {
@@ -980,6 +1006,8 @@ export class DeliveriesService {
       pickup: this.formatAddress(d.pickupAddress),
       dropoff: this.formatAddress(d.dropoffAddress),
       eta: d.deliveredAt ? 'Delivered' : 'Est. 2 hrs',
+      // ✅ Added: Delivery date for table display
+      createdAt: d.createdAt?.toISOString() || new Date().toISOString(),
       // Package flags shown to admin & rider
       isFragile: d.isFragile ?? false,
       isPerishable: d.isPerishable ?? false,

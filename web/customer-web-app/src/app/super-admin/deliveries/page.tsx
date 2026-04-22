@@ -26,6 +26,7 @@ import { AssignRiderModal } from "./components/AssignRiderModal";
 import { DataTable } from "@/app/super-admin/component/datatable";
 import { DeliveryCard } from "./components/deliverycard";
 import { DeliveriesPageSkeleton } from "./components/skeleton";
+import { TrackingIDDisplay } from "./components/DeliveryIDDisplay";
 import { fetcher } from "../hooks/useSuperAdminFetch";
 
 // --- Types ---
@@ -41,6 +42,7 @@ interface Delivery {
   pickup: string;
   dropoff: string;
   eta?: string;
+  createdAt?: string;
   isFragile?: boolean;
   isPerishable?: boolean;
   containsLiquid?: boolean;
@@ -226,7 +228,12 @@ export default function DeliveriesPage() {
               href={`/super-admin/deliveries/${row.original.id}`}
               className="text-yellow-500 font-mono font-bold text-xs hover:underline block"
             >
-              {row.original.id.substring(0, 10)}...
+              <TrackingIDDisplay 
+                fullId={row.original.id} 
+                showCopy={false}
+                showTooltip={true}
+                variant="compact"
+              />
             </Link>
             {isLate(row.original.eta, row.original.status) && (
               <span className="flex items-center gap-1 text-[10px] text-red-400 font-bold mt-0.5 animate-pulse">
@@ -253,6 +260,31 @@ export default function DeliveriesPage() {
             )}
           </div>
         ),
+      },
+      {
+        accessorKey: "createdAt",
+        header: "Date",
+        cell: ({ row }) => {
+          const date = row.original.createdAt
+            ? new Date(row.original.createdAt)
+            : new Date();
+          const formatted = date.toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+          });
+          const time = date.toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          });
+          return (
+            <div className="flex flex-col gap-1 text-xs">
+              <span className="text-white font-medium">{formatted}</span>
+              <span className="text-gray-400">{time}</span>
+            </div>
+          );
+        },
       },
       {
         accessorKey: "type",
@@ -493,10 +525,17 @@ export default function DeliveriesPage() {
                     {/* Group Header */}
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-yellow-500 font-bold text-xs font-mono">
-                          GROUP · {groupId.substring(0, 10)}...
-                        </p>
-                        <p className="text-gray-400 text-xs mt-0.5">
+                        <div className="flex items-center gap-2">
+                          <p className="text-yellow-500 font-bold text-xs font-mono">GROUP ·</p>
+                          <TrackingIDDisplay 
+                            fullId={groupId} 
+                            showCopy={false}
+                            showTooltip={true}
+                            variant="compact"
+                            prefix="grp#"
+                          />
+                        </div>
+                        <p className="text-gray-400 text-xs mt-1.5">
                           {items.length} deliveries · Drop-off:{" "}
                           <span className="text-white">{lead.dropoff}</span>
                         </p>
@@ -531,7 +570,13 @@ export default function DeliveriesPage() {
                             <Package className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
                             <div className="min-w-0">
                               <p className="text-white text-xs font-mono truncate">
-                                {d.id.substring(0, 12)}...
+                                <TrackingIDDisplay 
+                                  fullId={d.id} 
+                                  showCopy={false}
+                                  showTooltip={true}
+                                  variant="compact"
+                                  truncateTooltip={true}
+                                />
                               </p>
                               <p className="text-gray-500 text-[10px] truncate">
                                 From: {d.pickup}

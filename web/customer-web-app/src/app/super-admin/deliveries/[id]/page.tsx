@@ -25,9 +25,11 @@ import { toast } from "react-toastify";
 import useSWR from "swr";
 import { fetcher } from "../../hooks/useSuperAdminFetch";
 import { formatDateTime } from "@/utils/formatDate";
+import { formatTrackingId } from "@/lib/formatDeliveryId";
 import { DeliveryDetailsSkeleton } from "./skeleton";
 import { AssignRiderModal } from "../components/AssignRiderModal";
 import { UpdateStatusModal } from "../components/UpdateStatusModal";
+import { TrackingIDDisplay } from "../components/DeliveryIDDisplay";
 
 // --- Types ---
 interface DeliveryHistoryStep {
@@ -147,19 +149,18 @@ export default function DeliveryDetailPage() {
 
               <div className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-3 md:gap-4 group">
-                  <h1 className="text-2xl md:text-3xl font-bold text-white font-mono tracking-tight break-all">
-                    {delivery.id}
-                  </h1>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => copyToClipboard(delivery.id)}
-                      className="p-1.5 rounded bg-gray-800 text-gray-400 hover:text-white transition-colors"
-                    >
-                      <Copy className="w-4 h-4" />
-                    </button>
-                    <div className="hidden sm:block pl-4 border-l border-gray-700">
-                      <Barcode />
-                    </div>
+                  <div className="space-y-1">
+                    <p className="text-gray-400 text-xs">Tracking ID</p>
+                    <TrackingIDDisplay 
+                      fullId={delivery.id}
+                      variant="detailed"
+                      showCopy={true}
+                      showTooltip={true}
+                      truncateTooltip={false}
+                    />
+                  </div>
+                  <div className="hidden sm:block pl-4 border-l border-gray-700">
+                    <Barcode />
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">

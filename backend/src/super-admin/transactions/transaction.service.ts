@@ -190,6 +190,13 @@ export class TransactionsService {
                     product: { select: { name: true, images: true } },
                   },
                 },
+                delivery: {
+                  select: {
+                    id: true,
+                    deliveryFee: true,
+                    status: true,
+                  },
+                },
               },
             },
             // 2. Multi-Vendor Group Context
@@ -207,6 +214,13 @@ export class TransactionsService {
                     items: {
                       include: {
                         product: { select: { name: true, images: true } },
+                      },
+                    },
+                    delivery: {
+                      select: {
+                        id: true,
+                        deliveryFee: true,
+                        status: true,
                       },
                     },
                   },
@@ -571,6 +585,7 @@ export class TransactionsService {
           0,
         );
         const commission = subtotal * (order.store.commissionRate / 100);
+        const deliveryFee = order.delivery?.deliveryFee || 0;
 
         detail.orderDetails = {
           type: 'SINGLE_ORDER',
@@ -588,12 +603,14 @@ export class TransactionsService {
             options: i.selectedOptions,
           })),
           subtotal,
+          deliveryFee,
           total: order.total,
         };
 
         detail.financialBreakdown = {
           customerPaid: order.total,
           platformCommission: commission,
+          deliveryFee,
           vendorReceives: subtotal - commission,
         };
       }
@@ -602,6 +619,10 @@ export class TransactionsService {
       else if (t.payment.orderGroup) {
         const orders = t.payment.orderGroup.orders || [];
         const groupTotal = orders.reduce((sum, o) => sum + o.total, 0);
+        const totalDeliveryFees = orders.reduce(
+          (sum, o) => sum + (o.delivery?.deliveryFee || 0),
+          0,
+        );
 
         // Aggregate items from all stores
         const allItems = orders.flatMap((o) =>
@@ -625,13 +646,16 @@ export class TransactionsService {
             store: o.store.name,
             total: o.total,
             commissionRate: o.store.commissionRate,
+            deliveryFee: o.delivery?.deliveryFee || 0,
           })),
           items: allItems,
+          totalDeliveryFees,
           total: groupTotal,
         };
 
         detail.financialBreakdown = {
           customerPaid: groupTotal,
+          deliveryFee: totalDeliveryFees,
           note: 'Split across multiple vendors (See sub-orders)',
         };
       }
