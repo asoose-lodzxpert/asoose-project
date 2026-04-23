@@ -12,7 +12,7 @@ const ADMIN_ROLES = [
 
 // ── Maintenance-mode cache ────────────────────────────────────────────────────
 // Middleware runs on the Edge runtime where next: { revalidate } is ignored.
-// A module-level variable persists for the lifetime of the Edge worker instance,
+// A module-level variable persists for the lifetime oof the Edge worker instance,
 // giving us a simple TTL cache that avoids a backend round-trip on every request.
 const MAINTENANCE_CACHE_TTL_MS = 60_000; // re-check backend at most once per minute
 let maintenanceCacheValue = false;
