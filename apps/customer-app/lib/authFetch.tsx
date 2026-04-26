@@ -100,6 +100,10 @@ export function patch<T = any>(path: string, body?: any, opts: FetchOpts = {}) {
   return request<T>(path, { method: "PATCH", body: payload, ...opts });
 }
 
+export function del<T = any>(path: string, opts: FetchOpts = {}) {
+  return request<T>(path, { method: "DELETE", ...opts });
+}
+
 export { BACKEND_URL as backendUrl };
 
 async function parseBody(res: Response) {

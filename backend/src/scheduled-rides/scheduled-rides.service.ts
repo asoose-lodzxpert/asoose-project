@@ -160,6 +160,10 @@ export class ScheduledRidesService {
             estimatedEndTime: addMinutes(scheduledAt, dto.durationMin ?? durationMin),
             cancellationDeadline: addMinutes(scheduledAt, -60),
             idempotencyKey,
+            // Passenger (book for someone else)
+            ...(dto.passengerName && { passengerName: dto.passengerName.trim() }),
+            ...(dto.passengerPhone && { passengerPhone: dto.passengerPhone.trim() }),
+            ...(dto.rideContactId && { rideContactId: dto.rideContactId }),
           } as any,
         include: {
           customer: { select: { name: true, phone: true } },
@@ -365,6 +369,66 @@ export class ScheduledRidesService {
         removeOnComplete: true 
       },
     );
+
+    return updatedRide;
+  }
+
+  /** Driver formally accepts an assigned scheduled ride and moves it into the live flow. */
+  async acceptScheduledRide(rideId: string, driverId: string) {
+    const ride = await this.prisma.ride.findUnique({
+      where: { id: rideId },
+      include: {
+        customer: { select: { id: true, name: true, expoPushToken: true } },
+        rider: { select: { name: true } },
+        pickupAddress: true,
+        dropoffAddress: true,
+      },
+    });
+
+    if (!ride) throw new NotFoundException('Scheduled ride not found.');
+
+    if (ride.riderId !== driverId) {
+      throw new BadRequestException('You are not assigned to this ride.');
+    }
+
+    const acceptableStatuses = ['DRIVER_ASSIGNED_SCHED', 'SCHEDULED'];
+    if (!acceptableStatuses.includes(ride.status as string)) {
+      throw new BadRequestException(
+        `Cannot accept a ride in status: ${ride.status}`,
+      );
+    }
+
+    const updatedRide = await this.prisma.ride.update({
+      where: { id: rideId },
+      data: {
+        status: 'DRIVER_ACCEPTED' as any,
+        acceptedAt: new Date(),
+      } as any,
+      include: {
+        customer: { select: { id: true, name: true, expoPushToken: true } },
+        rider: { select: { name: true } },
+        pickupAddress: true,
+        dropoffAddress: true,
+      },
+    });
+
+    // Notify customer via in-app notification + socket + push (all via create())
+    try {
+      await this.notifications.create({
+        userId: ride.customer.id,
+        title: 'Driver Accepted',
+        message: `${ride.rider?.name ?? 'Your driver'} has accepted your scheduled ride and is on the way.`,
+        type: 'RIDE',
+        category: 'DRIVER_ACCEPTED',
+        metadata: { rideId, type: 'DRIVER_ACCEPTED' },
+      });
+    } catch (e) {
+      this.logger.error('Failed to send DRIVER_ACCEPTED notification', e);
+    }
+
+    await this.tripsCommonService.logActivity(driverId, 'SCHEDULED_RIDE_ACCEPTED_BY_DRIVER', {
+      rideId,
+    });
 
     return updatedRide;
   }

@@ -34,6 +34,7 @@ import { MetricsModule } from './metrics/metrics.module';
 import { SupportModule } from './support/support.module';
 import { AdminAuditModule } from './admin-audit/admin-audit.module';
 import { ScheduledRidesModule } from './scheduled-rides/scheduled-rides.module';
+import { RideContactsModule } from './ride-contacts/ride-contacts.module';
 
 @Module({
   imports: [
@@ -115,6 +116,7 @@ import { ScheduledRidesModule } from './scheduled-rides/scheduled-rides.module';
     SupportModule,
     AdminAuditModule,
     ScheduledRidesModule,
+    RideContactsModule,
   ],
   controllers: [AppController],
   providers: [

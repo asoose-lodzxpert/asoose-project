@@ -322,6 +322,10 @@ export class RidesService {
               startOtp: rawOtp,
               surgeMultiplier: 1.0,
               vehicleType: dto.vehicleType, // ECONOMY | BUSINESS
+              // Booking for someone else
+              ...(dto.passengerName && { passengerName: dto.passengerName.trim() }),
+              ...(dto.passengerPhone && { passengerPhone: dto.passengerPhone.trim() }),
+              ...(dto.rideContactId && { rideContactId: dto.rideContactId }),
             },
             include: { pickupAddress: true, dropoffAddress: true },
           });

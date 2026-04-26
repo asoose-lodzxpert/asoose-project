@@ -59,4 +59,13 @@ export class ScheduledRidesController {
   driverCancelRide(@Req() req, @Param('id') id: string) {
     return this.scheduledRidesService.cancelScheduledRideByDriver(id, req.user.id);
   }
+
+  @Patch(':id/accept')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.RIDER, UserRole.DRIVER, ...ADMIN_ROLES)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Driver accepts an assigned scheduled ride and enters active flow' })
+  acceptRide(@Req() req, @Param('id') id: string) {
+    return this.scheduledRidesService.acceptScheduledRide(id, req.user.id);
+  }
 }

@@ -68,4 +68,20 @@ export class BookScheduledRideDto {
   @ApiPropertyOptional()
   @IsOptional()
   durationMin?: number;
+
+  // ── Booking for someone else ─────────────────────────────────────────
+  @ApiPropertyOptional({ description: 'Name of the actual passenger (if different from booker)' })
+  @IsOptional()
+  @IsString()
+  passengerName?: string;
+
+  @ApiPropertyOptional({ description: 'Phone of the actual passenger' })
+  @IsOptional()
+  @IsString()
+  passengerPhone?: string;
+
+  @ApiPropertyOptional({ description: 'ID of a saved RideContact' })
+  @IsOptional()
+  @IsUUID()
+  rideContactId?: string;
 }
