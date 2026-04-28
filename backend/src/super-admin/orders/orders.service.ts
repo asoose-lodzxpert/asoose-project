@@ -63,6 +63,8 @@ export class OrdersService {
     }
 
     if (search) {
+      // Strip any ID prefixes: del#, track#, delivery#, or just # for copied shortened IDs
+      const normalizedSearch = search.trim().replace(/^(TRACK#|DEL#|DELIVERY#|#)/i, '').trim();
       const searchIdx = params.length + 1;
       conditions.push(`(
         o.id ILIKE $${searchIdx} OR 
@@ -70,7 +72,7 @@ export class OrdersService {
         s.name ILIKE $${searchIdx} OR 
         o."orderGroupId" ILIKE $${searchIdx}
       )`);
-      params.push(`%${search}%`);
+      params.push(`%${normalizedSearch}%`);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';

@@ -165,30 +165,31 @@ export class DeliveriesService {
     if (status && status !== 'All') where.status = status;
     if (riderId) where.riderId = riderId;
 
-    // ✅ Enhanced: Support searching by full ID, partial ID, or shortened format (track#XYZ, del#XYZ)
+    // ✅ Enhanced: Support searching by full ID, partial ID, or shortened format (track#XYZ, del#XYZ, #XYZ)
+    // Supports all formats: del#7F06D42D, 7F06D42D, #30E3B051, 30E3B051, full UUID, or partial UUID
     if (search) {
-      const searchUpper = search.trim().toUpperCase();
+      const searchTrimmed = search.trim();
+      const searchUpper = searchTrimmed.toUpperCase();
       
-      // Check if it's a shortened format search (track#XYZ, del#XYZ)
-      const isShortFormat = /^(TRACK#|DEL#)/.test(searchUpper);
+      // Extract shortened ID if it has a prefix (del#, track#, #, DELIVERY#, etc.)
+      // Strips: del#, track#, delivery#, or just # alone (for copied shortened IDs)
+      const shortIdPart = searchUpper.replace(/^(TRACK#|DEL#|DELIVERY#|#)/i, '').trim();
       
-      if (isShortFormat) {
-        // Extract the short ID portion (e.g., "440000" from "track#440000")
-        const shortIdPart = searchUpper.replace(/^(TRACK#|DEL#)/, '');
-        // Search for delivery IDs ending with the short ID
-        where.id = {
-          endsWith: shortIdPart,
-          mode: 'insensitive'
-        };
-      } else {
-        // Search for full UUID or partial UUID match
-        where.OR = [
-          { id: { contains: searchUpper, mode: 'insensitive' } },
-          { customer: { name: { contains: search, mode: 'insensitive' } } },
-          { recipientName: { contains: search, mode: 'insensitive' } },
-          { senderName: { contains: search, mode: 'insensitive' } },
-        ];
-      }
+      // Build search conditions - check if full UUID, shortened ID, or other fields match
+      where.OR = [
+        // 1. Exact UUID match (with or without hyphens)
+        { id: { equals: searchTrimmed, mode: 'insensitive' } },
+        { id: { equals: searchTrimmed.replace(/-/g, ''), mode: 'insensitive' } },
+        
+        // 2. UUID contains the search term (handles partial UUIDs and shortened IDs)
+        // This handles both first-segment (del#7F06D42D) and partial matches
+        { id: { contains: shortIdPart || searchUpper, mode: 'insensitive' } },
+        
+        // 3. Search by customer, recipient, or sender names
+        { customer: { name: { contains: searchTrimmed, mode: 'insensitive' } } },
+        { recipientName: { contains: searchTrimmed, mode: 'insensitive' } },
+        { senderName: { contains: searchTrimmed, mode: 'insensitive' } },
+      ];
     }
 
     if (from && to) {
@@ -249,7 +250,7 @@ export class DeliveriesService {
   async findOne(id: string) {
     this.logger.debug(`findOne delivery - id: ${id}`);
 
-    const delivery = await this.prisma.delivery.findUnique({
+    let delivery = await this.prisma.delivery.findUnique({
       where: { id },
       include: {
         payment: { select: { status: true, amount: true } },
@@ -274,6 +275,44 @@ export class DeliveriesService {
         dropoffAddress: true,
       },
     });
+
+    // ✅ If exact ID not found, try searching by shortened ID (del#7F06D42D, #30E3B051, 7F06D42D, or partial UUID)
+    if (!delivery) {
+      const searchTrimmed = id.trim();
+      const searchPattern = searchTrimmed.replace(/^(TRACK#|DEL#|DELIVERY#|#)/i, '').toUpperCase();
+      
+      // Search for delivery containing this pattern
+      delivery = await this.prisma.delivery.findFirst({
+        where: {
+          OR: [
+            { id: { contains: searchPattern, mode: 'insensitive' } },
+            { id: { equals: searchTrimmed, mode: 'insensitive' } },
+          ],
+        },
+        include: {
+          payment: { select: { status: true, amount: true } },
+          customer: { select: { name: true, phone: true, email: true } },
+          order: {
+            include: {
+              store: {
+                select: {
+                  name: true,
+                  address: true,
+                  vendor: { select: { phone: true } },
+                },
+              },
+            },
+          },
+          rider: {
+            include: {
+              vehicle: true,
+            },
+          },
+          pickupAddress: true,
+          dropoffAddress: true,
+        },
+      });
+    }
 
     if (!delivery) {
       this.logger.warn(`Delivery not found: ${id}`);

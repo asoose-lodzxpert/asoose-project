@@ -5,1204 +5,931 @@ const prisma = new PrismaClient();
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const daysAgo = (n: number) => {
+const daysAgo = (n: number, offsetHours = 0) => {
   const d = new Date();
   d.setDate(d.getDate() - n);
+  d.setHours(d.getHours() - offsetHours);
   return d;
 };
-
 const hoursAgo = (n: number) => {
   const d = new Date();
   d.setHours(d.getHours() - n);
   return d;
 };
-
 const minutesAgo = (n: number) => {
   const d = new Date();
   d.setMinutes(d.getMinutes() - n);
   return d;
 };
-
 const ref = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.floor(Math.random() * 999999)
     .toString()
     .padStart(6, "0")}`;
 
+// ─── Reusable: create one full order ─────────────────────────────────────────
+
+async function createOrder(opts: {
+  userId: string;
+  storeId: string;
+  riderId?: string;
+  pickupAddressId: string;
+  dropoffAddressId: string;
+  items: { nameSnap: string; quantity: number; price: number; productId: string }[];
+  deliveryFee: number;
+  commissionRate: number;
+  paymentMethod: "CASH" | "CARD" | "WALLET";
+  orderStatus: any;
+  deliveryStatus: any;
+  paymentStatus: "COMPLETED" | "PENDING" | "REFUNDED" | "FAILED";
+  createdAt: Date;
+  deliveredAt?: Date;
+  cancelledAt?: Date;
+  storeWalletBefore: number;
+  riderWalletBefore: number;
+  includeTransactions?: boolean;
+}) {
+  const orderTotal = opts.items.reduce((s, i) => s + i.price * i.quantity, 0);
+  const commission = orderTotal * (opts.commissionRate / 100);
+  const vendorNet = orderTotal - commission;
+  const total = orderTotal + opts.deliveryFee;
+  const isCompleted = opts.orderStatus === "DELIVERED";
+  const isCancelled = opts.orderStatus === "CANCELLED" || opts.orderStatus === "REJECTED";
+  const isRefunded = opts.paymentStatus === "REFUNDED";
+
+  const group = await prisma.orderGroup.create({
+    data: {
+      userId: opts.userId,
+      totalAmount: total,
+      paymentStatus: opts.paymentStatus,
+      createdAt: opts.createdAt,
+    },
+  });
+
+  const order = await prisma.order.create({
+    data: {
+      userId: opts.userId,
+      storeId: opts.storeId,
+      orderGroupId: group.id,
+      total: orderTotal,
+      status: opts.orderStatus,
+      paymentStatus: opts.paymentStatus === "COMPLETED" ? "PAID" : opts.paymentStatus,
+      createdAt: opts.createdAt,
+      updatedAt: opts.createdAt,
+      deliveredAt: opts.deliveredAt,
+      cancelledAt: opts.cancelledAt,
+      items: { create: opts.items },
+    },
+  });
+
+  let paymentId: string | undefined;
+  if (opts.paymentStatus !== "PENDING") {
+    const gateway =
+      opts.paymentMethod === "CASH"
+        ? "CASH"
+        : opts.paymentMethod === "WALLET"
+        ? "WALLET"
+        : "PAYSTACK";
+
+    const payment = await prisma.payment.create({
+      data: {
+        orderId: order.id,
+        orderGroupId: group.id,
+        userId: opts.userId,
+        amount: total,
+        method: opts.paymentMethod,
+        status: opts.paymentStatus,
+        reference: ref(gateway),
+        gateway,
+        transactionId: opts.paymentMethod === "CARD" ? `TXN${Date.now()}` : undefined,
+        paidAt: opts.paymentStatus === "COMPLETED" ? opts.createdAt : undefined,
+        verifiedAt: opts.paymentStatus === "COMPLETED" ? opts.createdAt : undefined,
+        createdAt: opts.createdAt,
+        updatedAt: opts.createdAt,
+      },
+    });
+    paymentId = payment.id;
+
+    await prisma.orderGroup.update({
+      where: { id: group.id },
+      data: { payment: { connect: { id: payment.id } } },
+    });
+  }
+
+  // Delivery
+  let deliveryId: string | undefined;
+  if (!isCancelled || opts.deliveryStatus !== "CANCELLED") {
+    const delivery = await prisma.delivery.create({
+      data: {
+        orderId: order.id,
+        customerId: opts.userId,
+        riderId: opts.riderId,
+        pickupAddressId: opts.pickupAddressId,
+        dropoffAddressId: opts.dropoffAddressId,
+        status: opts.deliveryStatus,
+        recipientName: "Customer",
+        recipientPhone: "+2348000000000",
+        deliveryFee: opts.deliveryFee,
+        distanceKm: parseFloat((Math.random() * 8 + 1).toFixed(1)),
+        orderGroupId: group.id,
+        assignedAt: opts.riderId ? opts.createdAt : undefined,
+        pickedUpAt: isCompleted ? opts.createdAt : undefined,
+        deliveredAt: opts.deliveredAt,
+        createdAt: opts.createdAt,
+        updatedAt: opts.createdAt,
+      },
+    });
+    deliveryId = delivery.id;
+  }
+
+  // Transactions
+  if ((opts.includeTransactions ?? true) && paymentId) {
+    if (isCompleted) {
+      await prisma.transaction.create({
+        data: {
+          type: "PAYMENT_RECEIVED",
+          amount: total,
+          entityType: "PLATFORM",
+          entityId: "platform",
+          paymentId,
+          orderId: order.id,
+          orderGroupId: group.id,
+          balanceBefore: 0,
+          balanceAfter: total,
+          description: `${opts.paymentMethod} payment for order`,
+          status: "COMPLETED",
+          createdAt: opts.createdAt,
+        },
+      });
+
+      await prisma.transaction.create({
+        data: {
+          type: "COMMISSION_DEDUCTED",
+          amount: commission,
+          entityType: "STORE",
+          entityId: opts.storeId,
+          orderId: order.id,
+          orderGroupId: group.id,
+          balanceBefore: opts.storeWalletBefore,
+          balanceAfter: opts.storeWalletBefore,
+          description: `${opts.commissionRate}% platform commission`,
+          metadata: { commissionRate: opts.commissionRate },
+          status: "COMPLETED",
+          createdAt: opts.createdAt,
+        },
+      });
+
+      await prisma.transaction.create({
+        data: {
+          type: "VENDOR_EARNING",
+          amount: vendorNet,
+          entityType: "STORE",
+          entityId: opts.storeId,
+          orderId: order.id,
+          orderGroupId: group.id,
+          balanceBefore: opts.storeWalletBefore,
+          balanceAfter: opts.storeWalletBefore + vendorNet,
+          description: `Net earning after ${opts.commissionRate}% commission`,
+          status: "COMPLETED",
+          createdAt: opts.createdAt,
+        },
+      });
+
+      if (opts.riderId && deliveryId) {
+        await prisma.transaction.create({
+          data: {
+            type: "RIDER_EARNING",
+            amount: opts.deliveryFee * 0.8,
+            entityType: "RIDER",
+            entityId: opts.riderId,
+            deliveryId,
+            orderId: order.id,
+            balanceBefore: opts.riderWalletBefore,
+            balanceAfter: opts.riderWalletBefore + opts.deliveryFee * 0.8,
+            description: "Rider delivery fee (80%)",
+            status: "COMPLETED",
+            createdAt: opts.createdAt,
+          },
+        });
+      }
+
+      await prisma.store.update({
+        where: { id: opts.storeId },
+        data: {
+          walletBalance: { increment: vendorNet },
+          totalRevenue: { increment: orderTotal },
+          totalOrders: { increment: 1 },
+        },
+      });
+
+      if (opts.riderId) {
+        await prisma.rider.update({
+          where: { id: opts.riderId },
+          data: { walletBalance: { increment: opts.deliveryFee * 0.8 } },
+        });
+      }
+    }
+
+    if (isRefunded) {
+      await prisma.transaction.create({
+        data: {
+          type: "PAYMENT_RECEIVED",
+          amount: total,
+          entityType: "PLATFORM",
+          entityId: "platform",
+          paymentId,
+          orderId: order.id,
+          orderGroupId: group.id,
+          balanceBefore: 0,
+          balanceAfter: total,
+          description: "Payment for later-cancelled order",
+          status: "REVERSED",
+          createdAt: opts.createdAt,
+        },
+      });
+      await prisma.transaction.create({
+        data: {
+          type: "REFUND_ISSUED",
+          amount: total,
+          entityType: "PLATFORM",
+          entityId: "platform",
+          orderId: order.id,
+          orderGroupId: group.id,
+          balanceBefore: total,
+          balanceAfter: 0,
+          description: "Full refund issued to customer",
+          metadata: { method: opts.paymentMethod },
+          status: "COMPLETED",
+          createdAt: opts.createdAt,
+        },
+      });
+    }
+  }
+
+  return { order, group };
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log("🌱  Seeding user with orders, rides & deliveries …\n");
+  console.log("🌱  Seeding store orders …\n");
 
   const hashedPassword = await bcrypt.hash("Password123!", 10);
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  PREREQUISITES — city, vendor, store, rider, products, addresses
+  //  INFRASTRUCTURE
   // ══════════════════════════════════════════════════════════════════════════
 
   const city = await prisma.city.upsert({
-    where: { name: "Abuja" },
+    where: { name: "Lagos" },
     update: {},
-    create: { name: "Abuja", state: "FCT", isActive: true },
+    create: { name: "Lagos", state: "Lagos", isActive: true },
   });
 
-  // ── User (the one we're seeding history for) ──────────────────────────────
-  const user = await prisma.user.upsert({
-    where: { email: "tunde.adeyemi@seed.dev" },
+  // ── 5 Customers ──────────────────────────────────────────────────────────
+  const customers = await Promise.all(
+    [
+      { name: "Chisom Obi",      email: "chisom@seed.dev",   phone: "+2348011111111", walletBalance: 12000 },
+      { name: "Seun Adekunle",   email: "seun@seed.dev",     phone: "+2348022222222", walletBalance: 6000  },
+      { name: "Ngozi Eze",       email: "ngozi@seed.dev",    phone: "+2348033333333", walletBalance: 2500  },
+      { name: "Damilola Bello",  email: "damilola@seed.dev", phone: "+2348044444444", walletBalance: 9000  },
+      { name: "Uche Nwosu",      email: "uche@seed.dev",     phone: "+2348055555555", walletBalance: 500   },
+    ].map(({ name, email, phone, walletBalance }) =>
+      prisma.user.upsert({
+        where: { email },
+        update: {},
+        create: { name, email, phone, walletBalance, password: hashedPassword, role: "CUSTOMER", status: "ACTIVE" },
+      })
+    )
+  );
+  const [chisom, seun, ngozi, damilola, uche] = customers;
+
+  // ── 3 Vendors + Stores ────────────────────────────────────────────────────
+
+  // Store A — Restaurant
+  const vendorA = await prisma.vendor.upsert({
+    where: { email: "mama-put@seed.dev" },
     update: {},
     create: {
-      email: "tunde.adeyemi@seed.dev",
+      email: "mama-put@seed.dev",
       password: hashedPassword,
-      name: "Tunde Adeyemi",
-      phone: "+2348031112222",
-      role: "CUSTOMER",
+      name: "Mama Put Ventures",
+      phone: "+2348066666666",
+      countryCode: "+234",
+      businessType: "RESTAURANT",
+      employees: "10-50",
       status: "ACTIVE",
-      walletBalance: 8500,
     },
   });
 
-  // ── Vendor & Store ────────────────────────────────────────────────────────
-  const vendor = await prisma.vendor.upsert({
-    where: { email: "nkechi.eze@seed.dev" },
+  const storeA = await prisma.store.upsert({
+    where: { slug: "mama-put-lekki" },
     update: {},
     create: {
-      email: "nkechi.eze@seed.dev",
+      name: "Mama Put Lekki",
+      slug: "mama-put-lekki",
+      description: "Lagos street food done right",
+      type: "RESTAURANT",
+      address: "12 Admiralty Way, Lekki Phase 1",
+      lat: 6.4317,
+      lng: 3.4686,
+      status: "ACTIVE",
+      verification: "VERIFIED",
+      commissionRate: 10,
+      prepTime: 15,
+      isOpen: true,
+      walletBalance: 0,
+      totalOrders: 0,
+      totalRevenue: 0,
+      vendorId: vendorA.id,
+      cityId: city.id,
+    },
+  });
+
+  // Store B — Grocery
+  const vendorB = await prisma.vendor.upsert({
+    where: { email: "fresh-mart@seed.dev" },
+    update: {},
+    create: {
+      email: "fresh-mart@seed.dev",
       password: hashedPassword,
-      name: "Nkechi Eze",
-      phone: "+2348089998877",
+      name: "Fresh Mart Ltd",
+      phone: "+2348077777777",
       countryCode: "+234",
-      businessType: "RESTAURANT",
+      businessType: "GROCERY",
+      employees: "20-100",
+      status: "ACTIVE",
+    },
+  });
+
+  const storeB = await prisma.store.upsert({
+    where: { slug: "fresh-mart-vi" },
+    update: {},
+    create: {
+      name: "Fresh Mart VI",
+      slug: "fresh-mart-vi",
+      description: "Fresh produce & daily essentials",
+      type: "GROCERY",
+      address: "15 Ozumba Mbadiwe, Victoria Island",
+      lat: 6.4281,
+      lng: 3.4219,
+      status: "ACTIVE",
+      verification: "VERIFIED",
+      commissionRate: 8,
+      prepTime: 10,
+      isOpen: true,
+      walletBalance: 0,
+      totalOrders: 0,
+      totalRevenue: 0,
+      vendorId: vendorB.id,
+      cityId: city.id,
+    },
+  });
+
+  // Store C — Pharmacy
+  const vendorC = await prisma.vendor.upsert({
+    where: { email: "healthplus@seed.dev" },
+    update: {},
+    create: {
+      email: "healthplus@seed.dev",
+      password: hashedPassword,
+      name: "HealthPlus Pharma",
+      phone: "+2348088888888",
+      countryCode: "+234",
+      businessType: "PHARMACY",
       employees: "5-20",
       status: "ACTIVE",
     },
   });
 
-  const store = await prisma.store.upsert({
-    where: { slug: "nkechi-bites" },
+  const storeC = await prisma.store.upsert({
+    where: { slug: "healthplus-ikoyi" },
     update: {},
     create: {
-      name: "Nkechi's Bites",
-      slug: "nkechi-bites",
-      description: "Fast Nigerian home cooking",
-      type: "RESTAURANT",
-      address: "Plot 7 Garki Area 11, Abuja",
-      lat: 9.0437,
-      lng: 7.4957,
+      name: "HealthPlus Ikoyi",
+      slug: "healthplus-ikoyi",
+      description: "Medications & health products",
+      type: "PHARMACY",
+      address: "3 Bourdillon Road, Ikoyi",
+      lat: 6.4536,
+      lng: 3.4378,
       status: "ACTIVE",
       verification: "VERIFIED",
-      commissionRate: 10,
-      prepTime: 20,
+      commissionRate: 5,
+      prepTime: 5,
       isOpen: true,
       walletBalance: 0,
       totalOrders: 0,
       totalRevenue: 0,
-      vendorId: vendor.id,
+      vendorId: vendorC.id,
       cityId: city.id,
     },
   });
 
-  // ── Rider ─────────────────────────────────────────────────────────────────
-  const rider = await prisma.rider.upsert({
-    where: { email: "emeka.okeke@seed.dev" },
+  // ── 2 Riders ─────────────────────────────────────────────────────────────
+  const riderA = await prisma.rider.upsert({
+    where: { email: "tayo.rider@seed.dev" },
     update: {},
     create: {
-      email: "emeka.okeke@seed.dev",
+      email: "tayo.rider@seed.dev",
       password: hashedPassword,
-      name: "Emeka Okeke",
-      phone: "+2347055443322",
+      name: "Tayo Alabi",
+      phone: "+2347011111111",
       countryCode: "+234",
       role: "RIDER",
       status: "ACTIVE",
       isOnline: true,
       walletBalance: 0,
       commissionRate: 20,
-      rating: 4.9,
+      rating: 4.8,
       totalRides: 0,
       cityId: city.id,
-      currentLat: 9.058,
-      currentLng: 7.491,
+      currentLat: 6.435,
+      currentLng: 3.465,
     },
   });
 
-  // ── Category & Products ───────────────────────────────────────────────────
-  const category = await prisma.category.upsert({
-    where: { slug: "nigerian-meals" },
-    update: {},
-    create: { name: "Nigerian Meals", slug: "nigerian-meals" },
-  });
-
-  const suya = await prisma.product.upsert({
-    where: { slug: "suya-nkechi" },
+  const riderB = await prisma.rider.upsert({
+    where: { email: "felix.rider@seed.dev" },
     update: {},
     create: {
-      name: "Suya Platter",
-      slug: "suya-nkechi",
-      description: "Spicy grilled beef suya with onions",
-      price: 2000,
+      email: "felix.rider@seed.dev",
+      password: hashedPassword,
+      name: "Felix Okafor",
+      phone: "+2347022222222",
+      countryCode: "+234",
+      role: "RIDER",
       status: "ACTIVE",
-      stock: 100,
-      manageStock: false,
-      storeId: store.id,
-      categoryId: category.id,
+      isOnline: true,
+      walletBalance: 0,
+      commissionRate: 20,
+      rating: 4.6,
+      totalRides: 0,
+      cityId: city.id,
+      currentLat: 6.428,
+      currentLng: 3.422,
     },
   });
 
-  const peppersoup = await prisma.product.upsert({
-    where: { slug: "peppersoup-nkechi" },
+  // ── Categories & Products ─────────────────────────────────────────────────
+  const catFood = await prisma.category.upsert({
+    where: { slug: "street-food" },
     update: {},
-    create: {
-      name: "Catfish Peppersoup",
-      slug: "peppersoup-nkechi",
-      description: "Hot & spicy catfish pepper soup",
-      price: 3500,
-      status: "ACTIVE",
-      stock: 50,
-      manageStock: false,
-      storeId: store.id,
-      categoryId: category.id,
-    },
+    create: { name: "Street Food", slug: "street-food" },
   });
 
-  const friedRice = await prisma.product.upsert({
-    where: { slug: "fried-rice-nkechi" },
+  const catGrocery = await prisma.category.upsert({
+    where: { slug: "groceries" },
     update: {},
-    create: {
-      name: "Fried Rice + Chicken",
-      slug: "fried-rice-nkechi",
-      description: "Party fried rice with grilled chicken",
-      price: 2800,
-      status: "ACTIVE",
-      stock: 80,
-      manageStock: false,
-      storeId: store.id,
-      categoryId: category.id,
-    },
+    create: { name: "Groceries", slug: "groceries" },
   });
 
-  // ── Addresses ─────────────────────────────────────────────────────────────
-  const homeAddress = await prisma.address.create({
-    data: {
-      userId: user.id,
-      label: "Home",
-      street: "23 Adetokunbo Ademola Crescent, Wuse 2",
-      city: "Abuja",
-      state: "FCT",
-      lat: 9.0765,
-      lng: 7.4922,
-      isDefault: true,
-    },
+  const catPharma = await prisma.category.upsert({
+    where: { slug: "pharmacy" },
+    update: {},
+    create: { name: "Pharmacy", slug: "pharmacy" },
   });
 
-  const officeAddress = await prisma.address.create({
-    data: {
-      userId: user.id,
-      label: "Office",
-      street: "Central Business District, Plot 1144",
-      city: "Abuja",
-      state: "FCT",
-      lat: 9.0579,
-      lng: 7.4892,
-      isDefault: false,
-    },
-  });
+  // Store A products
+  const boli          = await prisma.product.upsert({ where: { slug: "boli-mpl" },           update: {}, create: { name: "Boli & Fish",             slug: "boli-mpl",           price: 1200, status: "ACTIVE", stock: 100, manageStock: false, storeId: storeA.id, categoryId: catFood.id } });
+  const amala         = await prisma.product.upsert({ where: { slug: "amala-mpl" },          update: {}, create: { name: "Amala & Ewedu",            slug: "amala-mpl",          price: 2500, status: "ACTIVE", stock: 80,  manageStock: false, storeId: storeA.id, categoryId: catFood.id } });
+  const moinmoin      = await prisma.product.upsert({ where: { slug: "moinmoin-mpl" },       update: {}, create: { name: "Moin Moin (6 wraps)",      slug: "moinmoin-mpl",       price: 1800, status: "ACTIVE", stock: 60,  manageStock: false, storeId: storeA.id, categoryId: catFood.id } });
+  const akaraEgg      = await prisma.product.upsert({ where: { slug: "akara-egg-mpl" },      update: {}, create: { name: "Akara & Boiled Egg",       slug: "akara-egg-mpl",      price: 900,  status: "ACTIVE", stock: 120, manageStock: false, storeId: storeA.id, categoryId: catFood.id } });
+  const ofeOnugbu     = await prisma.product.upsert({ where: { slug: "ofe-onugbu-mpl" },     update: {}, create: { name: "Ofe Onugbu + Eba",         slug: "ofe-onugbu-mpl",     price: 3000, status: "ACTIVE", stock: 40,  manageStock: false, storeId: storeA.id, categoryId: catFood.id } });
+  const nkwobi        = await prisma.product.upsert({ where: { slug: "nkwobi-mpl" },         update: {}, create: { name: "Nkwobi (500g)",            slug: "nkwobi-mpl",         price: 4500, status: "ACTIVE", stock: 30,  manageStock: false, storeId: storeA.id, categoryId: catFood.id } });
+  const drinkWater    = await prisma.product.upsert({ where: { slug: "water-bottle-mpl" },   update: {}, create: { name: "Table Water (50cl)",       slug: "water-bottle-mpl",   price: 200,  status: "ACTIVE", stock: 500, manageStock: false, storeId: storeA.id, categoryId: catFood.id } });
 
-  const storeAddress = await prisma.address.create({
-    data: {
-      vendorId: vendor.id,
-      label: "Store Pickup",
-      street: "Plot 7 Garki Area 11",
-      city: "Abuja",
-      state: "FCT",
-      lat: 9.0437,
-      lng: 7.4957,
-      isDefault: true,
-    },
-  });
+  // Store B products
+  const rice5kg       = await prisma.product.upsert({ where: { slug: "rice-5kg-fm" },        update: {}, create: { name: "Rice (5kg bag)",           slug: "rice-5kg-fm",        price: 5500, status: "ACTIVE", stock: 200, manageStock: false, storeId: storeB.id, categoryId: catGrocery.id } });
+  const tomato        = await prisma.product.upsert({ where: { slug: "tomato-1kg-fm" },      update: {}, create: { name: "Fresh Tomatoes (1kg)",     slug: "tomato-1kg-fm",      price: 1200, status: "ACTIVE", stock: 300, manageStock: false, storeId: storeB.id, categoryId: catGrocery.id } });
+  const cookingOil    = await prisma.product.upsert({ where: { slug: "oil-2l-fm" },          update: {}, create: { name: "Vegetable Oil (2L)",       slug: "oil-2l-fm",          price: 3800, status: "ACTIVE", stock: 150, manageStock: false, storeId: storeB.id, categoryId: catGrocery.id } });
+  const eggs12        = await prisma.product.upsert({ where: { slug: "eggs-12-fm" },         update: {}, create: { name: "Eggs (crate of 12)",       slug: "eggs-12-fm",         price: 1800, status: "ACTIVE", stock: 100, manageStock: false, storeId: storeB.id, categoryId: catGrocery.id } });
+  const indomie       = await prisma.product.upsert({ where: { slug: "indomie-pack-fm" },    update: {}, create: { name: "Indomie Noodles (40 pack)","slug": "indomie-pack-fm",  price: 4200, status: "ACTIVE", stock: 180, manageStock: false, storeId: storeB.id, categoryId: catGrocery.id } });
+  const garri         = await prisma.product.upsert({ where: { slug: "garri-2kg-fm" },       update: {}, create: { name: "Garri (2kg)",              slug: "garri-2kg-fm",       price: 1500, status: "ACTIVE", stock: 250, manageStock: false, storeId: storeB.id, categoryId: catGrocery.id } });
 
-  const pickupPoint = await prisma.address.create({
-    data: {
-      userId: user.id,
-      label: "Friend's Place",
-      street: "5 Ahmadu Bello Way, Garki",
-      city: "Abuja",
-      state: "FCT",
-      lat: 9.0491,
-      lng: 7.4875,
-      isDefault: false,
-    },
-  });
+  // Store C products
+  const paracetamol   = await prisma.product.upsert({ where: { slug: "paracetamol-hp" },     update: {}, create: { name: "Paracetamol (Strip)",      slug: "paracetamol-hp",     price: 350,  status: "ACTIVE", stock: 500, manageStock: false, storeId: storeC.id, categoryId: catPharma.id } });
+  const ibuprofen     = await prisma.product.upsert({ where: { slug: "ibuprofen-hp" },       update: {}, create: { name: "Ibuprofen 400mg",          slug: "ibuprofen-hp",       price: 450,  status: "ACTIVE", stock: 400, manageStock: false, storeId: storeC.id, categoryId: catPharma.id } });
+  const vitaminC      = await prisma.product.upsert({ where: { slug: "vitaminc-hp" },        update: {}, create: { name: "Vitamin C 1000mg (30s)",   slug: "vitaminc-hp",        price: 3200, status: "ACTIVE", stock: 200, manageStock: false, storeId: storeC.id, categoryId: catPharma.id } });
+  const handSanitizer = await prisma.product.upsert({ where: { slug: "sanitizer-hp" },      update: {}, create: { name: "Hand Sanitizer (500ml)",   slug: "sanitizer-hp",       price: 1800, status: "ACTIVE", stock: 300, manageStock: false, storeId: storeC.id, categoryId: catPharma.id } });
+  const glucometer    = await prisma.product.upsert({ where: { slug: "glucometer-hp" },      update: {}, create: { name: "Glucometer Kit",           slug: "glucometer-hp",      price: 12000, status: "ACTIVE", stock: 50, manageStock: false, storeId: storeC.id, categoryId: catPharma.id } });
 
-  console.log("  ✓ Prerequisites ready\n");
+  // ── Customer delivery addresses ───────────────────────────────────────────
+  const makeAddr = (userId: string, label: string, street: string, lat: number, lng: number) =>
+    prisma.address.create({ data: { userId, label, street, city: "Lagos", state: "Lagos", lat, lng, isDefault: label === "Home" } });
 
-  // ══════════════════════════════════════════════════════════════════════════
-  //  ORDERS
-  // ══════════════════════════════════════════════════════════════════════════
+  const chisomHome   = await makeAddr(chisom.id,   "Home",   "4 Awolowo Rd, Ikoyi",         6.4499, 3.4312);
+  const seunHome     = await makeAddr(seun.id,     "Home",   "22 Allen Ave, Ikeja",          6.6018, 3.3515);
+  const ngoziHome    = await makeAddr(ngozi.id,    "Home",   "10 Bode Thomas, Surulere",     6.5012, 3.3607);
+  const damilolaHome = await makeAddr(damilola.id, "Home",   "7 Lekki-Epe Expy, Ajah",      6.4698, 3.5712);
+  const ucheHome     = await makeAddr(uche.id,     "Home",   "5 Broad St, Lagos Island",     6.4541, 3.3947);
+  const chisomWork   = await makeAddr(chisom.id,   "Office", "1415 Idejo St, Victoria Island", 6.4323, 3.4215);
 
-  // ── ORDER 1: Delivered — 14 days ago (cash) ───────────────────────────────
-  console.log("  📦 Order 1: Delivered (cash, 14 days ago)");
-  {
-    const orderTotal = suya.price * 2 + peppersoup.price * 1; // 7500
-    const deliveryFee = 800;
-    const commission = orderTotal * 0.1;
-    const vendorNet = orderTotal - commission;
+  // ── Store pickup addresses ────────────────────────────────────────────────
+  const storeAAddr = await prisma.address.create({ data: { vendorId: vendorA.id, label: "Pickup", street: "12 Admiralty Way, Lekki Phase 1", city: "Lagos", state: "Lagos", lat: 6.4317, lng: 3.4686, isDefault: true } });
+  const storeBAddr = await prisma.address.create({ data: { vendorId: vendorB.id, label: "Pickup", street: "15 Ozumba Mbadiwe, Victoria Island", city: "Lagos", state: "Lagos", lat: 6.4281, lng: 3.4219, isDefault: true } });
+  const storeCAddr = await prisma.address.create({ data: { vendorId: vendorC.id, label: "Pickup", street: "3 Bourdillon Road, Ikoyi", city: "Lagos", state: "Lagos", lat: 6.4536, lng: 3.4378, isDefault: true } });
 
-    const group = await prisma.orderGroup.create({
-      data: {
-        userId: user.id,
-        totalAmount: orderTotal + deliveryFee,
-        paymentStatus: "COMPLETED",
-        createdAt: daysAgo(14),
-      },
-    });
-
-    const order = await prisma.order.create({
-      data: {
-        userId: user.id,
-        storeId: store.id,
-        orderGroupId: group.id,
-        total: orderTotal,
-        status: "DELIVERED",
-        paymentStatus: "PAID",
-        createdAt: daysAgo(14),
-        updatedAt: daysAgo(14),
-        deliveredAt: daysAgo(14),
-        items: {
-          create: [
-            { nameSnap: suya.name, quantity: 2, price: suya.price, productId: suya.id },
-            { nameSnap: peppersoup.name, quantity: 1, price: peppersoup.price, productId: peppersoup.id },
-          ],
-        },
-      },
-    });
-
-    const payment = await prisma.payment.create({
-      data: {
-        orderId: order.id,
-        orderGroupId: group.id,
-        userId: user.id,
-        amount: orderTotal + deliveryFee,
-        method: "CASH",
-        status: "COMPLETED",
-        reference: ref("CASH"),
-        gateway: "CASH",
-        paidAt: daysAgo(14),
-        verifiedAt: daysAgo(14),
-        createdAt: daysAgo(14),
-        updatedAt: daysAgo(14),
-      },
-    });
-
-    await prisma.orderGroup.update({
-      where: { id: group.id },
-      data: { payment: { connect: { id: payment.id } } },
-    });
-
-    await prisma.delivery.create({
-      data: {
-        orderId: order.id,
-        customerId: user.id,
-        riderId: rider.id,
-        pickupAddressId: storeAddress.id,
-        dropoffAddressId: homeAddress.id,
-        status: "DELIVERED",
-        recipientName: user.name,
-        recipientPhone: user.phone!,
-        deliveryFee,
-        distanceKm: 3.8,
-        orderGroupId: group.id,
-        assignedAt: daysAgo(14),
-        pickedUpAt: daysAgo(14),
-        deliveredAt: daysAgo(14),
-        createdAt: daysAgo(14),
-        updatedAt: daysAgo(14),
-      },
-    });
-
-    // Transactions
-    for (const [type, amount, entityType, entityId, desc] of [
-      ["PAYMENT_RECEIVED", orderTotal + deliveryFee, "PLATFORM", "platform", "Cash payment received"],
-      ["COMMISSION_DEDUCTED", commission, "STORE", store.id, "10% commission"],
-      ["VENDOR_EARNING", vendorNet, "STORE", store.id, "Vendor net earning"],
-      ["RIDER_EARNING", deliveryFee * 0.8, "RIDER", rider.id, "Rider delivery fee"],
-    ] as [string, number, string, string, string][]) {
-      await prisma.transaction.create({
-        data: {
-          type: type as any,
-          amount,
-          entityType: entityType as any,
-          entityId,
-          orderId: order.id,
-          orderGroupId: group.id,
-          balanceBefore: 0,
-          balanceAfter: amount,
-          description: desc,
-          status: "COMPLETED",
-          createdAt: daysAgo(14),
-        },
-      });
-    }
-
-    await prisma.store.update({
-      where: { id: store.id },
-      data: { walletBalance: { increment: vendorNet }, totalRevenue: { increment: orderTotal }, totalOrders: { increment: 1 } },
-    });
-    await prisma.rider.update({
-      where: { id: rider.id },
-      data: { walletBalance: { increment: deliveryFee * 0.8 } },
-    });
-    console.log("    ✓ Order 1 →", order.id);
-  }
-
-  // ── ORDER 2: Delivered — 7 days ago (Paystack card) ──────────────────────
-  console.log("  📦 Order 2: Delivered (card / Paystack, 7 days ago)");
-  {
-    const orderTotal = friedRice.price * 2; // 5600
-    const deliveryFee = 600;
-    const commission = orderTotal * 0.1;
-    const vendorNet = orderTotal - commission;
-
-    const group = await prisma.orderGroup.create({
-      data: {
-        userId: user.id,
-        totalAmount: orderTotal + deliveryFee,
-        paymentStatus: "COMPLETED",
-        createdAt: daysAgo(7),
-      },
-    });
-
-    const order = await prisma.order.create({
-      data: {
-        userId: user.id,
-        storeId: store.id,
-        orderGroupId: group.id,
-        total: orderTotal,
-        status: "DELIVERED",
-        paymentStatus: "PAID",
-        createdAt: daysAgo(7),
-        updatedAt: daysAgo(7),
-        deliveredAt: daysAgo(7),
-        items: {
-          create: [
-            { nameSnap: friedRice.name, quantity: 2, price: friedRice.price, productId: friedRice.id },
-          ],
-        },
-      },
-    });
-
-    const payment = await prisma.payment.create({
-      data: {
-        orderId: order.id,
-        orderGroupId: group.id,
-        userId: user.id,
-        amount: orderTotal + deliveryFee,
-        method: "CARD",
-        status: "COMPLETED",
-        reference: ref("PSK"),
-        gateway: "PAYSTACK",
-        transactionId: `TXN${Date.now()}`,
-        paidAt: daysAgo(7),
-        verifiedAt: daysAgo(7),
-        createdAt: daysAgo(7),
-        updatedAt: daysAgo(7),
-      },
-    });
-
-    await prisma.orderGroup.update({
-      where: { id: group.id },
-      data: { payment: { connect: { id: payment.id } } },
-    });
-
-    const storeWallet = await prisma.store
-      .findUnique({ where: { id: store.id } })
-      .then((s) => s!.walletBalance);
-
-    await prisma.delivery.create({
-      data: {
-        orderId: order.id,
-        customerId: user.id,
-        riderId: rider.id,
-        pickupAddressId: storeAddress.id,
-        dropoffAddressId: officeAddress.id,
-        status: "DELIVERED",
-        recipientName: user.name,
-        recipientPhone: user.phone!,
-        deliveryFee,
-        distanceKm: 5.1,
-        orderGroupId: group.id,
-        assignedAt: daysAgo(7),
-        pickedUpAt: daysAgo(7),
-        deliveredAt: daysAgo(7),
-        createdAt: daysAgo(7),
-        updatedAt: daysAgo(7),
-      },
-    });
-
-    await prisma.transaction.create({
-      data: {
-        type: "PAYMENT_RECEIVED",
-        amount: orderTotal + deliveryFee,
-        entityType: "PLATFORM",
-        entityId: "platform",
-        paymentId: payment.id,
-        orderId: order.id,
-        orderGroupId: group.id,
-        balanceBefore: 0,
-        balanceAfter: orderTotal + deliveryFee,
-        description: "Card payment via Paystack",
-        status: "COMPLETED",
-        createdAt: daysAgo(7),
-      },
-    });
-    await prisma.transaction.create({
-      data: {
-        type: "VENDOR_EARNING",
-        amount: vendorNet,
-        entityType: "STORE",
-        entityId: store.id,
-        orderId: order.id,
-        orderGroupId: group.id,
-        balanceBefore: storeWallet,
-        balanceAfter: storeWallet + vendorNet,
-        description: "Vendor net earning after 10% commission",
-        status: "COMPLETED",
-        createdAt: daysAgo(7),
-      },
-    });
-
-    await prisma.store.update({
-      where: { id: store.id },
-      data: { walletBalance: { increment: vendorNet }, totalRevenue: { increment: orderTotal }, totalOrders: { increment: 1 } },
-    });
-    await prisma.rider.update({ where: { id: rider.id }, data: { walletBalance: { increment: deliveryFee * 0.8 } } });
-    console.log("    ✓ Order 2 →", order.id);
-  }
-
-  // ── ORDER 3: Cancelled + Refunded — 3 days ago ────────────────────────────
-  console.log("  📦 Order 3: Cancelled & refunded (3 days ago)");
-  {
-    const orderTotal = suya.price * 3; // 6000
-    const deliveryFee = 700;
-
-    const group = await prisma.orderGroup.create({
-      data: {
-        userId: user.id,
-        totalAmount: orderTotal + deliveryFee,
-        paymentStatus: "REFUNDED",
-        createdAt: daysAgo(3),
-      },
-    });
-
-    const order = await prisma.order.create({
-      data: {
-        userId: user.id,
-        storeId: store.id,
-        orderGroupId: group.id,
-        total: orderTotal,
-        status: "CANCELLED",
-        paymentStatus: "REFUNDED",
-        createdAt: daysAgo(3),
-        updatedAt: daysAgo(3),
-        cancelledAt: daysAgo(3),
-        items: {
-          create: [
-            { nameSnap: suya.name, quantity: 3, price: suya.price, productId: suya.id },
-          ],
-        },
-      },
-    });
-
-    const payment = await prisma.payment.create({
-      data: {
-        orderId: order.id,
-        orderGroupId: group.id,
-        userId: user.id,
-        amount: orderTotal + deliveryFee,
-        method: "CARD",
-        status: "REFUNDED",
-        reference: ref("PSK"),
-        gateway: "PAYSTACK",
-        transactionId: `TXN${Date.now()}`,
-        paidAt: daysAgo(3),
-        verifiedAt: daysAgo(3),
-        createdAt: daysAgo(3),
-        updatedAt: daysAgo(3),
-      },
-    });
-
-    await prisma.orderGroup.update({
-      where: { id: group.id },
-      data: { payment: { connect: { id: payment.id } } },
-    });
-
-    await prisma.transaction.create({
-      data: {
-        type: "PAYMENT_RECEIVED",
-        amount: orderTotal + deliveryFee,
-        entityType: "PLATFORM",
-        entityId: "platform",
-        paymentId: payment.id,
-        orderId: order.id,
-        orderGroupId: group.id,
-        balanceBefore: 0,
-        balanceAfter: orderTotal + deliveryFee,
-        description: "Payment for cancelled order",
-        status: "REVERSED",
-        createdAt: daysAgo(3),
-      },
-    });
-
-    await prisma.transaction.create({
-      data: {
-        type: "REFUND_ISSUED",
-        amount: orderTotal + deliveryFee,
-        entityType: "PLATFORM",
-        entityId: "platform",
-        orderId: order.id,
-        orderGroupId: group.id,
-        balanceBefore: orderTotal + deliveryFee,
-        balanceAfter: 0,
-        description: "Full refund — store rejected order",
-        metadata: { reason: "Store out of stock", method: "CARD_REVERSAL" },
-        status: "COMPLETED",
-        createdAt: daysAgo(3),
-      },
-    });
-
-    console.log("    ✓ Order 3 (cancelled) →", order.id);
-  }
-
-  // ── ORDER 4: Currently PREPARING (placed 30 min ago) ─────────────────────
-  console.log("  📦 Order 4: Active — store is preparing (30 min ago)");
-  {
-    const orderTotal = peppersoup.price * 1 + friedRice.price * 1; // 6300
-    const deliveryFee = 900;
-
-    const group = await prisma.orderGroup.create({
-      data: {
-        userId: user.id,
-        totalAmount: orderTotal + deliveryFee,
-        paymentStatus: "COMPLETED",
-        createdAt: minutesAgo(30),
-      },
-    });
-
-    const order = await prisma.order.create({
-      data: {
-        userId: user.id,
-        storeId: store.id,
-        orderGroupId: group.id,
-        total: orderTotal,
-        status: "PREPARING",
-        paymentStatus: "PAID",
-        createdAt: minutesAgo(30),
-        updatedAt: minutesAgo(20),
-        items: {
-          create: [
-            { nameSnap: peppersoup.name, quantity: 1, price: peppersoup.price, productId: peppersoup.id },
-            { nameSnap: friedRice.name, quantity: 1, price: friedRice.price, productId: friedRice.id },
-          ],
-        },
-      },
-    });
-
-    const payment = await prisma.payment.create({
-      data: {
-        orderId: order.id,
-        orderGroupId: group.id,
-        userId: user.id,
-        amount: orderTotal + deliveryFee,
-        method: "WALLET",
-        status: "COMPLETED",
-        reference: ref("WLT"),
-        gateway: "WALLET",
-        paidAt: minutesAgo(30),
-        verifiedAt: minutesAgo(30),
-        createdAt: minutesAgo(30),
-        updatedAt: minutesAgo(30),
-      },
-    });
-
-    await prisma.orderGroup.update({
-      where: { id: group.id },
-      data: { payment: { connect: { id: payment.id } } },
-    });
-
-    // Delivery assigned but rider hasn't picked up yet
-    await prisma.delivery.create({
-      data: {
-        orderId: order.id,
-        customerId: user.id,
-        riderId: rider.id,
-        pickupAddressId: storeAddress.id,
-        dropoffAddressId: homeAddress.id,
-        status: "ASSIGNED",
-        recipientName: user.name,
-        recipientPhone: user.phone!,
-        deliveryFee,
-        distanceKm: 4.5,
-        orderGroupId: group.id,
-        assignedAt: minutesAgo(20),
-        createdAt: minutesAgo(30),
-        updatedAt: minutesAgo(20),
-      },
-    });
-
-    await prisma.transaction.create({
-      data: {
-        type: "PAYMENT_RECEIVED",
-        amount: orderTotal + deliveryFee,
-        entityType: "PLATFORM",
-        entityId: "platform",
-        paymentId: payment.id,
-        orderId: order.id,
-        orderGroupId: group.id,
-        balanceBefore: 0,
-        balanceAfter: orderTotal + deliveryFee,
-        description: "Wallet payment — order being prepared",
-        status: "COMPLETED",
-        createdAt: minutesAgo(30),
-      },
-    });
-
-    console.log("    ✓ Order 4 (active) →", order.id);
-  }
+  console.log("  ✓ Infrastructure ready (3 stores · 5 customers · 2 riders)\n");
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  RIDES
+  //  STORE A — MAMA PUT LEKKI (restaurant)  23 orders
   // ══════════════════════════════════════════════════════════════════════════
 
-  // ── RIDE 1: Completed — 10 days ago (cash) ────────────────────────────────
-  console.log("\n  🚖 Ride 1: Completed (cash, 10 days ago)");
-  {
-    const totalFare = 2200;
-    const platformFee = totalFare * 0.2;
-    const driverFee = totalFare - platformFee;
+  console.log("  🍽️  Store A — Mama Put Lekki");
 
-    const ride = await prisma.ride.create({
-      data: {
-        customerId: user.id,
-        riderId: rider.id,
-        pickupAddressId: homeAddress.id,
-        dropoffAddressId: officeAddress.id,
-        status: "COMPLETED",
-        baseFare: 1000,
-        distanceFare: 900,
-        timeFare: 300,
-        surgeMultiplier: 1.0,
-        platformFee,
-        driverFee,
-        totalFare,
-        distanceKm: 8.2,
-        durationMin: 22,
-        vehicleType: "ECONOMY",
-        acceptedAt: daysAgo(10),
-        startedAt: daysAgo(10),
-        completedAt: daysAgo(10),
-        createdAt: daysAgo(10),
-        updatedAt: daysAgo(10),
-      },
+  const storeAOrders: { label: string; opts: Parameters<typeof createOrder>[0] }[] = [];
+
+  const getStoreWallet = async (id: string) =>
+    prisma.store.findUnique({ where: { id } }).then((s) => s!.walletBalance);
+  const getRiderWallet = async (id: string) =>
+    prisma.rider.findUnique({ where: { id } }).then((r) => r!.walletBalance);
+
+  // === DELIVERED orders (14 total) ===
+  const deliveredConfigsA = [
+    { days: 30, customer: chisom,   dropAddr: chisomHome,   rider: riderA, items: [{ nameSnap: amala.name,     quantity: 2, price: amala.price,     productId: amala.id },     { nameSnap: drinkWater.name, quantity: 2, price: drinkWater.price, productId: drinkWater.id }], fee: 800,  method: "CASH"   as const },
+    { days: 28, customer: seun,     dropAddr: seunHome,     rider: riderB, items: [{ nameSnap: moinmoin.name,  quantity: 1, price: moinmoin.price,  productId: moinmoin.id },  { nameSnap: boli.name,       quantity: 1, price: boli.price,       productId: boli.id }],       fee: 1000, method: "CARD"   as const },
+    { days: 25, customer: ngozi,    dropAddr: ngoziHome,    rider: riderA, items: [{ nameSnap: ofeOnugbu.name, quantity: 1, price: ofeOnugbu.price, productId: ofeOnugbu.id }],                                                                                                 fee: 700,  method: "WALLET" as const },
+    { days: 21, customer: damilola, dropAddr: damilolaHome, rider: riderA, items: [{ nameSnap: nkwobi.name,    quantity: 1, price: nkwobi.price,    productId: nkwobi.id },    { nameSnap: amala.name,      quantity: 1, price: amala.price,      productId: amala.id }],       fee: 1200, method: "CARD"   as const },
+    { days: 20, customer: chisom,   dropAddr: chisomWork,   rider: riderB, items: [{ nameSnap: akaraEgg.name,  quantity: 3, price: akaraEgg.price,  productId: akaraEgg.id }],                                                                                                 fee: 600,  method: "CASH"   as const },
+    { days: 18, customer: uche,     dropAddr: ucheHome,     rider: riderA, items: [{ nameSnap: boli.name,      quantity: 2, price: boli.price,      productId: boli.id },      { nameSnap: drinkWater.name, quantity: 4, price: drinkWater.price, productId: drinkWater.id }], fee: 500,  method: "CARD"   as const },
+    { days: 15, customer: seun,     dropAddr: seunHome,     rider: riderB, items: [{ nameSnap: amala.name,     quantity: 1, price: amala.price,     productId: amala.id },     { nameSnap: moinmoin.name,   quantity: 1, price: moinmoin.price,   productId: moinmoin.id }],   fee: 900,  method: "WALLET" as const },
+    { days: 14, customer: ngozi,    dropAddr: ngoziHome,    rider: riderA, items: [{ nameSnap: nkwobi.name,    quantity: 1, price: nkwobi.price,    productId: nkwobi.id }],                                                                                                    fee: 700,  method: "CARD"   as const },
+    { days: 12, customer: damilola, dropAddr: damilolaHome, rider: riderB, items: [{ nameSnap: ofeOnugbu.name, quantity: 2, price: ofeOnugbu.price, productId: ofeOnugbu.id }, { nameSnap: drinkWater.name, quantity: 2, price: drinkWater.price, productId: drinkWater.id }], fee: 1100, method: "CASH"   as const },
+    { days: 10, customer: chisom,   dropAddr: chisomHome,   rider: riderA, items: [{ nameSnap: moinmoin.name,  quantity: 2, price: moinmoin.price,  productId: moinmoin.id },  { nameSnap: akaraEgg.name,   quantity: 2, price: akaraEgg.price,   productId: akaraEgg.id }],   fee: 800,  method: "CARD"   as const },
+    { days: 8,  customer: uche,     dropAddr: ucheHome,     rider: riderB, items: [{ nameSnap: amala.name,     quantity: 1, price: amala.price,     productId: amala.id }],                                                                                                     fee: 500,  method: "CASH"   as const },
+    { days: 6,  customer: seun,     dropAddr: seunHome,     rider: riderA, items: [{ nameSnap: boli.name,      quantity: 3, price: boli.price,      productId: boli.id },      { nameSnap: drinkWater.name, quantity: 6, price: drinkWater.price, productId: drinkWater.id }], fee: 1000, method: "CARD"   as const },
+    { days: 4,  customer: ngozi,    dropAddr: ngoziHome,    rider: riderB, items: [{ nameSnap: nkwobi.name,    quantity: 1, price: nkwobi.price,    productId: nkwobi.id },    { nameSnap: amala.name,      quantity: 1, price: amala.price,      productId: amala.id }],       fee: 700,  method: "WALLET" as const },
+    { days: 2,  customer: damilola, dropAddr: damilolaHome, rider: riderA, items: [{ nameSnap: ofeOnugbu.name, quantity: 1, price: ofeOnugbu.price, productId: ofeOnugbu.id }, { nameSnap: moinmoin.name,   quantity: 1, price: moinmoin.price,   productId: moinmoin.id }],   fee: 900,  method: "CARD"   as const },
+  ];
+
+  for (const cfg of deliveredConfigsA) {
+    const sw = await getStoreWallet(storeA.id);
+    const rw = await getRiderWallet(cfg.rider.id);
+    const { order } = await createOrder({
+      userId: cfg.customer.id,
+      storeId: storeA.id,
+      riderId: cfg.rider.id,
+      pickupAddressId: storeAAddr.id,
+      dropoffAddressId: cfg.dropAddr.id,
+      items: cfg.items,
+      deliveryFee: cfg.fee,
+      commissionRate: storeA.commissionRate,
+      paymentMethod: cfg.method,
+      orderStatus: "DELIVERED",
+      deliveryStatus: "DELIVERED",
+      paymentStatus: "COMPLETED",
+      createdAt: daysAgo(cfg.days),
+      deliveredAt: daysAgo(cfg.days, -2),
+      storeWalletBefore: sw,
+      riderWalletBefore: rw,
     });
-
-    const payment = await prisma.payment.create({
-      data: {
-        rideId: ride.id,
-        userId: user.id,
-        amount: totalFare,
-        method: "CASH",
-        status: "COMPLETED",
-        reference: ref("RIDE-CASH"),
-        gateway: "CASH",
-        paidAt: daysAgo(10),
-        verifiedAt: daysAgo(10),
-        createdAt: daysAgo(10),
-        updatedAt: daysAgo(10),
-      },
-    });
-
-    const riderWallet = await prisma.rider
-      .findUnique({ where: { id: rider.id } })
-      .then((r) => r!.walletBalance);
-
-    await prisma.transaction.create({
-      data: {
-        type: "PAYMENT_RECEIVED",
-        amount: totalFare,
-        entityType: "PLATFORM",
-        entityId: "platform",
-        paymentId: payment.id,
-        rideId: ride.id,
-        balanceBefore: 0,
-        balanceAfter: totalFare,
-        description: "Cash ride fare collected",
-        status: "COMPLETED",
-        createdAt: daysAgo(10),
-      },
-    });
-
-    await prisma.transaction.create({
-      data: {
-        type: "RIDER_EARNING",
-        amount: driverFee,
-        entityType: "RIDER",
-        entityId: rider.id,
-        rideId: ride.id,
-        balanceBefore: riderWallet,
-        balanceAfter: riderWallet + driverFee,
-        description: "Rider fare (80% of total)",
-        metadata: { vehicleType: "ECONOMY", distanceKm: 8.2, durationMin: 22 },
-        status: "COMPLETED",
-        createdAt: daysAgo(10),
-      },
-    });
-
-    await prisma.rider.update({
-      where: { id: rider.id },
-      data: { walletBalance: { increment: driverFee }, totalRides: { increment: 1 } },
-    });
-
-    console.log("    ✓ Ride 1 →", ride.id);
+    process.stdout.write(".");
   }
 
-  // ── RIDE 2: Completed — 5 days ago (card, BUSINESS) ──────────────────────
-  console.log("  🚖 Ride 2: Completed (card / Paystack, Business, 5 days ago)");
-  {
-    const totalFare = 5500;
-    const platformFee = totalFare * 0.2;
-    const driverFee = totalFare - platformFee;
-
-    const ride = await prisma.ride.create({
-      data: {
-        customerId: user.id,
-        riderId: rider.id,
-        pickupAddressId: officeAddress.id,
-        dropoffAddressId: homeAddress.id,
-        status: "COMPLETED",
-        baseFare: 2500,
-        distanceFare: 2000,
-        timeFare: 1000,
-        surgeMultiplier: 1.0,
-        platformFee,
-        driverFee,
-        totalFare,
-        distanceKm: 14.6,
-        durationMin: 35,
-        vehicleType: "BUSINESS",
-        acceptedAt: daysAgo(5),
-        startedAt: daysAgo(5),
-        completedAt: daysAgo(5),
-        createdAt: daysAgo(5),
-        updatedAt: daysAgo(5),
-      },
+  // === CANCELLED + refunded (3) ===
+  for (const cfg of [
+    { days: 26, customer: chisom,   items: [{ nameSnap: nkwobi.name,   quantity: 1, price: nkwobi.price,   productId: nkwobi.id }],   fee: 800,  method: "CARD"   as const },
+    { days: 11, customer: uche,     items: [{ nameSnap: amala.name,    quantity: 2, price: amala.price,    productId: amala.id }],    fee: 600,  method: "WALLET" as const },
+    { days: 3,  customer: seun,     items: [{ nameSnap: ofeOnugbu.name,quantity: 1, price: ofeOnugbu.price,productId: ofeOnugbu.id }], fee: 700,  method: "CARD"   as const },
+  ]) {
+    const sw = await getStoreWallet(storeA.id);
+    await createOrder({
+      userId: cfg.customer.id,
+      storeId: storeA.id,
+      pickupAddressId: storeAAddr.id,
+      dropoffAddressId: chisomHome.id,
+      items: cfg.items,
+      deliveryFee: cfg.fee,
+      commissionRate: storeA.commissionRate,
+      paymentMethod: cfg.method,
+      orderStatus: "CANCELLED",
+      deliveryStatus: "CANCELLED",
+      paymentStatus: "REFUNDED",
+      createdAt: daysAgo(cfg.days),
+      cancelledAt: daysAgo(cfg.days, -1),
+      storeWalletBefore: sw,
+      riderWalletBefore: 0,
     });
-
-    const payment = await prisma.payment.create({
-      data: {
-        rideId: ride.id,
-        userId: user.id,
-        amount: totalFare,
-        method: "CARD",
-        status: "COMPLETED",
-        reference: ref("RIDE-PSK"),
-        gateway: "PAYSTACK",
-        transactionId: `TXN${Date.now()}`,
-        paidAt: daysAgo(5),
-        verifiedAt: daysAgo(5),
-        createdAt: daysAgo(5),
-        updatedAt: daysAgo(5),
-      },
-    });
-
-    const riderWallet = await prisma.rider
-      .findUnique({ where: { id: rider.id } })
-      .then((r) => r!.walletBalance);
-
-    await prisma.transaction.create({
-      data: {
-        type: "PAYMENT_RECEIVED",
-        amount: totalFare,
-        entityType: "PLATFORM",
-        entityId: "platform",
-        paymentId: payment.id,
-        rideId: ride.id,
-        balanceBefore: 0,
-        balanceAfter: totalFare,
-        description: "Card payment — Business ride",
-        status: "COMPLETED",
-        createdAt: daysAgo(5),
-      },
-    });
-
-    await prisma.transaction.create({
-      data: {
-        type: "RIDER_EARNING",
-        amount: driverFee,
-        entityType: "RIDER",
-        entityId: rider.id,
-        rideId: ride.id,
-        balanceBefore: riderWallet,
-        balanceAfter: riderWallet + driverFee,
-        description: "Rider earning — Business class fare",
-        metadata: { vehicleType: "BUSINESS", distanceKm: 14.6, durationMin: 35 },
-        status: "COMPLETED",
-        createdAt: daysAgo(5),
-      },
-    });
-
-    await prisma.rider.update({
-      where: { id: rider.id },
-      data: { walletBalance: { increment: driverFee }, totalRides: { increment: 1 } },
-    });
-
-    console.log("    ✓ Ride 2 →", ride.id);
+    process.stdout.write(".");
   }
 
-  // ── RIDE 3: Cancelled by user — 2 days ago ────────────────────────────────
-  console.log("  🚖 Ride 3: Cancelled by user (2 days ago)");
-  {
-    const ride = await prisma.ride.create({
-      data: {
-        customerId: user.id,
-        riderId: rider.id,
-        pickupAddressId: homeAddress.id,
-        dropoffAddressId: pickupPoint.id,
-        status: "CANCELLED_BY_USER",
-        vehicleType: "ECONOMY",
-        totalFare: 1800,
-        cancellationReason: "Changed my mind",
-        cancelledBy: user.id,
-        cancelledAt: daysAgo(2),
-        createdAt: daysAgo(2),
-        updatedAt: daysAgo(2),
-      },
+  // === REJECTED by store (2) ===
+  for (const cfg of [
+    { days: 17, customer: ngozi,    items: [{ nameSnap: moinmoin.name,  quantity: 3, price: moinmoin.price,  productId: moinmoin.id }],  fee: 700, method: "CASH" as const },
+    { days: 5,  customer: damilola, items: [{ nameSnap: akaraEgg.name,  quantity: 5, price: akaraEgg.price,  productId: akaraEgg.id }],  fee: 600, method: "CARD" as const },
+  ]) {
+    const sw = await getStoreWallet(storeA.id);
+    await createOrder({
+      userId: cfg.customer.id,
+      storeId: storeA.id,
+      pickupAddressId: storeAAddr.id,
+      dropoffAddressId: ngoziHome.id,
+      items: cfg.items,
+      deliveryFee: cfg.fee,
+      commissionRate: storeA.commissionRate,
+      paymentMethod: cfg.method,
+      orderStatus: "REJECTED",
+      deliveryStatus: "CANCELLED",
+      paymentStatus: "REFUNDED",
+      createdAt: daysAgo(cfg.days),
+      cancelledAt: daysAgo(cfg.days, -1),
+      storeWalletBefore: sw,
+      riderWalletBefore: 0,
     });
-
-    console.log("    ✓ Ride 3 (cancelled) →", ride.id);
+    process.stdout.write(".");
   }
 
-  // ── RIDE 4: Scheduled — tomorrow at 07:00 ─────────────────────────────────
-  console.log("  🚖 Ride 4: Scheduled (tomorrow 07:00 AM)");
+  // === ACTIVE orders (live right now) ===
+  // Confirmed — 45 min ago
   {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(7, 0, 0, 0);
-
-    const cancellationDeadline = new Date(tomorrow);
-    cancellationDeadline.setHours(6, 30, 0, 0);
-
-    const estimatedEnd = new Date(tomorrow);
-    estimatedEnd.setHours(7, 40, 0, 0);
-
-    const ride = await prisma.ride.create({
-      data: {
-        customerId: user.id,
-        riderId: rider.id,
-        pickupAddressId: homeAddress.id,
-        dropoffAddressId: officeAddress.id,
-        status: "DRIVER_ASSIGNED_SCHED",
-        isScheduled: true,
-        scheduledAt: tomorrow,
-        scheduledFare: 3200,
-        totalFare: 3200,
-        cancellationDeadline,
-        estimatedDurationMin: 40,
-        estimatedEndTime: estimatedEnd,
-        assignmentWindowMin: 90,
-        assignedBy: "ADMIN",
-        vehicleType: "ECONOMY",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
+    const sw = await getStoreWallet(storeA.id);
+    await createOrder({
+      userId: chisom.id, storeId: storeA.id, riderId: riderA.id,
+      pickupAddressId: storeAAddr.id, dropoffAddressId: chisomWork.id,
+      items: [{ nameSnap: amala.name, quantity: 2, price: amala.price, productId: amala.id }, { nameSnap: drinkWater.name, quantity: 2, price: drinkWater.price, productId: drinkWater.id }],
+      deliveryFee: 800, commissionRate: storeA.commissionRate, paymentMethod: "WALLET",
+      orderStatus: "CONFIRMED", deliveryStatus: "ASSIGNED",
+      paymentStatus: "COMPLETED", createdAt: minutesAgo(45),
+      storeWalletBefore: sw, riderWalletBefore: 0, includeTransactions: false,
     });
-
-    const payment = await prisma.payment.create({
-      data: {
-        rideId: ride.id,
-        userId: user.id,
-        amount: 3200,
-        method: "WALLET",
-        status: "PENDING",
-        reference: ref("RIDE-SCHED"),
-        gateway: "WALLET",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    });
-
-    console.log("    ✓ Ride 4 (scheduled) →", ride.id);
+    process.stdout.write(".");
   }
 
-  // ── RIDE 5: In Progress — right now ──────────────────────────────────────
-  console.log("  🚖 Ride 5: IN_PROGRESS (happening now)");
+  // Preparing — 20 min ago
   {
-    const totalFare = 1900;
-
-    const ride = await prisma.ride.create({
-      data: {
-        customerId: user.id,
-        riderId: rider.id,
-        pickupAddressId: pickupPoint.id,
-        dropoffAddressId: homeAddress.id,
-        status: "IN_PROGRESS",
-        baseFare: 800,
-        distanceFare: 800,
-        timeFare: 300,
-        surgeMultiplier: 1.0,
-        platformFee: totalFare * 0.2,
-        driverFee: totalFare * 0.8,
-        totalFare,
-        distanceKm: 6.1,
-        durationMin: 18,
-        vehicleType: "ECONOMY",
-        acceptedAt: minutesAgo(25),
-        startedAt: minutesAgo(10),
-        createdAt: minutesAgo(30),
-        updatedAt: minutesAgo(10),
-      },
+    const sw = await getStoreWallet(storeA.id);
+    await createOrder({
+      userId: seun.id, storeId: storeA.id,
+      pickupAddressId: storeAAddr.id, dropoffAddressId: seunHome.id,
+      items: [{ nameSnap: boli.name, quantity: 2, price: boli.price, productId: boli.id }],
+      deliveryFee: 1000, commissionRate: storeA.commissionRate, paymentMethod: "CARD",
+      orderStatus: "PREPARING", deliveryStatus: "PENDING",
+      paymentStatus: "COMPLETED", createdAt: minutesAgo(20),
+      storeWalletBefore: sw, riderWalletBefore: 0, includeTransactions: false,
     });
-
-    const payment = await prisma.payment.create({
-      data: {
-        rideId: ride.id,
-        userId: user.id,
-        amount: totalFare,
-        method: "CARD",
-        status: "COMPLETED",
-        reference: ref("RIDE-LIVE"),
-        gateway: "PAYSTACK",
-        transactionId: `TXN${Date.now()}`,
-        paidAt: minutesAgo(25),
-        verifiedAt: minutesAgo(25),
-        createdAt: minutesAgo(30),
-        updatedAt: minutesAgo(25),
-      },
-    });
-
-    await prisma.transaction.create({
-      data: {
-        type: "PAYMENT_RECEIVED",
-        amount: totalFare,
-        entityType: "PLATFORM",
-        entityId: "platform",
-        paymentId: payment.id,
-        rideId: ride.id,
-        balanceBefore: 0,
-        balanceAfter: totalFare,
-        description: "Ride in progress — fare pre-authorised",
-        status: "PENDING",
-        createdAt: minutesAgo(25),
-      },
-    });
-
-    console.log("    ✓ Ride 5 (live) →", ride.id);
+    process.stdout.write(".");
   }
+
+  // Ready (waiting for rider pickup) — 10 min ago
+  {
+    const sw = await getStoreWallet(storeA.id);
+    await createOrder({
+      userId: ngozi.id, storeId: storeA.id, riderId: riderB.id,
+      pickupAddressId: storeAAddr.id, dropoffAddressId: ngoziHome.id,
+      items: [{ nameSnap: nkwobi.name, quantity: 1, price: nkwobi.price, productId: nkwobi.id }],
+      deliveryFee: 700, commissionRate: storeA.commissionRate, paymentMethod: "CASH",
+      orderStatus: "READY", deliveryStatus: "ASSIGNED",
+      paymentStatus: "COMPLETED", createdAt: minutesAgo(10),
+      storeWalletBefore: sw, riderWalletBefore: 0, includeTransactions: false,
+    });
+    process.stdout.write(".");
+  }
+
+  // Dispatched — rider on the way
+  {
+    const sw = await getStoreWallet(storeA.id);
+    await createOrder({
+      userId: damilola.id, storeId: storeA.id, riderId: riderA.id,
+      pickupAddressId: storeAAddr.id, dropoffAddressId: damilolaHome.id,
+      items: [{ nameSnap: ofeOnugbu.name, quantity: 1, price: ofeOnugbu.price, productId: ofeOnugbu.id }, { nameSnap: moinmoin.name, quantity: 1, price: moinmoin.price, productId: moinmoin.id }],
+      deliveryFee: 1200, commissionRate: storeA.commissionRate, paymentMethod: "CARD",
+      orderStatus: "DISPATCHED", deliveryStatus: "IN_TRANSIT",
+      paymentStatus: "COMPLETED", createdAt: minutesAgo(35),
+      storeWalletBefore: sw, riderWalletBefore: 0, includeTransactions: false,
+    });
+    process.stdout.write(".");
+  }
+
+  console.log(`\n    ✓ Store A done (${deliveredConfigsA.length + 3 + 2 + 4} orders)`);
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  STANDALONE DELIVERIES
+  //  STORE B — FRESH MART VI (grocery)  18 orders
   // ══════════════════════════════════════════════════════════════════════════
 
-  // ── DELIVERY 1: Completed — sent package 9 days ago ──────────────────────
-  console.log("\n  📬 Delivery 1: Standalone completed (9 days ago)");
-  {
-    const deliveryFee = 2000;
+  console.log("  🛒  Store B — Fresh Mart VI");
 
-    const delivery = await prisma.delivery.create({
-      data: {
-        customerId: user.id,
-        riderId: rider.id,
-        pickupAddressId: homeAddress.id,
-        dropoffAddressId: pickupPoint.id,
-        status: "DELIVERED",
-        senderName: user.name,
-        senderPhone: user.phone!,
-        recipientName: "Bola Tinubu Jr.",
-        recipientPhone: "+2348044556677",
-        packageDetails: "Laptop and charger in a sealed box",
-        weightKg: 2.5,
-        isFragile: true,
-        declaredValue: 150000,
-        deliveryFee,
-        distanceKm: 9.2,
-        assignedAt: daysAgo(9),
-        pickedUpAt: daysAgo(9),
-        deliveredAt: daysAgo(9),
-        createdAt: daysAgo(9),
-        updatedAt: daysAgo(9),
-      },
+  // Delivered (11)
+  const deliveredConfigsB = [
+    { days: 29, customer: damilola, dropAddr: damilolaHome, rider: riderB, items: [{ nameSnap: rice5kg.name,    quantity: 2, price: rice5kg.price,    productId: rice5kg.id },    { nameSnap: cookingOil.name, quantity: 1, price: cookingOil.price, productId: cookingOil.id }], fee: 1200, method: "CARD"   as const },
+    { days: 24, customer: chisom,   dropAddr: chisomHome,   rider: riderA, items: [{ nameSnap: eggs12.name,     quantity: 2, price: eggs12.price,     productId: eggs12.id },     { nameSnap: tomato.name,     quantity: 3, price: tomato.price,     productId: tomato.id }],     fee: 900,  method: "WALLET" as const },
+    { days: 22, customer: seun,     dropAddr: seunHome,     rider: riderB, items: [{ nameSnap: indomie.name,    quantity: 1, price: indomie.price,    productId: indomie.id },    { nameSnap: garri.name,      quantity: 1, price: garri.price,      productId: garri.id }],      fee: 800,  method: "CASH"   as const },
+    { days: 19, customer: uche,     dropAddr: ucheHome,     rider: riderA, items: [{ nameSnap: rice5kg.name,    quantity: 1, price: rice5kg.price,    productId: rice5kg.id }],                                                                                                    fee: 700,  method: "CARD"   as const },
+    { days: 16, customer: ngozi,    dropAddr: ngoziHome,    rider: riderB, items: [{ nameSnap: tomato.name,     quantity: 5, price: tomato.price,     productId: tomato.id },     { nameSnap: cookingOil.name, quantity: 1, price: cookingOil.price, productId: cookingOil.id }], fee: 1000, method: "CARD"   as const },
+    { days: 13, customer: damilola, dropAddr: damilolaHome, rider: riderA, items: [{ nameSnap: eggs12.name,     quantity: 3, price: eggs12.price,     productId: eggs12.id }],                                                                                                     fee: 600,  method: "WALLET" as const },
+    { days: 11, customer: chisom,   dropAddr: chisomWork,   rider: riderB, items: [{ nameSnap: garri.name,      quantity: 2, price: garri.price,      productId: garri.id },      { nameSnap: indomie.name,    quantity: 1, price: indomie.price,    productId: indomie.id }],    fee: 750,  method: "CASH"   as const },
+    { days: 9,  customer: seun,     dropAddr: seunHome,     rider: riderA, items: [{ nameSnap: rice5kg.name,    quantity: 2, price: rice5kg.price,    productId: rice5kg.id },    { nameSnap: tomato.name,     quantity: 2, price: tomato.price,     productId: tomato.id }],     fee: 1100, method: "CARD"   as const },
+    { days: 7,  customer: uche,     dropAddr: ucheHome,     rider: riderB, items: [{ nameSnap: cookingOil.name, quantity: 2, price: cookingOil.price, productId: cookingOil.id }],                                                                                                 fee: 800,  method: "CARD"   as const },
+    { days: 5,  customer: ngozi,    dropAddr: ngoziHome,    rider: riderA, items: [{ nameSnap: indomie.name,    quantity: 2, price: indomie.price,    productId: indomie.id },    { nameSnap: eggs12.name,     quantity: 1, price: eggs12.price,     productId: eggs12.id }],     fee: 900,  method: "WALLET" as const },
+    { days: 1,  customer: damilola, dropAddr: damilolaHome, rider: riderB, items: [{ nameSnap: rice5kg.name,    quantity: 1, price: rice5kg.price,    productId: rice5kg.id },    { nameSnap: garri.name,      quantity: 1, price: garri.price,      productId: garri.id },      { nameSnap: tomato.name, quantity: 2, price: tomato.price, productId: tomato.id }], fee: 1000, method: "CARD" as const },
+  ];
+
+  for (const cfg of deliveredConfigsB) {
+    const sw = await getStoreWallet(storeB.id);
+    const rw = await getRiderWallet(cfg.rider.id);
+    await createOrder({
+      userId: cfg.customer.id, storeId: storeB.id, riderId: cfg.rider.id,
+      pickupAddressId: storeBAddr.id, dropoffAddressId: cfg.dropAddr.id,
+      items: cfg.items, deliveryFee: cfg.fee, commissionRate: storeB.commissionRate,
+      paymentMethod: cfg.method, orderStatus: "DELIVERED", deliveryStatus: "DELIVERED",
+      paymentStatus: "COMPLETED", createdAt: daysAgo(cfg.days), deliveredAt: daysAgo(cfg.days, -3),
+      storeWalletBefore: sw, riderWalletBefore: rw,
     });
-
-    const payment = await prisma.payment.create({
-      data: {
-        deliveryId: delivery.id,
-        userId: user.id,
-        amount: deliveryFee,
-        method: "CARD",
-        status: "COMPLETED",
-        reference: ref("DEL-PSK"),
-        gateway: "PAYSTACK",
-        transactionId: `TXN${Date.now()}`,
-        paidAt: daysAgo(9),
-        verifiedAt: daysAgo(9),
-        createdAt: daysAgo(9),
-        updatedAt: daysAgo(9),
-      },
-    });
-
-    const riderWallet = await prisma.rider
-      .findUnique({ where: { id: rider.id } })
-      .then((r) => r!.walletBalance);
-
-    await prisma.transaction.create({
-      data: {
-        type: "PAYMENT_RECEIVED",
-        amount: deliveryFee,
-        entityType: "PLATFORM",
-        entityId: "platform",
-        paymentId: payment.id,
-        deliveryId: delivery.id,
-        balanceBefore: 0,
-        balanceAfter: deliveryFee,
-        description: "Standalone delivery fee paid",
-        status: "COMPLETED",
-        createdAt: daysAgo(9),
-      },
-    });
-
-    await prisma.transaction.create({
-      data: {
-        type: "RIDER_EARNING",
-        amount: deliveryFee * 0.8,
-        entityType: "RIDER",
-        entityId: rider.id,
-        deliveryId: delivery.id,
-        balanceBefore: riderWallet,
-        balanceAfter: riderWallet + deliveryFee * 0.8,
-        description: "Rider earnings — standalone delivery",
-        metadata: { isFragile: true, weightKg: 2.5, declaredValue: 150000 },
-        status: "COMPLETED",
-        createdAt: daysAgo(9),
-      },
-    });
-
-    await prisma.rider.update({
-      where: { id: rider.id },
-      data: { walletBalance: { increment: deliveryFee * 0.8 } },
-    });
-
-    console.log("    ✓ Delivery 1 →", delivery.id);
+    process.stdout.write(".");
   }
 
-  // ── DELIVERY 2: In Transit — right now ───────────────────────────────────
-  console.log("  📬 Delivery 2: In transit (happening now)");
-  {
-    const deliveryFee = 1500;
-
-    const delivery = await prisma.delivery.create({
-      data: {
-        customerId: user.id,
-        riderId: rider.id,
-        pickupAddressId: storeAddress.id,
-        dropoffAddressId: homeAddress.id,
-        status: "IN_TRANSIT",
-        senderName: "Kemi Ajoke",
-        senderPhone: "+2348066778899",
-        recipientName: user.name,
-        recipientPhone: user.phone!,
-        packageDetails: "Clothing items",
-        weightKg: 1.0,
-        isFragile: false,
-        isPerishable: false,
-        deliveryFee,
-        distanceKm: 6.4,
-        assignedAt: hoursAgo(1),
-        pickedUpAt: minutesAgo(20),
-        createdAt: hoursAgo(1),
-        updatedAt: minutesAgo(20),
-      },
+  // Cancelled (2)
+  for (const cfg of [
+    { days: 23, customer: chisom,   items: [{ nameSnap: rice5kg.name, quantity: 2, price: rice5kg.price, productId: rice5kg.id }],     fee: 900,  method: "CARD"   as const },
+    { days: 8,  customer: uche,     items: [{ nameSnap: indomie.name, quantity: 1, price: indomie.price, productId: indomie.id }],     fee: 700,  method: "WALLET" as const },
+  ]) {
+    const sw = await getStoreWallet(storeB.id);
+    await createOrder({
+      userId: cfg.customer.id, storeId: storeB.id,
+      pickupAddressId: storeBAddr.id, dropoffAddressId: ucheHome.id,
+      items: cfg.items, deliveryFee: cfg.fee, commissionRate: storeB.commissionRate,
+      paymentMethod: cfg.method, orderStatus: "CANCELLED", deliveryStatus: "CANCELLED",
+      paymentStatus: "REFUNDED", createdAt: daysAgo(cfg.days), cancelledAt: daysAgo(cfg.days, -1),
+      storeWalletBefore: sw, riderWalletBefore: 0,
     });
-
-    const payment = await prisma.payment.create({
-      data: {
-        deliveryId: delivery.id,
-        userId: user.id,
-        amount: deliveryFee,
-        method: "WALLET",
-        status: "COMPLETED",
-        reference: ref("DEL-WLT"),
-        gateway: "WALLET",
-        paidAt: hoursAgo(1),
-        verifiedAt: hoursAgo(1),
-        createdAt: hoursAgo(1),
-        updatedAt: hoursAgo(1),
-      },
-    });
-
-    await prisma.transaction.create({
-      data: {
-        type: "PAYMENT_RECEIVED",
-        amount: deliveryFee,
-        entityType: "PLATFORM",
-        entityId: "platform",
-        paymentId: payment.id,
-        deliveryId: delivery.id,
-        balanceBefore: 0,
-        balanceAfter: deliveryFee,
-        description: "Delivery fee — package in transit",
-        status: "COMPLETED",
-        createdAt: hoursAgo(1),
-      },
-    });
-
-    console.log("    ✓ Delivery 2 (live) →", delivery.id);
+    process.stdout.write(".");
   }
 
-  // ── DELIVERY 3: Cancelled — 6 days ago ───────────────────────────────────
-  console.log("  📬 Delivery 3: Cancelled (6 days ago)");
+  // Active — Pending (just placed)
   {
-    const deliveryFee = 1200;
-
-    const delivery = await prisma.delivery.create({
-      data: {
-        customerId: user.id,
-        pickupAddressId: homeAddress.id,
-        dropoffAddressId: officeAddress.id,
-        status: "CANCELLED",
-        senderName: user.name,
-        senderPhone: user.phone!,
-        recipientName: "Fatima Musa",
-        recipientPhone: "+2348077889900",
-        packageDetails: "Documents",
-        weightKg: 0.3,
-        isFragile: false,
-        deliveryFee,
-        distanceKm: 4.0,
-        createdAt: daysAgo(6),
-        updatedAt: daysAgo(6),
-      },
+    const sw = await getStoreWallet(storeB.id);
+    await createOrder({
+      userId: chisom.id, storeId: storeB.id,
+      pickupAddressId: storeBAddr.id, dropoffAddressId: chisomHome.id,
+      items: [{ nameSnap: eggs12.name, quantity: 2, price: eggs12.price, productId: eggs12.id }, { nameSnap: tomato.name, quantity: 3, price: tomato.price, productId: tomato.id }],
+      deliveryFee: 850, commissionRate: storeB.commissionRate, paymentMethod: "CARD",
+      orderStatus: "PENDING", deliveryStatus: "PENDING",
+      paymentStatus: "COMPLETED", createdAt: minutesAgo(5),
+      storeWalletBefore: sw, riderWalletBefore: 0, includeTransactions: false,
     });
-
-    console.log("    ✓ Delivery 3 (cancelled) →", delivery.id);
+    process.stdout.write(".");
   }
+
+  // Active — Confirmed
+  {
+    const sw = await getStoreWallet(storeB.id);
+    await createOrder({
+      userId: seun.id, storeId: storeB.id, riderId: riderA.id,
+      pickupAddressId: storeBAddr.id, dropoffAddressId: seunHome.id,
+      items: [{ nameSnap: rice5kg.name, quantity: 1, price: rice5kg.price, productId: rice5kg.id }, { nameSnap: cookingOil.name, quantity: 1, price: cookingOil.price, productId: cookingOil.id }],
+      deliveryFee: 1200, commissionRate: storeB.commissionRate, paymentMethod: "WALLET",
+      orderStatus: "CONFIRMED", deliveryStatus: "ASSIGNED",
+      paymentStatus: "COMPLETED", createdAt: minutesAgo(15),
+      storeWalletBefore: sw, riderWalletBefore: 0, includeTransactions: false,
+    });
+    process.stdout.write(".");
+  }
+
+  // Active — Dispatched
+  {
+    const sw = await getStoreWallet(storeB.id);
+    await createOrder({
+      userId: ngozi.id, storeId: storeB.id, riderId: riderB.id,
+      pickupAddressId: storeBAddr.id, dropoffAddressId: ngoziHome.id,
+      items: [{ nameSnap: garri.name, quantity: 2, price: garri.price, productId: garri.id }, { nameSnap: eggs12.name, quantity: 1, price: eggs12.price, productId: eggs12.id }],
+      deliveryFee: 750, commissionRate: storeB.commissionRate, paymentMethod: "CARD",
+      orderStatus: "DISPATCHED", deliveryStatus: "IN_TRANSIT",
+      paymentStatus: "COMPLETED", createdAt: minutesAgo(40),
+      storeWalletBefore: sw, riderWalletBefore: 0, includeTransactions: false,
+    });
+    process.stdout.write(".");
+  }
+
+  console.log(`\n    ✓ Store B done (${deliveredConfigsB.length + 2 + 3} orders)`);
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  SUMMARY
+  //  STORE C — HEALTHPLUS IKOYI (pharmacy)  14 orders
   // ══════════════════════════════════════════════════════════════════════════
 
-  const finalUser   = await prisma.user.findUnique({ where: { id: user.id } });
-  const finalRider  = await prisma.rider.findUnique({ where: { id: rider.id } });
-  const finalStore  = await prisma.store.findUnique({ where: { id: store.id } });
+  console.log("  💊  Store C — HealthPlus Ikoyi");
 
-  console.log("\n✅  Seed complete!");
-  console.log("─────────────────────────────────────────────────────────");
-  console.log(`  User     : ${user.name} <${user.email}>`);
-  console.log(`  Password : Password123!`);
-  console.log(`  Wallet   : ₦${finalUser?.walletBalance.toLocaleString()}`);
-  console.log("");
-  console.log(`  Orders   : 4  (2 delivered · 1 cancelled · 1 preparing)`);
-  console.log(`  Rides    : 5  (2 completed · 1 cancelled · 1 scheduled · 1 live)`);
-  console.log(`  Deliveries: 3  (1 completed · 1 in-transit · 1 cancelled)`);
-  console.log("");
-  console.log(`  Store wallet  : ₦${finalStore?.walletBalance.toLocaleString()}`);
-  console.log(`  Rider wallet  : ₦${finalRider?.walletBalance.toLocaleString()}`);
-  console.log("─────────────────────────────────────────────────────────");
+  // Delivered (9)
+  const deliveredConfigsC = [
+    { days: 27, customer: chisom,   dropAddr: chisomHome,   rider: riderB, items: [{ nameSnap: vitaminC.name,   quantity: 2, price: vitaminC.price,    productId: vitaminC.id },   { nameSnap: paracetamol.name, quantity: 1, price: paracetamol.price, productId: paracetamol.id }], fee: 600,  method: "CARD"   as const },
+    { days: 23, customer: uche,     dropAddr: ucheHome,     rider: riderA, items: [{ nameSnap: glucometer.name, quantity: 1, price: glucometer.price,  productId: glucometer.id }],                                                                                                       fee: 500,  method: "WALLET" as const },
+    { days: 20, customer: seun,     dropAddr: seunHome,     rider: riderB, items: [{ nameSnap: ibuprofen.name,  quantity: 2, price: ibuprofen.price,   productId: ibuprofen.id },  { nameSnap: handSanitizer.name,quantity: 1,price: handSanitizer.price,productId: handSanitizer.id }], fee: 700,  method: "CASH"   as const },
+    { days: 17, customer: ngozi,    dropAddr: ngoziHome,    rider: riderA, items: [{ nameSnap: paracetamol.name,quantity: 3, price: paracetamol.price, productId: paracetamol.id }],                                                                                                      fee: 400,  method: "CARD"   as const },
+    { days: 14, customer: damilola, dropAddr: damilolaHome, rider: riderB, items: [{ nameSnap: handSanitizer.name,quantity:2, price: handSanitizer.price,productId:handSanitizer.id},{ nameSnap: vitaminC.name,  quantity: 1, price: vitaminC.price,   productId: vitaminC.id }],       fee: 800,  method: "WALLET" as const },
+    { days: 10, customer: chisom,   dropAddr: chisomWork,   rider: riderA, items: [{ nameSnap: glucometer.name, quantity: 1, price: glucometer.price,  productId: glucometer.id }],                                                                                                       fee: 600,  method: "CARD"   as const },
+    { days: 7,  customer: uche,     dropAddr: ucheHome,     rider: riderB, items: [{ nameSnap: ibuprofen.name,  quantity: 1, price: ibuprofen.price,   productId: ibuprofen.id },  { nameSnap: paracetamol.name, quantity: 2, price: paracetamol.price, productId: paracetamol.id }],   fee: 450,  method: "CASH"   as const },
+    { days: 4,  customer: seun,     dropAddr: seunHome,     rider: riderA, items: [{ nameSnap: vitaminC.name,   quantity: 1, price: vitaminC.price,    productId: vitaminC.id }],                                                                                                         fee: 500,  method: "WALLET" as const },
+    { days: 1,  customer: ngozi,    dropAddr: ngoziHome,    rider: riderB, items: [{ nameSnap: handSanitizer.name,quantity:1,price:handSanitizer.price,productId:handSanitizer.id}, { nameSnap: ibuprofen.name,  quantity: 1, price: ibuprofen.price,   productId: ibuprofen.id }],     fee: 650,  method: "CARD"   as const },
+  ];
+
+  for (const cfg of deliveredConfigsC) {
+    const sw = await getStoreWallet(storeC.id);
+    const rw = await getRiderWallet(cfg.rider.id);
+    await createOrder({
+      userId: cfg.customer.id, storeId: storeC.id, riderId: cfg.rider.id,
+      pickupAddressId: storeCAddr.id, dropoffAddressId: cfg.dropAddr.id,
+      items: cfg.items, deliveryFee: cfg.fee, commissionRate: storeC.commissionRate,
+      paymentMethod: cfg.method, orderStatus: "DELIVERED", deliveryStatus: "DELIVERED",
+      paymentStatus: "COMPLETED", createdAt: daysAgo(cfg.days), deliveredAt: daysAgo(cfg.days, -1),
+      storeWalletBefore: sw, riderWalletBefore: rw,
+    });
+    process.stdout.write(".");
+  }
+
+  // Cancelled (2)
+  for (const cfg of [
+    { days: 18, customer: damilola, items: [{ nameSnap: glucometer.name, quantity: 1, price: glucometer.price, productId: glucometer.id }], fee: 600, method: "CARD" as const },
+    { days: 6,  customer: chisom,   items: [{ nameSnap: vitaminC.name,   quantity: 2, price: vitaminC.price,   productId: vitaminC.id }],   fee: 500, method: "WALLET" as const },
+  ]) {
+    const sw = await getStoreWallet(storeC.id);
+    await createOrder({
+      userId: cfg.customer.id, storeId: storeC.id,
+      pickupAddressId: storeCAddr.id, dropoffAddressId: chisomHome.id,
+      items: cfg.items, deliveryFee: cfg.fee, commissionRate: storeC.commissionRate,
+      paymentMethod: cfg.method, orderStatus: "CANCELLED", deliveryStatus: "CANCELLED",
+      paymentStatus: "REFUNDED", createdAt: daysAgo(cfg.days), cancelledAt: daysAgo(cfg.days, -1),
+      storeWalletBefore: sw, riderWalletBefore: 0,
+    });
+    process.stdout.write(".");
+  }
+
+  // Active — Confirmed (10 min ago)
+  {
+    const sw = await getStoreWallet(storeC.id);
+    await createOrder({
+      userId: damilola.id, storeId: storeC.id, riderId: riderA.id,
+      pickupAddressId: storeCAddr.id, dropoffAddressId: damilolaHome.id,
+      items: [{ nameSnap: paracetamol.name, quantity: 2, price: paracetamol.price, productId: paracetamol.id }, { nameSnap: ibuprofen.name, quantity: 1, price: ibuprofen.price, productId: ibuprofen.id }],
+      deliveryFee: 550, commissionRate: storeC.commissionRate, paymentMethod: "CARD",
+      orderStatus: "CONFIRMED", deliveryStatus: "ASSIGNED",
+      paymentStatus: "COMPLETED", createdAt: minutesAgo(10),
+      storeWalletBefore: sw, riderWalletBefore: 0, includeTransactions: false,
+    });
+    process.stdout.write(".");
+  }
+
+  // Active — Preparing (25 min ago)
+  {
+    const sw = await getStoreWallet(storeC.id);
+    await createOrder({
+      userId: uche.id, storeId: storeC.id,
+      pickupAddressId: storeCAddr.id, dropoffAddressId: ucheHome.id,
+      items: [{ nameSnap: glucometer.name, quantity: 1, price: glucometer.price, productId: glucometer.id }],
+      deliveryFee: 600, commissionRate: storeC.commissionRate, paymentMethod: "WALLET",
+      orderStatus: "PREPARING", deliveryStatus: "PENDING",
+      paymentStatus: "COMPLETED", createdAt: minutesAgo(25),
+      storeWalletBefore: sw, riderWalletBefore: 0, includeTransactions: false,
+    });
+    process.stdout.write(".");
+  }
+
+  // Active — Dispatched (riderB on the way)
+  {
+    const sw = await getStoreWallet(storeC.id);
+    await createOrder({
+      userId: seun.id, storeId: storeC.id, riderId: riderB.id,
+      pickupAddressId: storeCAddr.id, dropoffAddressId: seunHome.id,
+      items: [{ nameSnap: handSanitizer.name, quantity: 1, price: handSanitizer.price, productId: handSanitizer.id }, { nameSnap: vitaminC.name, quantity: 1, price: vitaminC.price, productId: vitaminC.id }],
+      deliveryFee: 700, commissionRate: storeC.commissionRate, paymentMethod: "CARD",
+      orderStatus: "DISPATCHED", deliveryStatus: "IN_TRANSIT",
+      paymentStatus: "COMPLETED", createdAt: minutesAgo(50),
+      storeWalletBefore: sw, riderWalletBefore: 0, includeTransactions: false,
+    });
+    process.stdout.write(".");
+  }
+
+  console.log(`\n    ✓ Store C done (${deliveredConfigsC.length + 2 + 3} orders)`);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  FINAL SUMMARY
+  // ══════════════════════════════════════════════════════════════════════════
+
+  const [fStoreA, fStoreB, fStoreC] = await Promise.all([
+    prisma.store.findUnique({ where: { id: storeA.id } }),
+    prisma.store.findUnique({ where: { id: storeB.id } }),
+    prisma.store.findUnique({ where: { id: storeC.id } }),
+  ]);
+  const [fRiderA, fRiderB] = await Promise.all([
+    prisma.rider.findUnique({ where: { id: riderA.id } }),
+    prisma.rider.findUnique({ where: { id: riderB.id } }),
+  ]);
+
+  const totalOrders = (fStoreA!.totalOrders + fStoreB!.totalOrders + fStoreC!.totalOrders);
+
+  console.log("\n✅  Store seed complete!");
+  console.log("─────────────────────────────────────────────────────────────────");
+  console.log("  STORES");
+  console.log(`  Mama Put Lekki     │ ${String(fStoreA!.totalOrders).padStart(2)} delivered │ wallet ₦${fStoreA!.walletBalance.toLocaleString()} │ revenue ₦${fStoreA!.totalRevenue.toLocaleString()}`);
+  console.log(`  Fresh Mart VI      │ ${String(fStoreB!.totalOrders).padStart(2)} delivered │ wallet ₦${fStoreB!.walletBalance.toLocaleString()} │ revenue ₦${fStoreB!.totalRevenue.toLocaleString()}`);
+  console.log(`  HealthPlus Ikoyi   │ ${String(fStoreC!.totalOrders).padStart(2)} delivered │ wallet ₦${fStoreC!.walletBalance.toLocaleString()} │ revenue ₦${fStoreC!.totalRevenue.toLocaleString()}`);
+  console.log("─────────────────────────────────────────────────────────────────");
+  console.log("  RIDERS");
+  console.log(`  Tayo Alabi         │ wallet ₦${fRiderA!.walletBalance.toLocaleString()}`);
+  console.log(`  Felix Okafor       │ wallet ₦${fRiderB!.walletBalance.toLocaleString()}`);
+  console.log("─────────────────────────────────────────────────────────────────");
+  console.log("  CUSTOMERS (all password: Password123!)");
+  customers.forEach((c) => console.log(`  ${c.name.padEnd(18)} │ ${c.email}`));
+  console.log("─────────────────────────────────────────────────────────────────");
+  console.log(`  Total seeded orders : ~${totalOrders} delivered + cancellations + 9 live`);
+  console.log("─────────────────────────────────────────────────────────────────");
 }
 
 main()
