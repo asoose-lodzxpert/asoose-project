@@ -9,27 +9,27 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.asoose.com/api/v1",
-        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyDPw8HD12C_D6yyt6aFo2Pac20sEAWLIz8",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "520199690549-nh7qdd4re947hmgom7pp226f8nptqjpm.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS": "520199690549-s90js4cdaf1hhmbestsmddtc5lf3nnse.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyDr0dMWEWJ-Ly8F8MhbrztOXcFYnDcS4W8",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "470697368611-8444s92507r3qbptbna74s7asf2cgctl.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS": "470697368611-loe015r3m80llqh4am6v6iudurng0r0a.apps.googleusercontent.com"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.asoose.com/api/v1",
-        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyDPw8HD12C_D6yyt6aFo2Pac20sEAWLIz8",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "520199690549-nh7qdd4re947hmgom7pp226f8nptqjpm.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS": "520199690549-s90js4cdaf1hhmbestsmddtc5lf3nnse.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyDr0dMWEWJ-Ly8F8MhbrztOXcFYnDcS4W8",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "470697368611-8444s92507r3qbptbna74s7asf2cgctl.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS": "470697368611-loe015r3m80llqh4am6v6iudurng0r0a.apps.googleusercontent.com"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.asoose.com/api/v1",
-        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyDPw8HD12C_D6yyt6aFo2Pac20sEAWLIz8",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "520199690549-nh7qdd4re947hmgom7pp226f8nptqjpm.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS": "520199690549-s90js4cdaf1hhmbestsmddtc5lf3nnse.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyDr0dMWEWJ-Ly8F8MhbrztOXcFYnDcS4W8",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "470697368611-8444s92507r3qbptbna74s7asf2cgctl.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS": "470697368611-loe015r3m80llqh4am6v6iudurng0r0a.apps.googleusercontent.com",
         "EXPO_ANDROID_BUILD_DEOBFUSCATION": "1"
       }
     }
