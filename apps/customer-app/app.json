@@ -2,7 +2,7 @@
   "expo": {
     "name": "ASOOSE",
     "slug": "asoose-customer-app",
-    "version": "1.0.1",
+    "version": "1.0.3",
     "orientation": "portrait",
     "privacyPolicyUrl": "https://asoose.com/privacy-policy",
     "icon": "./assets/images/asoose-icon.png",
@@ -32,6 +32,7 @@
         "ITSAppUsesNonExemptEncryption": false
       },
       "bundleIdentifier": "com.asoose.app",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "config": {
         "googleMapsApiKey": "AIzaSyC1QLEDtvDu8r1gLtEec4d28aWP8VozXfA"
       },

@@ -2,7 +2,7 @@
   "expo": {
     "name": "ASOOSE VENDOR",
     "slug": "asoose-vendor-app",
-    "version": "1.0.0",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "vendorapp",
@@ -11,6 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.asoose.vendor.app",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "config": {
         "googleMapsApiKey": "AIzaSyC1QLEDtvDu8r1gLtEec4d28aWP8VozXfA"
       },
