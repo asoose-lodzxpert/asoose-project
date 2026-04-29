@@ -19,6 +19,8 @@ import {
   Ban,
   ExternalLink,
   Filter,
+  Search,
+  X,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { formatDateTime } from "@/utils/formatDate";
@@ -499,6 +501,7 @@ export default function StoreOrdersOverviewPage() {
   const [selectedStore, setSelectedStore] = useState("");
   const [page, setPage] = useState(1);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
   const LIMIT = 20;
 
   const activeTab = TABS.find((t) => t.key === tab)!;
@@ -508,6 +511,7 @@ export default function StoreOrdersOverviewPage() {
   params.set("limit", String(LIMIT));
   if (activeTab.statuses) params.set("status", activeTab.statuses);
   if (selectedStore) params.set("storeId", selectedStore);
+  if (searchQuery) params.set("search", searchQuery);
 
   const swrKey = `${API}/super-admin/orders/store-orders?${params.toString()}&_r=${refreshKey}`;
 
@@ -524,7 +528,7 @@ export default function StoreOrdersOverviewPage() {
   // Reset page on tab / store change
   useEffect(() => {
     setPage(1);
-  }, [tab, selectedStore]);
+  }, [tab, selectedStore, searchQuery]);
 
   const orders = data?.data ?? [];
   const meta = data?.meta;
@@ -570,6 +574,29 @@ export default function StoreOrdersOverviewPage() {
 
         {/* Store filter + Tabs row */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          {/* Search bar */}
+          <div className="flex-1 relative">
+            <div className="flex items-center gap-2 bg-[#1E293B] border border-gray-700/50 rounded-xl px-3 py-2">
+              <Search className="w-4 h-4 text-gray-400 shrink-0" />
+              <input
+                type="text"
+                placeholder="Search by order ID or customer name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-transparent text-sm text-white outline-none flex-1 placeholder-gray-500"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="p-1 hover:bg-white/10 rounded-lg transition-colors"
+                  title="Clear search"
+                >
+                  <X className="w-4 h-4 text-gray-400 hover:text-white" />
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Store filter */}
           <div className="flex items-center gap-2 bg-[#1E293B] border border-gray-700/50 rounded-xl px-3 py-2 min-w-[220px]">
             <Filter className="w-4 h-4 text-gray-400 shrink-0" />
