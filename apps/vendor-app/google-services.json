@@ -1,13 +1,51 @@
 {
   "project_info": {
-    "project_number": "520199690549",
-    "project_id": "hummer-414316",
-    "storage_bucket": "hummer-414316.firebasestorage.app"
+    "project_number": "322272643004",
+    "project_id": "asoose-86e91",
+    "storage_bucket": "asoose-86e91.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:520199690549:android:1b9c1ea1d18adde875547c",
+        "mobilesdk_app_id": "1:322272643004:android:63ffad46338ba61d0c8db9",
+        "android_client_info": {
+          "package_name": "com.asoose.com"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAVhQTvf44bP9ha6O1Ki7GDO0lEyHbseL0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:322272643004:android:2d35a7cafb8eabc90c8db9",
+        "android_client_info": {
+          "package_name": "com.asoose.rider.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAVhQTvf44bP9ha6O1Ki7GDO0lEyHbseL0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:322272643004:android:c5f2d977f619a7310c8db9",
         "android_client_info": {
           "package_name": "com.asoose.vendor.app"
         }
@@ -15,7 +53,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAtqHfcdAnzptfNEOVEzabs5l7nB1hTJmg"
+          "current_key": "AIzaSyAVhQTvf44bP9ha6O1Ki7GDO0lEyHbseL0"
         }
       ],
       "services": {
