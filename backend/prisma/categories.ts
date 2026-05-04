@@ -22,6 +22,7 @@ export async function seedCategories() {
     'Grills',
     'Fast Food',
     'Breakfast',
+    'HEBRON BUKKA BREAKFAST PROMO',
     'Local Dishes',
 
     // Drinks

@@ -32,6 +32,8 @@ interface OrderListItem {
   vendor: string;
   rider: string;
   amount: number;
+  deliveryFee: number;
+  itemTotal: number;
   paymentStatus: string;
   type: string;
   placedAt: string;
@@ -162,9 +164,14 @@ export default function OrdersPage() {
         accessorKey: "amount",
         header: "Total",
         cell: ({ row }) => (
-          <span className="font-bold text-white text-sm">
-            <Currency amount={row.original.amount} />
-          </span>
+          <div className="flex flex-col">
+            <span className="font-bold text-white text-sm">
+              <Currency amount={row.original.amount} />
+            </span>
+            <span className="text-[10px] text-gray-500 whitespace-nowrap mt-0.5">
+              Items: <Currency amount={row.original.itemTotal} /> • Del: <Currency amount={row.original.deliveryFee} />
+            </span>
+          </div>
         ),
       },
       {

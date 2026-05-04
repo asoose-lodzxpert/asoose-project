@@ -39,6 +39,8 @@ interface OrderDetail {
   serviceType: string;
   status: string;
   amount: number;
+  deliveryFee: number;
+  itemTotal: number;
   updatedAt: string;
   isLate: boolean;
   dispute?: { id: string; reason: string };
@@ -300,7 +302,8 @@ export default function OrderDetailsPage() {
         {/* LEFT COLUMN */}
         <div className="lg:col-span-2 space-y-6 min-w-0">
           {order.subOrders && order.subOrders.length > 0 ? (
-            order.subOrders.map((sub, idx) => (
+            <>
+              {order.subOrders.map((sub, idx) => (
               <div key={sub.id} className="bg-[#1E293B] border border-slate-800 rounded-xl overflow-hidden shadow-sm mb-6 last:mb-0">
                 <div className="p-4 md:p-5 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
                   <div className="flex flex-col">
@@ -343,7 +346,29 @@ export default function OrderDetailsPage() {
                   <span className="text-sm font-bold text-white"><Currency amount={sub.amount} /></span>
                 </div>
               </div>
-            ))
+              ))}
+              <div className="bg-[#1E293B] border border-slate-800 rounded-xl overflow-hidden shadow-sm mt-6">
+                <div className="bg-slate-900/50 p-4 md:p-5 space-y-2">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-400">Items Total</span>
+                    <span className="text-white font-bold"><Currency amount={order.itemTotal} /></span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-400">Delivery Fee</span>
+                    <span className="text-white font-bold"><Currency amount={order.deliveryFee} /></span>
+                  </div>
+                  <div className="border-t border-slate-700/50 my-2 pt-2"></div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-bold text-white uppercase">
+                      Group Order Total
+                    </span>
+                    <span className="text-xl font-bold text-yellow-500">
+                      <Currency amount={order.amount} />
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </>
           ) : (
             <div className="bg-[#1E293B] border border-slate-800 rounded-xl overflow-hidden shadow-sm">
               <div className="p-4 md:p-5 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
@@ -399,7 +424,16 @@ export default function OrderDetailsPage() {
                 ))}
               </div>
               <div className="bg-slate-900/50 p-4 md:p-5 space-y-2 border-t border-slate-800">
-                <div className="flex justify-between items-center pt-2">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-400">Items Total</span>
+                  <span className="text-white font-bold"><Currency amount={order.itemTotal} /></span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-400">Delivery Fee</span>
+                  <span className="text-white font-bold"><Currency amount={order.deliveryFee} /></span>
+                </div>
+                <div className="border-t border-slate-700/50 my-2 pt-2"></div>
+                <div className="flex justify-between items-center">
                   <span className="text-sm font-bold text-white uppercase">
                     Order Total
                   </span>
