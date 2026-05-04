@@ -18,6 +18,10 @@ export interface BookScheduledRideDto {
   totalFare?: number;
   distanceKm?: number;
   durationMin?: number;
+  // Booking for someone else
+  passengerName?: string;
+  passengerPhone?: string;
+  rideContactId?: string;
 }
 
 export class ScheduledRideService {

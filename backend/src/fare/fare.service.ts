@@ -29,6 +29,23 @@ export class FareService {
   readonly DefaultBaseDeliveryFare = 700;
   readonly DefaultDeliveryPerKm = 400;
 
+  // Airport locations for internal geofencing check
+  private readonly AIRPORT_LOCATIONS = [
+    { name: 'Nnamdi Azikiwe International Airport (ABV)', lat: 9.00667, lng: 7.26306 },
+    { name: 'Maiduguri International Airport (MIU)', lat: 11.8542, lng: 13.0807 },
+  ];
+  private readonly AIRPORT_RADIUS_KM = 3.0; // 3km radius
+
+  private isAirportDropoff(lat: number, lng: number): boolean {
+    for (const airport of this.AIRPORT_LOCATIONS) {
+      const distance = this.geoService.calculateDistance(lat, lng, airport.lat, airport.lng);
+      if (distance <= this.AIRPORT_RADIUS_KM) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /**
    * Reads a numeric system setting from the DB.
    * Falls back to the provided default if the key is missing or not a number.
@@ -93,8 +110,40 @@ export class FareService {
     const isNightRate = hour >= 22;
     const perKm = isNightRate ? nightSurchargePerKm : riderPerKm;
 
-    const variableFare = Math.round(distanceKm * perKm);
-    const economyPrice = baseRideFare + variableFare;
+    const isAirportDrop = this.isAirportDropoff(lat2, lng2);
+
+    let economyPrice = 0;
+
+    if (isAirportDrop) {
+      if (distanceKm <= 10) {
+        economyPrice = 10000;
+      } else {
+        economyPrice = 10000 + Math.ceil(distanceKm - 10) * 2000;
+      }
+    } else {
+      if (distanceKm <= 5) {
+        economyPrice = 5000;
+      } else if (distanceKm <= 10) {
+        economyPrice = 8000;
+      } else if (distanceKm <= 15) {
+        economyPrice = 12000;
+      } else if (distanceKm <= 20) {
+        economyPrice = 15000;
+      } else if (distanceKm <= 25) {
+        economyPrice = 18000;
+      } else if (distanceKm <= 30) {
+        economyPrice = 21000;
+      } else {
+        // Fallback for > 30km: add 1000 for each additional km
+        economyPrice = 21000 + Math.ceil(distanceKm - 30) * 1000;
+      }
+    }
+
+    // Optionally apply night surcharge on top of the fixed model
+    if (isNightRate) {
+      economyPrice += Math.round(distanceKm * nightSurchargePerKm);
+    }
+
     const businessPrice = Math.round(economyPrice * 1.5);
 
     const price = dto.vehicleType === 'BUSINESS' ? businessPrice : economyPrice;
@@ -109,8 +158,8 @@ export class FareService {
       distance: { meters: distanceMeters, text: distanceText, value: distanceKm },
       eta: { seconds: durationSeconds, text: durationText },
       breakdown: {
-        baseFare: baseRideFare,
-        distanceFare: variableFare,
+        baseFare: isAirportDrop ? 10000 : 5000,
+        distanceFare: economyPrice - (isAirportDrop ? 10000 : 5000),
         timeFare: 0,
         platformFee,
       }

@@ -107,6 +107,11 @@ export class OrdersService {
     const data = await Promise.all(
       entries.map(async (entry) => {
         if (entry.entryType === 'GROUP') {
+          const groupDelivery = await this.prisma.delivery.findFirst({
+            where: { orderGroupId: entry.id }
+          });
+          const deliveryFee = groupDelivery?.deliveryFee || 0;
+
           const group = await this.prisma.orderGroup.findUnique({
             where: { id: entry.id },
             include: {
@@ -130,6 +135,8 @@ export class OrdersService {
             vendor: `Multi-vendor (${group.orders.length} stores)`,
             rider: 'Multi-stop Delivery',
             amount: group.totalAmount,
+            deliveryFee,
+            itemTotal: group.totalAmount - deliveryFee,
             paymentStatus: group.payment?.status ?? 'UNPAID',
             type: 'Mixed',
             placedAt: group.createdAt.toISOString(),
@@ -146,6 +153,8 @@ export class OrdersService {
           });
           if (!order) return null;
 
+          const deliveryFee = order.delivery?.deliveryFee || 0;
+
           return {
             id: order.id,
             groupId: null,
@@ -154,6 +163,8 @@ export class OrdersService {
             vendor: order.store.name,
             rider: order.delivery?.rider?.name ?? 'Unassigned',
             amount: order.total,
+            deliveryFee,
+            itemTotal: order.total - deliveryFee,
             paymentStatus: order.payment?.status ?? 'UNPAID',
             type: this.mapStoreTypeToService(order.store.type),
             placedAt: order.createdAt.toISOString(),
@@ -918,6 +929,8 @@ export class OrdersService {
       groupStatus: order.orderGroup ? this.deriveGroupStatus(groupOrders) : order.status,
       dispute,
       amount: order.total,
+      deliveryFee: order.delivery?.deliveryFee || order.orderGroup?.delivery?.deliveryFee || 0,
+      itemTotal: order.total - (order.delivery?.deliveryFee || order.orderGroup?.delivery?.deliveryFee || 0),
       updatedAt: order.updatedAt,
       isLate:
         ['PREPARING', 'PENDING'].includes(order.status) &&

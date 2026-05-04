@@ -30,20 +30,7 @@ const ALLOWED_TYPES = [
   'image/jpg',
 ] as const;
 
-/**
- * Validate a file using BOTH the client-supplied mimetype AND the actual
- * magic bytes read from the buffer.  The mimetype check alone is fully
- * spoofable by any client that sets a custom Content-Type.
- *
- * `file-type` is ESM-only so we dynamic-import it.
- */
 async function assertSafeMimeType(file: Express.Multer.File): Promise<void> {
-  if (!ALLOWED_TYPES.includes(file.mimetype as any)) {
-    throw new BadRequestException(
-      'Invalid file type. Only PDF, JPG, and PNG are allowed',
-    );
-  }
-
   // Magic-byte inspection — catches files renamed to a different extension
   const { fileTypeFromBuffer } = await import('file-type');
   const detected = await fileTypeFromBuffer(file.buffer);
@@ -51,21 +38,15 @@ async function assertSafeMimeType(file: Express.Multer.File): Promise<void> {
   // `detected` is undefined for plain-text / unrecognised formats
   if (!detected || !ALLOWED_TYPES.includes(detected.mime as any)) {
     throw new BadRequestException(
-      `File content does not match declared type (detected: ${detected?.mime ?? 'unknown'})`,
+      `Invalid file type. Detected: ${detected?.mime ?? 'unknown'}`,
     );
   }
 
-  // Final guard: declared type must agree with detected type
-  // (e.g. client says image/png but file is actually a JPEG)
-  const declaredNorm =
-    file.mimetype === 'image/jpg' ? 'image/jpeg' : file.mimetype;
-  const detectedNorm =
-    detected.mime === 'image/jpg' ? 'image/jpeg' : detected.mime;
-  if (declaredNorm !== detectedNorm) {
-    throw new BadRequestException(
-      `Declared MIME type (${file.mimetype}) does not match file content (${detected.mime})`,
-    );
-  }
+  // Override the client-provided mimetype with the detected one.
+  // This is crucial because React Native FormData often sends 'application/octet-stream'
+  // when appending blobs, which would otherwise fail strict type checks or upload to S3
+  // with the wrong Content-Type.
+  file.mimetype = detected.mime;
 }
 
 @ApiTags('Storage')
