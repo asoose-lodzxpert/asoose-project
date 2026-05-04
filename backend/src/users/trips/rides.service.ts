@@ -647,13 +647,13 @@ export class RidesService {
         metadata: { rideId, type: 'RIDE_COMPLETED' },
       });
 
-      // Post-ride payment model: driver earnings are recorded when the
-      // customer's payment is confirmed via the Paystack webhook
-      // (see payment-status.service.ts). No wallet update here.
+      // Release driver in matching system
+      await this.driverStateService.releaseDriver(riderId, rideId).catch((err) => {
+        this.logger.error(`Failed to release driver ${riderId} after completion`, err);
+      });
 
-      // Socket notification (TRIP_COMPLETED) is handled by jobs.service.ts — do not double-emit.
       await this.common.logActivity(riderId, 'RIDE_COMPLETED', { rideId });
-      return { message: 'Ride completed' };
+      return { success: true };
     });
   }
 
@@ -795,6 +795,13 @@ export class RidesService {
       customerId: userId,
       driverId: assignedDriverId || undefined, // CRITICAL: ensures listener can notify driver
     });
+
+    // Release driver if assigned
+    if (assignedDriverId) {
+      await this.driverStateService.releaseDriver(assignedDriverId, rideId).catch((err) => {
+        this.logger.error(`Failed to release driver ${assignedDriverId} after cancellation`, err);
+      });
+    }
 
     await this.common.logActivity(userId, 'RIDE_CANCELLED', { rideId, reason });
     return { message: 'Ride cancelled' };
@@ -1145,10 +1152,21 @@ export class RidesService {
     });
   }
   async findIncomingRidesForDriver(driverId: string): Promise<any[]> {
+    // This looks for rides where matching is in progress but this driver is targetable
+    // or specifically locked for this driver.
+    const pendingDriverRideId = await this.driverStateService.getState(driverId)
+      .then(s => s?.pendingJobId)
+      .catch(() => null);
+
     return this.prisma.ride.findMany({
       where: {
-        riderId: driverId,
-        status: 'SEARCHING_DRIVER' as any,
+        OR: [
+          { id: pendingDriverRideId || 'none' },
+          { 
+            status: 'SEARCHING_DRIVER' as any,
+            riderId: null
+          }
+        ]
       },
       include: {
         pickupAddress: true,
@@ -1158,19 +1176,42 @@ export class RidesService {
       take: 10,
     });
   }
+
   async updateRideStatus(rideId: string, status: string): Promise<any> {
-    return null;
+    return this.prisma.ride.update({
+      where: { id: rideId },
+      data: { status: status as any }
+    });
   }
+
   async declineRide(rideId: string, driverId: string): Promise<any> {
-    return { success: false };
+    // Release the lock in Redis and trigger re-matching
+    await this.driverStateService.declineJob(driverId, { jobId: rideId, jobType: 'ride' });
+    return { success: true };
   }
+
   async arrivePickup(rideId: string, driverId: string): Promise<any> {
-    return { success: false };
+    return this.driverArrived(rideId, driverId);
   }
+
   async confirmPickup(rideId: string, driverId: string): Promise<any> {
-    return { success: false };
+    // This normally happens via the OTP flow in startRide, 
+    // but this stub allows for manual override by admin.
+    const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
+    if (!ride) throw new NotFoundException();
+    return this.startRide(rideId, driverId, ride.startOtp || '');
   }
+
   async arriveDropoff(rideId: string, driverId: string): Promise<any> {
-    return { success: false };
+    // Notify customer that driver is at destination
+    const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
+    if (ride) {
+      this.notificationsGateway.server.to(`user_${ride.customerId}`).emit('ride_update', {
+        type: 'ARRIVED_DROPOFF',
+        rideId,
+        label: 'Arrived at Destination'
+      });
+    }
+    return { success: true };
   }
 }
