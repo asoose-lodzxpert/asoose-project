@@ -39,6 +39,7 @@ import {
   PaymentType,
 } from '../../payment/interfaces/payment.interface';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { FareService } from '../../fare/fare.service';
 
 @Injectable()
 export class RidesService {
@@ -55,6 +56,7 @@ export class RidesService {
     private readonly paymentInitService: PaymentInitService,
     private readonly eventEmitter: EventEmitter2,
     private readonly notificationsService: NotificationsService,
+    private readonly fareService: FareService,
   ) { }
 
   // ========================================
@@ -93,21 +95,25 @@ export class RidesService {
       if (type === VehicleType.BUSINESS) multiplier = 1.5;
       if (type === VehicleType.ECONOMY) multiplier = 1.0;
 
-      const fareDetails = this.geo.calculateFare(distanceKm, durationMin);
+      const fareDetails = await this.fareService.getRideFare({
+        pickuplat: pickup.lat,
+        pickuplong: pickup.lng,
+        dropofflat: dropoff.lat,
+        dropofflong: dropoff.lng,
+        vehicleType: type as any,
+      });
 
       estimates[type as string] = {
-        estimatedFare: this.common.round(fareDetails.totalFare * multiplier),
+        estimatedFare: fareDetails.price,
         distance: distanceKm,
         duration: durationMin,
         breakdown: {
-          baseFare: this.common.round(fareDetails.baseFare * multiplier),
-          distanceFare: this.common.round(
-            fareDetails.distanceFare * multiplier,
-          ),
-          timeFare: this.common.round(fareDetails.timeFare * multiplier),
-          platformFee: fareDetails.platformFee,
+          baseFare: fareDetails.breakdown.baseFare,
+          distanceFare: fareDetails.breakdown.distanceFare,
+          timeFare: fareDetails.breakdown.timeFare,
+          platformFee: fareDetails.breakdown.platformFee,
         },
-        total: this.common.round(fareDetails.totalFare * multiplier),
+        total: fareDetails.price,
       };
     }
 
@@ -305,6 +311,15 @@ export class RidesService {
 
           const finalFare = this.common.round(fare);
 
+          // Calculate breakdown to save to DB
+          const fareBreakdown = await this.fareService.getRideFare({
+            pickuplat: securePickup.lat,
+            pickuplong: securePickup.lng,
+            dropofflat: secureDropoff.lat,
+            dropofflong: secureDropoff.lng,
+            vehicleType: dto.vehicleType as any,
+          });
+
           // 7. Generate OTP (stored as plaintext so customer can view it)
           const rawOtp = this.geo.generateOTP(TRIPS_CONFIG.OTP_LENGTH);
 
@@ -319,6 +334,10 @@ export class RidesService {
               distanceKm,
               durationMin,
               totalFare: finalFare,
+              baseFare: fareBreakdown.breakdown.baseFare,
+              distanceFare: fareBreakdown.breakdown.distanceFare,
+              timeFare: fareBreakdown.breakdown.timeFare,
+              platformFee: fareBreakdown.breakdown.platformFee,
               startOtp: rawOtp,
               surgeMultiplier: 1.0,
               vehicleType: dto.vehicleType, // ECONOMY | BUSINESS
