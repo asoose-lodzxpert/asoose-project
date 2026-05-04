@@ -75,14 +75,33 @@ export class FareService {
   async getRideFare(dto: RideFareDto) {
     const { pickuplat, pickuplong, dropofflat, dropofflong } = dto;
 
-    // Load admin-configured fare rates (or fall back to hardcoded defaults)
-    const [baseRideFare, riderPerKm, nightSurchargePerKm] = await Promise.all([
-      this.getSetting('ride_base_fare', this.DefaultBaseRideFare),
-      this.getSetting('ride_per_km', this.DefaultRiderPerKm),
-      this.getSetting(
-        'ride_night_surcharge_per_km',
-        this.DefaultNightSurchargePerKm,
-      ),
+    // 1. Load all pricing configurations from DB (with defaults)
+    const [
+      fare5km,
+      fare10km,
+      fare15km,
+      fare20km,
+      fare25km,
+      fare30km,
+      extraKmFare,
+      airportBase10km,
+      airportExtraKm,
+      nightSurchargePerKm,
+      businessMultiplier,
+      platformFeePercent,
+    ] = await Promise.all([
+      this.getSetting('ride_fare_5km', 5000),
+      this.getSetting('ride_fare_10km', 8000),
+      this.getSetting('ride_fare_15km', 12000),
+      this.getSetting('ride_fare_20km', 15000),
+      this.getSetting('ride_fare_25km', 18000),
+      this.getSetting('ride_fare_30km', 21000),
+      this.getSetting('ride_fare_extra_km', 1000),
+      this.getSetting('ride_airport_base_10km', 10000),
+      this.getSetting('ride_airport_extra_km', 2000),
+      this.getSetting('ride_night_surcharge_per_km', 1000),
+      this.getSetting('ride_business_multiplier', 1.5),
+      this.getSetting('ride_platform_fee_percent', 20),
     ]);
 
     const lat1 = Number(pickuplat);
@@ -101,53 +120,62 @@ export class FareService {
     const durationText = `${Math.round(durationSeconds / 60)} min`;
     const distanceText = `${distanceKm.toFixed(2)} km`;
 
-    // After 10 PM (Africa/Lagos) apply admin-configured night surcharge rate
+    // 2. Check for Night Rate (After 10 PM Africa/Lagos)
     const now = new Date();
     const lagosTime = new Date(
       now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }),
     );
-    const hour = lagosTime.getHours();
-    const isNightRate = hour >= 22;
-    const perKm = isNightRate ? nightSurchargePerKm : riderPerKm;
+    const isNightRate = lagosTime.getHours() >= 22;
 
     const isAirportDrop = this.isAirportDropoff(lat2, lng2);
 
     let economyPrice = 0;
+    let baseBreakdown = 0;
 
+    // 3. Apply Tiered Pricing Model
     if (isAirportDrop) {
+      baseBreakdown = airportBase10km;
       if (distanceKm <= 10) {
-        economyPrice = 10000;
+        economyPrice = airportBase10km;
       } else {
-        economyPrice = 10000 + Math.ceil(distanceKm - 10) * 2000;
+        economyPrice = airportBase10km + Math.ceil(distanceKm - 10) * airportExtraKm;
       }
     } else {
       if (distanceKm <= 5) {
-        economyPrice = 5000;
+        economyPrice = fare5km;
+        baseBreakdown = fare5km;
       } else if (distanceKm <= 10) {
-        economyPrice = 8000;
+        economyPrice = fare10km;
+        baseBreakdown = fare10km;
       } else if (distanceKm <= 15) {
-        economyPrice = 12000;
+        economyPrice = fare15km;
+        baseBreakdown = fare15km;
       } else if (distanceKm <= 20) {
-        economyPrice = 15000;
+        economyPrice = fare20km;
+        baseBreakdown = fare20km;
       } else if (distanceKm <= 25) {
-        economyPrice = 18000;
+        economyPrice = fare25km;
+        baseBreakdown = fare25km;
       } else if (distanceKm <= 30) {
-        economyPrice = 21000;
+        economyPrice = fare30km;
+        baseBreakdown = fare30km;
       } else {
-        // Fallback for > 30km: add 1000 for each additional km
-        economyPrice = 21000 + Math.ceil(distanceKm - 30) * 1000;
+        economyPrice = fare30km + Math.ceil(distanceKm - 30) * extraKmFare;
+        baseBreakdown = fare30km;
       }
     }
 
-    // Optionally apply night surcharge on top of the fixed model
+    // 4. Optionally apply night surcharge
     if (isNightRate) {
       economyPrice += Math.round(distanceKm * nightSurchargePerKm);
     }
 
-    const businessPrice = Math.round(economyPrice * 1.5);
-
+    // 5. Apply Class Multiplier
+    const businessPrice = Math.round(economyPrice * businessMultiplier);
     const price = dto.vehicleType === 'BUSINESS' ? businessPrice : economyPrice;
-    const platformFee = Math.round(price * 0.2);
+    
+    // 6. Calculate Platform Fee
+    const platformFee = Math.round(price * (platformFeePercent / 100));
 
     return {
       price,
@@ -158,8 +186,8 @@ export class FareService {
       distance: { meters: distanceMeters, text: distanceText, value: distanceKm },
       eta: { seconds: durationSeconds, text: durationText },
       breakdown: {
-        baseFare: isAirportDrop ? 10000 : 5000,
-        distanceFare: economyPrice - (isAirportDrop ? 10000 : 5000),
+        baseFare: baseBreakdown,
+        distanceFare: price - baseBreakdown,
         timeFare: 0,
         platformFee,
       }

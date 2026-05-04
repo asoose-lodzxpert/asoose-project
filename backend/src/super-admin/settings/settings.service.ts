@@ -100,14 +100,21 @@ export class SettingsService {
       // Financials
       { key: 'global_commission', value: '10', category: 'Financials' },
       { key: 'min_withdrawal', value: '5000', category: 'Financials' },
-      // Logistics – Ride pricing
-      { key: 'ride_base_fare', value: '1000', category: 'Logistics' },
-      { key: 'ride_per_km', value: '700', category: 'Logistics' },
-      {
-        key: 'ride_night_surcharge_per_km',
-        value: '1000',
-        category: 'Logistics',
-      },
+      // Logistics – Ride pricing (Tiered Model)
+      { key: 'ride_fare_5km', value: '5000', category: 'Logistics' },
+      { key: 'ride_fare_10km', value: '8000', category: 'Logistics' },
+      { key: 'ride_fare_15km', value: '12000', category: 'Logistics' },
+      { key: 'ride_fare_20km', value: '15000', category: 'Logistics' },
+      { key: 'ride_fare_25km', value: '18000', category: 'Logistics' },
+      { key: 'ride_fare_30km', value: '21000', category: 'Logistics' },
+      { key: 'ride_fare_extra_km', value: '1000', category: 'Logistics' },
+      // Logistics – Airport pricing
+      { key: 'ride_airport_base_10km', value: '10000', category: 'Logistics' },
+      { key: 'ride_airport_extra_km', value: '2000', category: 'Logistics' },
+      // Logistics – Surcharges & Fees
+      { key: 'ride_night_surcharge_per_km', value: '1000', category: 'Logistics' },
+      { key: 'ride_business_multiplier', value: '1.5', category: 'Logistics' },
+      { key: 'ride_platform_fee_percent', value: '20', category: 'Logistics' },
       // Logistics – Delivery pricing
       { key: 'delivery_base_fare', value: '700', category: 'Logistics' },
       { key: 'delivery_per_km', value: '400', category: 'Logistics' },
