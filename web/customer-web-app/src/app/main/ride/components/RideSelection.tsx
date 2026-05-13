@@ -61,6 +61,7 @@ export function RideSelection() {
   const dropoffLocation = useRideStore((state) => state.dropoffLocation);
   const setRideStatus = useRideStore((state) => state.setRideStatus);
   const setRideType = useRideStore((state) => state.setRideType);
+  const resetRide = useRideStore((state) => state.resetRide);
   const setPickupLocation = useRideStore((state) => state.setPickupLocation);
   const setDropoffLocation = useRideStore((state) => state.setDropoffLocation);
   const setRideId = useRideStore((state) => state.setRideId);
@@ -317,7 +318,14 @@ export function RideSelection() {
 
       // Driver matching begins on the backend after createRide.
       // confirmRide is called later from PostDriverPayment after DRIVER_FOUND.
-      setRideStatus("searching");
+      if (bookingForOther) {
+        toast.success(`Ride requested for ${passengerName || 'Guest'}`);
+        resetRide();
+        setPendingBooking(null);
+        setBookingForOther(false);
+      } else {
+        setRideStatus("searching");
+      }
     } catch (error: any) {
       const norm = normalizeApiError(error);
       console.error("Booking failed:", JSON.stringify(norm, null, 2));
@@ -591,18 +599,18 @@ export function RideSelection() {
                       </label>
                     </div>
                     {bookingForOther && (
-                      <div className="space-y-2 mt-3 pt-3 border-t border-gray-100 dark:border-white/5">
+                      <div className="space-y-4 mt-4 pt-4 border-t border-gray-100 dark:border-white/5">
                         <input
                           type="text"
                           placeholder="Passenger Name"
-                          className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-white/10 rounded-lg bg-gray-50 dark:bg-white/5 focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                          className="w-full px-4 py-3 text-sm border border-gray-200 dark:border-white/10 rounded-lg bg-gray-50 dark:bg-white/5 focus:outline-none focus:ring-1 focus:ring-yellow-500"
                           value={passengerName || ""}
                           onChange={(e) => setPassengerName(e.target.value)}
                         />
                         <input
                           type="tel"
                           placeholder="Passenger Phone"
-                          className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-white/10 rounded-lg bg-gray-50 dark:bg-white/5 focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                          className="w-full px-4 py-3 text-sm border border-gray-200 dark:border-white/10 rounded-lg bg-gray-50 dark:bg-white/5 focus:outline-none focus:ring-1 focus:ring-yellow-500"
                           value={passengerPhone || ""}
                           onChange={(e) => setPassengerPhone(e.target.value)}
                         />

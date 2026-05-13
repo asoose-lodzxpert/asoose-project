@@ -531,6 +531,16 @@ export function RideProvider({ children }: { children: ReactNode }) {
           ...(passengerPhone && { passengerPhone }),
         });
 
+        if (passengerName) {
+          Toast.show({
+            type: "success",
+            text1: "Ride Booked",
+            text2: `A ride for ${passengerName} has been successfully requested.`,
+          });
+          resetBooking();
+          return response.ride.id;
+        }
+
         setCurrentRide(response.ride);
         // Matching starts immediately after request — go directly to finding-driver
         setPageView("FINDING_DRIVER");
