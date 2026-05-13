@@ -79,7 +79,10 @@ if (typeof window !== 'undefined' && !window.google) {
 
 // ── @react-google-maps/api ──────────────────────────────────────────────────
 jest.mock('@react-google-maps/api', () => ({
-  GoogleMap: ({ children }: any) => <div data-testid="google-map">{children}</div>,
+  GoogleMap: ({ children }: any) => {
+    const React = require('react');
+    return React.createElement('div', { 'data-testid': 'google-map' }, children);
+  },
   Marker: () => null,
   Polyline: () => null,
 }));

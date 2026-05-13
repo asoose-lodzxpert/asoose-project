@@ -514,6 +514,21 @@ export default function DeliveryDetailPage() {
           )}
         </div>
 
+        {/* Delivery OTP */}
+        {delivery.deliveryOtp && delivery.status !== "DELIVERED" && delivery.status !== "CANCELLED" && (
+          <div className="bg-green-500/5 dark:bg-green-500/10 rounded-3xl p-6 border border-green-500/20 shadow-sm text-center">
+            <h2 className="text-xs font-bold text-green-600 dark:text-green-400 uppercase tracking-widest mb-3">
+              Delivery Verification Code
+            </h2>
+            <div className="text-4xl font-black text-green-600 dark:text-green-400 tracking-[0.5em] mb-3">
+              {delivery.deliveryOtp}
+            </div>
+            <p className="text-xs text-green-600/70 dark:text-green-400/70 max-w-[80%] mx-auto">
+              Please provide this code to the rider only when your package has been successfully delivered.
+            </p>
+          </div>
+        )}
+
         {/* Rider info — shown only when assigned */}
         {delivery.riderName && (
           <div className="bg-white dark:bg-[#151515] rounded-3xl p-6 border border-gray-100 dark:border-white/5 shadow-sm">

@@ -287,6 +287,7 @@ export class DeliveriesService {
             isPerishable: dto.perishable ?? false,
             containsLiquid: dto.containsLiquid ?? false,
             declaredValue: dto.declaredValue ?? 0,
+            deliveryOtp: Math.floor(1000 + Math.random() * 9000).toString(),
           },
         });
         this.logger.log(

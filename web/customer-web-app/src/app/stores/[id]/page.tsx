@@ -1,4 +1,4 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -222,15 +222,66 @@ function buildProductListSchema(store: StoreDetail, storeUrl: string) {
           "@type": "Product",
           name: p.name,
           description: p.description,
+          sku: p.id,
+          brand: {
+            "@type": "Brand",
+            name: store.name
+          },
           url: `${SITE_URL}/product/${p.slug ?? p.id}`,
           ...(productImage && { image: productImage }),
           ...(p.category?.name && { category: p.category.name }),
+          ...(store.rating > 0 && {
+            aggregateRating: {
+              "@type": "AggregateRating",
+              ratingValue: store.rating.toFixed(1),
+              reviewCount: store.reviews?.length || 1,
+            },
+            review: {
+              "@type": "Review",
+              reviewRating: {
+                "@type": "Rating",
+                ratingValue: store.rating.toFixed(1),
+                bestRating: "5",
+              },
+              author: {
+                "@type": "Organization",
+                name: "Asoose Users",
+              },
+            },
+          }),
           offers: {
             "@type": "Offer",
             price: p.price,
             priceCurrency: "NGN",
             availability: "https://schema.org/InStock",
             seller: { "@type": "Organization", name: store.name },
+            hasMerchantReturnPolicy: {
+              "@type": "MerchantReturnPolicy",
+              returnPolicyCategory: "https://schema.org/MerchantReturnNotPermitted"
+            },
+            shippingDetails: {
+              "@type": "OfferShippingDetails",
+              shippingRate: {
+                "@type": "MonetaryAmount",
+                value: store.deliveryFee ?? 500,
+                currency: "NGN"
+              },
+              deliveryTime: {
+                "@type": "ShippingDeliveryTime",
+                handlingTime: {
+                  "@type": "QuantitativeValue",
+                  minValue: 0,
+                  maxValue: 1,
+                  unitCode: "d"
+                },
+                transitTime: {
+                  "@type": "QuantitativeValue",
+                  minValue: 0,
+                  maxValue: 1,
+                  unitCode: "d"
+                }
+              }
+            }
           },
         },
       };

@@ -58,6 +58,7 @@ interface DeliveryDetail {
   history: DeliveryHistoryStep[];
   isPaid?: boolean;
   paymentStatus?: string;
+  deliveryOtp?: string;
 }
 
 // Visual Barcode Component
@@ -401,6 +402,17 @@ export default function DeliveryDetailPage() {
                   {delivery.package.fragile && (
                     <div className="flex items-center gap-2 text-red-400 text-xs font-bold uppercase justify-center border border-red-500/20 bg-red-500/10 py-2 rounded-lg">
                       <AlertCircle className="w-4 h-4" /> Fragile Handling
+                    </div>
+                  )}
+                  {delivery.deliveryOtp && (
+                    <div className="mt-4 pt-4 border-t border-gray-800">
+                      <span className="text-gray-500 text-xs uppercase font-bold block mb-2">Delivery Verification Code</span>
+                      <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3 flex items-center justify-between">
+                        <span className="text-2xl font-black text-green-500 tracking-widest">{delivery.deliveryOtp}</span>
+                        <div className="flex items-center gap-1.5 text-[10px] text-green-500/60 font-bold uppercase">
+                          <CheckCircle className="w-3 h-3" /> Mandatory OTP
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

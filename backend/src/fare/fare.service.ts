@@ -125,7 +125,8 @@ export class FareService {
     const lagosTime = new Date(
       now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }),
     );
-    const isNightRate = lagosTime.getHours() >= 22;
+    const hours = lagosTime.getHours();
+    const isNightRate = hours >= 22 || hours < 5;
 
     const isAirportDrop = this.isAirportDropoff(lat2, lng2);
 

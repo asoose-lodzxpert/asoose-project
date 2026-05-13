@@ -13,7 +13,7 @@ import { LocationAutocompleteInput } from "./LocationAutocompleteInput";
 import { useDebounce } from "../hooks/useDebounce";
 import { SidebarSection, SidebarDivider } from "./Sidebar";
 import { PrimaryButton, SecondaryButton, Text } from "@/components/ui";
-import { X, RotateCcw, Loader2, Car } from "lucide-react";
+import { X, RotateCcw, Loader2, Car, User, Users } from "lucide-react";
 
 /**
  * Retry a transient-failure-prone async operation (H2 fix).
@@ -82,6 +82,13 @@ export function RideSelection() {
   const setDropoffAddressStore = useRideStore(
     (state) => state.setDropoffAddress,
   );
+  
+  // --- Passenger State ---
+  const passengerName = useRideStore((state) => state.passengerName);
+  const passengerPhone = useRideStore((state) => state.passengerPhone);
+  const setPassengerName = useRideStore((state) => state.setPassengerName);
+  const setPassengerPhone = useRideStore((state) => state.setPassengerPhone);
+  const [bookingForOther, setBookingForOther] = useState(false);
 
   // New Selectors for Map Control
   const mapInstance = useRideStore((state) => state.mapInstance);
@@ -279,6 +286,8 @@ export function RideSelection() {
         distanceKm: selectedEstimate.distance,
         // Ensure integer — backend schema stores durationMin as Int
         durationMin: Math.round(selectedEstimate.duration),
+        ...(bookingForOther && passengerName ? { passengerName } : {}),
+        ...(bookingForOther && passengerPhone ? { passengerPhone } : {}),
       });
 
       try {
@@ -557,6 +566,49 @@ export function RideSelection() {
                     ✓ Confirmed fare — you will not be charged more than this
                     amount.
                   </p>
+
+                  {/* Who Is Riding Toggle */}
+                  <div className="w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-white/10 rounded-xl p-3 mt-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        {bookingForOther ? <Users size={16} className="text-gray-500" /> : <User size={16} className="text-gray-500" />}
+                        <Text size="sm" weight="medium">Booking for someone else?</Text>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={bookingForOther}
+                          onChange={(e) => {
+                            setBookingForOther(e.target.checked);
+                            if (!e.target.checked) {
+                              setPassengerName(null);
+                              setPassengerPhone(null);
+                            }
+                          }}
+                        />
+                        <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-yellow-500"></div>
+                      </label>
+                    </div>
+                    {bookingForOther && (
+                      <div className="space-y-2 mt-3 pt-3 border-t border-gray-100 dark:border-white/5">
+                        <input
+                          type="text"
+                          placeholder="Passenger Name"
+                          className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-white/10 rounded-lg bg-gray-50 dark:bg-white/5 focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                          value={passengerName || ""}
+                          onChange={(e) => setPassengerName(e.target.value)}
+                        />
+                        <input
+                          type="tel"
+                          placeholder="Passenger Phone"
+                          className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-white/10 rounded-lg bg-gray-50 dark:bg-white/5 focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                          value={passengerPhone || ""}
+                          onChange={(e) => setPassengerPhone(e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </div>
 
                   {/* Action buttons */}
                   <div className="grid grid-cols-2 gap-3 w-full">

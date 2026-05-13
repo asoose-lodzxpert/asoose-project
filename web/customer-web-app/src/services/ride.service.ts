@@ -35,6 +35,8 @@ export interface RideRequestPayload {
   distanceKm: number;
   durationMin: number;
   notes?: string;
+  passengerName?: string;
+  passengerPhone?: string;
 }
 
 /**

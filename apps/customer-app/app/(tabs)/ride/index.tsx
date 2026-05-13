@@ -18,6 +18,7 @@ import { useRide } from "@/context/RideContext";
 import { RideLocationCard } from "@/components/ride/RideLocationCard";
 import { VehicleTypeSelector } from "@/components/ride/VehicleTypeSelector";
 import { FareEstimateCard } from "@/components/ride/FareEstimateCard";
+import WhoIsRidingModal from "@/components/modals/WhoIsRidingModal";
 import Toast from "react-native-toast-message";
 
 export default function RideBookingScreen() {
@@ -36,7 +37,13 @@ export default function RideBookingScreen() {
     scheduledAt,
     setScheduledAt,
     resetBooking,
+    passengerName,
+    passengerPhone,
+    setPassengerName,
+    setPassengerPhone,
   } = useRide();
+
+  const [showWhoIsRiding, setShowWhoIsRiding] = useState(false);
 
   const primary = useThemeColor({}, "brandPrimary");
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
@@ -246,6 +253,23 @@ export default function RideBookingScreen() {
           durationMin={fareEstimate?.durationMin}
         />
 
+        {/* Who Is Riding Selector */}
+        <Pressable 
+          style={[styles.whoIsRidingBtn, { borderColor: "#E5E7EB", backgroundColor: "#fff" }]}
+          onPress={() => setShowWhoIsRiding(true)}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <IconSymbol name="person.2.fill" size={20} color={primary} />
+            <View>
+              <ThemedText style={{ fontSize: 13, color: "#6B7280", marginBottom: 2 }}>Booking For</ThemedText>
+              <ThemedText style={{ fontSize: 16, fontWeight: "600", color: "#111827" }}>
+                {passengerName ? `${passengerName} (Guest)` : "Me"}
+              </ThemedText>
+            </View>
+          </View>
+          <IconSymbol name="chevron.right" size={20} color="#9CA3AF" />
+        </Pressable>
+
         {/* Selected Schedule Time */}
         {scheduledAt && (
           <View style={[styles.scheduledCard, { backgroundColor: `${primary}10`, borderColor: primary }]}>
@@ -344,6 +368,21 @@ export default function RideBookingScreen() {
           />
         )}
       </View>
+
+      <WhoIsRidingModal
+        visible={showWhoIsRiding}
+        onClose={() => setShowWhoIsRiding(false)}
+        onConfirmSelf={() => {
+          setPassengerName(null);
+          setPassengerPhone(null);
+          setShowWhoIsRiding(false);
+        }}
+        onSelectOther={(name, phone) => {
+          setPassengerName(name || "Guest");
+          setPassengerPhone(phone || "");
+          setShowWhoIsRiding(false);
+        }}
+      />
     </ThemedView>
   );
 }
@@ -458,5 +497,14 @@ const styles = StyleSheet.create({
   },
   clearScheduled: {
     padding: 4,
+  },
+  whoIsRidingBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 16,
   },
 });

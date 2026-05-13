@@ -13,6 +13,7 @@ import { initiatePayment } from "@/services/payment.service";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import type { InAppTx } from "@/types/payment";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import DriverInfoRow from "@/components/ride-tracking/DriverInfoRow";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Dimensions,
@@ -196,6 +197,23 @@ export default function DeliveryDetailsScreen() {
     </View>
   );
 
+  const renderRiderCard = () => {
+    if (!delivery.rider) return null;
+
+    return (
+      <View
+        style={[styles.card, { backgroundColor: card, borderColor: border }]}
+      >
+        <ThemedText style={styles.cardTitle}>Courier Info</ThemedText>
+        <DriverInfoRow
+          driver={delivery.rider}
+          driverPhone={delivery.rider.phone}
+          rideId={delivery.id}
+        />
+      </View>
+    );
+  };
+
   const renderContactCard = () => (
     <View style={[styles.card, { backgroundColor: card, borderColor: border }]}>
       <ThemedText style={styles.cardTitle}>Recipient Info</ThemedText>
@@ -216,6 +234,7 @@ export default function DeliveryDetailsScreen() {
           </ThemedText>
         </View>
         <Pressable
+          onPress={() => Linking.openURL(`tel:${delivery.recipientPhone}`)}
           style={[styles.callBtn, { backgroundColor: primary + "15" }]}
         >
           <IconSymbol name="phone.fill" size={20} color={primary} />
@@ -223,6 +242,20 @@ export default function DeliveryDetailsScreen() {
       </View>
     </View>
   );
+
+  const renderOtpCard = () => {
+    if (!delivery.deliveryOtp || delivery.status === "DELIVERED" || delivery.status === "CANCELLED") return null;
+
+    return (
+      <View style={[styles.card, { backgroundColor: primary + "08", borderColor: primary, borderWidth: 1.5 }]}>
+        <ThemedText style={[styles.cardTitle, { color: primary, opacity: 0.8 }]}>Delivery Verification</ThemedText>
+        <View style={styles.otpContent}>
+          <ThemedText style={styles.otpLabel}>Give this OTP to the rider upon delivery:</ThemedText>
+          <ThemedText style={[styles.otpValue, { color: primary }]}>{delivery.deliveryOtp}</ThemedText>
+        </View>
+      </View>
+    );
+  };
 
   const renderPaymentCard = () => {
     const isPaid = delivery.payment?.status === "COMPLETED";
@@ -290,7 +323,9 @@ export default function DeliveryDetailsScreen() {
         contentContainerStyle={styles.scrollPadding}
       >
         {renderStatusHeader()}
+        {renderOtpCard()}
         {renderRouteCard()}
+        {renderRiderCard()}
         {renderContactCard()}
         {renderDeliverySpecs()}
         {renderPaymentCard()}
@@ -489,5 +524,20 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "700",
     fontSize: 14,
+  },
+  otpContent: {
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  otpLabel: {
+    fontSize: 13,
+    textAlign: "center",
+    marginBottom: 8,
+    opacity: 0.8,
+  },
+  otpValue: {
+    fontSize: 36,
+    fontWeight: "800",
+    letterSpacing: 8,
   },
 });

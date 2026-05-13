@@ -246,7 +246,7 @@ export default function TransactionDetailPage() {
               <RecentActivityCard activity={txn.recentActivity} />
             )}
 
-            {txn.balanceBefore !== undefined &&
+            {/* {txn.balanceBefore !== undefined &&
               txn.balanceAfter !== undefined && (
                 <WalletBalanceCard
                   before={txn.balanceBefore}
@@ -259,7 +259,7 @@ export default function TransactionDetailPage() {
                     "RIDER_EARNING",
                   ].includes(txn.type)}
                 />
-              )}
+              )} */}
           </div>
         </div>
       </div>

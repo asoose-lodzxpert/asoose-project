@@ -290,3 +290,13 @@ export interface DeliveryUpdateEvent {
     vehicle: string;
   };
 }
+
+export interface ChatMessageEvent {
+  id: string;
+  senderId: string;
+  senderName: string;
+  message: string;
+  createdAt: string;
+  rideId?: string;
+  orderId?: string;
+}

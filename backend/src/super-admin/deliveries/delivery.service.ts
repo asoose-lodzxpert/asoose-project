@@ -1077,6 +1077,7 @@ export class DeliveriesService {
       created: d.createdAt.toISOString(),
       eta: d.deliveredAt ? 'Arrived' : 'Calculated based on traffic',
       type: this.inferType(d.weightKg || 0, d.isFragile),
+      deliveryOtp: d.deliveryOtp,
 
       package: {
         weight: `${d.weightKg || 0} kg`,

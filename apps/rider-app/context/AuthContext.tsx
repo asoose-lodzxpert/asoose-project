@@ -70,9 +70,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
 
             setUser(userData);
-          } catch {
-            await logout();
-            setUser(null);
+          } catch (refreshError: any) {
+            // Only log out if it's explicitly a session failure (e.g. 401 or invalid token)
+            // If it's a network error (e.g. fetch failed), we KEEP the existing (potentially expired) session
+            // so the app doesn't kick the user out while they're in a tunnel or basement.
+            const isUnauthorized = refreshError?.message?.includes("401") || 
+                                  refreshError?.message?.toLowerCase().includes("unauthorized") ||
+                                  refreshError?.message?.toLowerCase().includes("expired");
+            
+            if (isUnauthorized) {
+              console.warn("[AuthContext] Session expired, logging out:", refreshError.message);
+              await logout();
+              setUser(null);
+            } else {
+              console.log("[AuthContext] Refresh failed but likely due to network. Retaining session.", refreshError.message);
+            }
           }
         } else {
           setUser(null);

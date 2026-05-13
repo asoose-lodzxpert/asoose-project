@@ -1,9 +1,10 @@
 import React from "react";
 import Link from "next/link";
-import { Package, ExternalLink } from "lucide-react";
+import { Package, ExternalLink, AlertTriangle } from "lucide-react";
 import { SectionCard } from "./SectionCard";
 import { TransactionDetail } from "../types";
-import { Currency } from "@/app/main/components/Currency"; // ✅ Added
+import { Currency } from "@/app/main/components/Currency";
+import { validateOrderFinancialBreakdown } from "@/utils/financial"; // ✅ Added validation
 
 interface OrderDetailsProps {
   details: NonNullable<TransactionDetail["orderDetails"]>;
@@ -14,6 +15,24 @@ export const OrderDetailsCard = ({
   details,
   financialBreakdown,
 }: OrderDetailsProps) => {
+  // ✅ FIXED: Validate financial breakdown
+  let validationError: string | null = null;
+  if (
+    financialBreakdown &&
+    (details.type === "SINGLE_ORDER" || !details.type)
+  ) {
+    const validation = validateOrderFinancialBreakdown({
+      subtotal: details.subtotal,
+      commissionRate: details.commissionRate || 0,
+      commissionAmount: financialBreakdown.platformCommission,
+      vendorReceives: financialBreakdown.vendorReceives,
+    });
+    if (!validation.valid) {
+      validationError = validation.errors.join("; ");
+      console.error("💰 Financial Breakdown Validation Error:", validationError);
+    }
+  }
+
   // Since details.orderId might be undefined for group orders, use 'details.orderId || #'
   const action =
     details.type === "GROUP_ORDER" ? null : (
@@ -138,6 +157,18 @@ export const OrderDetailsCard = ({
         {financialBreakdown && (
           <div className="border-t border-gray-700 pt-6">
             <h4 className="text-white font-medium mb-4">Financial Breakdown</h4>
+            
+            {/* ✅ FIXED: Show validation error if present */}
+            {validationError && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-red-500 text-xs font-medium">Calculation Error Detected</p>
+                  <p className="text-red-400 text-xs mt-1">{validationError}</p>
+                </div>
+              </div>
+            )}
+            
             <div className="space-y-3">
               {(details.type === "SINGLE_ORDER" || !details.type) && (
                 <>

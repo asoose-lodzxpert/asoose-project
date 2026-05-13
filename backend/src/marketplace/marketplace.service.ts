@@ -509,6 +509,8 @@ export class MarketplaceService {
             name: true,
             slug: true,
             type: true,
+            rating: true,
+            ratingCount: true,
           },
         },
         modifierGroups: {

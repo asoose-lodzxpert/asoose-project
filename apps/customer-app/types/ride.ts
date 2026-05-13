@@ -117,6 +117,8 @@ export type CreateRidePayload = {
   fare: number;
   distanceKm: number;
   durationMin: number;
+  passengerName?: string;
+  passengerPhone?: string;
 };
 
 export type RideEstimatePayload = {

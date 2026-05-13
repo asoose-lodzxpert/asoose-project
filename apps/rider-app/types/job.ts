@@ -7,7 +7,8 @@ export type JobStatus =
   | "en-route-pickup"
   | "at-pickup"
   | "en-route-dropoff"
-  | "confirm-job";
+  | "confirm-job"
+  | "payment-pending";
 
 /** A single pickup stop in a multi-store grouped delivery */
 export interface DeliveryStop {
@@ -114,4 +115,5 @@ export interface CurrentJob {
   // Scheduled ride fields
   isScheduled?: boolean;
   scheduledAt?: string | Date;
+  requiresOtp?: boolean;
 }

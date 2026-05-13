@@ -39,8 +39,12 @@ type RideContextType = {
   // Booking flow
   pickupLocation: Location | null;
   dropoffLocation: Location | null;
+  passengerName: string | null;
+  passengerPhone: string | null;
   setPickupLocation: (location: Location | null) => void;
   setDropoffLocation: (location: Location | null) => void;
+  setPassengerName: (name: string | null) => void;
+  setPassengerPhone: (phone: string | null) => void;
   setScheduledAt: (date: Date | null) => void;
 
   // Actions
@@ -87,6 +91,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
   // Booking state
   const [pickupLocation, setPickupLocation] = useState<Location | null>(null);
   const [dropoffLocation, setDropoffLocation] = useState<Location | null>(null);
+  const [passengerName, setPassengerName] = useState<string | null>(null);
+  const [passengerPhone, setPassengerPhone] = useState<string | null>(null);
   const [scheduledAt, setScheduledAt] = useState<Date | null>(null);
   const [scheduledRides, setScheduledRides] = useState<any[]>([]);
 
@@ -391,6 +397,14 @@ export function RideProvider({ children }: { children: ReactNode }) {
     });
 
     socketRef.current = socket;
+    socket.on("new_chat_message", (data: any) => {
+      if (__DEV__) console.log("[RideContext] New chat message:", data);
+      Toast.show({
+        type: "info",
+        text1: "New Message",
+        text2: data.message,
+      });
+    });
   }, [user?.id, refreshCurrentRide]);
 
   // Cleanup socket on unmount or when user changes
@@ -513,6 +527,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
           distanceKm: fareEstimate.distanceKm,
           durationMin: fareEstimate.durationMin,
           notes,
+          ...(passengerName && { passengerName }),
+          ...(passengerPhone && { passengerPhone }),
         });
 
         setCurrentRide(response.ride);
@@ -569,6 +585,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
           totalFare: fareEstimate.fareBreakdown.totalFare,
           distanceKm: fareEstimate.distanceKm,
           durationMin: fareEstimate.durationMin,
+          ...(passengerName && { passengerName }),
+          ...(passengerPhone && { passengerPhone }),
         }, idempotencyKey);
 
         Toast.show({
@@ -689,6 +707,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const resetBooking = useCallback(() => {
     setPickupLocation(null);
     setDropoffLocation(null);
+    setPassengerName(null);
+    setPassengerPhone(null);
     setScheduledAt(null);
     setFareEstimate(null);
     setError(null);
@@ -708,6 +728,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
     setFareEstimate(null);
     setPickupLocation(null);
     setDropoffLocation(null);
+    setPassengerName(null);
+    setPassengerPhone(null);
     setError(null);
   }, []);
 
@@ -722,8 +744,12 @@ export function RideProvider({ children }: { children: ReactNode }) {
     scheduledRides,
     pickupLocation,
     dropoffLocation,
+    passengerName,
+    passengerPhone,
     setPickupLocation,
     setDropoffLocation,
+    setPassengerName,
+    setPassengerPhone,
     setScheduledAt,
     estimateFare,
     createRide,

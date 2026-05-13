@@ -1,4 +1,4 @@
-﻿import {
+import {
   View,
   StyleSheet,
   Pressable,
@@ -135,6 +135,7 @@ export default function RideTrackingScreen() {
               <DriverInfoRow
                 driver={currentRide.rider}
                 driverPhone={driverPhone}
+                rideId={currentRide.id}
               />
             )}
             {showOTP && (
@@ -147,7 +148,11 @@ export default function RideTrackingScreen() {
 
         {/* IN_PROGRESS — ride ongoing, show driver info */}
         {inProgress && hasDriver && (
-          <DriverInfoRow driver={currentRide.rider} driverPhone={driverPhone} />
+          <DriverInfoRow
+            driver={currentRide.rider}
+            driverPhone={driverPhone}
+            rideId={currentRide.id}
+          />
         )}
 
         {/* COMPLETED — post-ride payment required */}

@@ -3,5 +3,5 @@ export interface WhoIsRidingModalProps {
   visible: boolean;
   onClose: () => void;
   onConfirmSelf: () => void;
-  onSelectOther: () => void;
+  onSelectOther: (name?: string, phone?: string) => void;
 }

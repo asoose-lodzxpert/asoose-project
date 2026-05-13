@@ -24,7 +24,7 @@ import { TokenRevocationService } from './token-revocation.service';
       useFactory: async (configService: ConfigService) => ({
         secret: configService.getOrThrow<string>('JWT_SECRET'),
         signOptions: {
-          expiresIn: '7d',
+          expiresIn: '14d',
           audience: 'asoose-app',
           issuer: 'asoose-api',
         },

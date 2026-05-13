@@ -64,6 +64,12 @@ export class RideService {
       ...(payload.notes?.trim() && {
         notes: payload.notes.trim(),
       }),
+      ...(payload.passengerName?.trim() && {
+        passengerName: payload.passengerName.trim(),
+      }),
+      ...(payload.passengerPhone?.trim() && {
+        passengerPhone: payload.passengerPhone.trim(),
+      }),
     };
 
     if (__DEV__)

@@ -307,6 +307,27 @@ export default function SettingsScreen() {
           </Pressable>
 
           <Pressable
+            style={[styles.row, { borderBottomColor: border }]}
+            onPress={() =>
+              router.push({
+                pathname: "/chat/[id]",
+                params: { id: "admin", name: "Chat Support" },
+              })
+            }
+          >
+            <View
+              style={[styles.iconBox, { backgroundColor: primary + "15" }]}
+            >
+              <IconSymbol name="headphones" size={18} color={primary} />
+            </View>
+            <View style={styles.rowTextWrap}>
+              <ThemedText style={styles.rowLabel}>Chat Support</ThemedText>
+              <ThemedText type="caption">Get help with your account</ThemedText>
+            </View>
+            <IconSymbol name="chevron.right" size={18} color={muted} />
+          </Pressable>
+
+          <Pressable
             style={styles.rowLast}
             onPress={() => router.push("/(settings)/disputes" as any)}
           >

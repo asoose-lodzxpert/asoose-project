@@ -379,8 +379,16 @@ export class RiderAuthService {
         role: rider.role,
       };
       const accessToken = this.jwtService.sign(newPayload);
+      const newRefreshToken = this.signRefreshToken(newPayload);
 
-      return { accessToken };
+      // Invalidate the old refresh token
+      if (payload.jti) {
+        const now = Math.floor(Date.now() / 1000);
+        const ttl = payload.exp ? payload.exp - now : 30 * 24 * 60 * 60;
+        await this.tokenRevocation.revokeRefreshToken(payload.jti, ttl);
+      }
+
+      return { accessToken, refreshToken: newRefreshToken };
     } catch (error) {
       throw new UnauthorizedException('Invalid refresh token');
     }

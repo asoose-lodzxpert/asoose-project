@@ -450,7 +450,7 @@ export class RidesService {
       },
 
       fare: {
-        base: ride.baseFare ? `₦${ride.baseFare.toLocaleString()}` : '₦0',
+        base: ride.baseFare ? `₦${ride.baseFare.toLocaleString()}` : (ride.status.startsWith('CANCELLED') && ride.scheduledFare ? `₦${ride.scheduledFare.toLocaleString()}` : '₦0'),
         distance: ride.distanceFare ? `₦${ride.distanceFare.toLocaleString()}` : '₦0',
         time: ride.timeFare ? `₦${ride.timeFare.toLocaleString()}` : '₦0',
         platformFee: ride.platformFee ? `₦${ride.platformFee.toLocaleString()}` : '₦0',

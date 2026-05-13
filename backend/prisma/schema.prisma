@@ -1447,3 +1447,26 @@ model AdminCustomerMessage {
   @@index([adminId])
   @@index([createdAt(sort: Desc)])
 }
+
+model ChatMessage {
+  id           String    @id @default(uuid())
+  orderId      String?   // Linked to an order (Rider-Customer coordination)
+  rideId       String?   // Linked to a ride (Rider-Customer coordination)
+  
+  senderId     String    // User ID, Rider ID, or Admin ID
+  receiverId   String    // Target ID
+  
+  senderType   UserRole
+  receiverType UserRole
+  
+  message      String    @db.Text
+  isRead       Boolean   @default(false)
+  
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([senderId, receiverId])
+  @@index([orderId])
+  @@index([rideId])
+  @@index([createdAt(sort: Desc)])
+}

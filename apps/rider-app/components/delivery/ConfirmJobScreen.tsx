@@ -15,10 +15,13 @@ import {
   ScrollView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import { ThemedInput } from "@/components/ThemedInput";
 
 export default function ConfirmJobScreen() {
   const [cancelVisible, setCancelVisible] = useState(false);
   const { activeJob, completeJob, cancelJob } = useJobs();
+  const router = useRouter();
 
   const primary = useThemeColor({}, "brandPrimary");
   const background = useThemeColor({}, "surfaceBackground");
@@ -36,12 +39,14 @@ export default function ConfirmJobScreen() {
   const isRide = activeJob.jobType === "ride";
   const dropoff = resolveAddress(activeJob.dropoffAddress);
 
+  const [otp, setOtp] = useState("");
+
   const handleComplete = async () => {
-    await completeJob(undefined);
+    await completeJob({ otp });
   };
 
   const pillLabel = isRide ? "Complete Ride" : "Confirm Delivery";
-  const canComplete = true;
+  const canComplete = !activeJob.requiresOtp || otp.length >= 4;
 
   return (
     <>
@@ -110,21 +115,62 @@ export default function ConfirmJobScreen() {
                     </ThemedText>
                   ) : null}
                   {activeJob.dropoffContactPhone ? (
-                    <Pressable
-                      style={styles.phoneRow}
-                      onPress={() =>
-                        Linking.openURL(`tel:${activeJob.dropoffContactPhone}`)
-                      }
-                    >
-                      <IconSymbol name="phone" size={13} color={danger} />
-                      <ThemedText style={[styles.phoneText, { color: danger }]}>
-                        {activeJob.dropoffContactPhone}
-                      </ThemedText>
-                    </Pressable>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <Pressable
+                        style={styles.phoneRow}
+                        onPress={() =>
+                          router.push({
+                            pathname: "/chat/[id]",
+                            params: { 
+                              id: activeJob.customerId || activeJob.senderId,
+                              name: activeJob.recipientName || activeJob.customerName,
+                              orderId: activeJob.jobType === 'delivery' ? activeJob.id : undefined,
+                              rideId: activeJob.jobType === 'ride' ? activeJob.id : undefined
+                            }
+                          })
+                        }
+                      >
+                        <IconSymbol name="bubble.left" size={13} color={danger} />
+                        <ThemedText style={[styles.phoneText, { color: danger }]}>
+                          Chat
+                        </ThemedText>
+                      </Pressable>
+                      <Pressable
+                        style={styles.phoneRow}
+                        onPress={() =>
+                          Linking.openURL(`tel:${activeJob.dropoffContactPhone}`)
+                        }
+                      >
+                        <IconSymbol name="phone" size={13} color={danger} />
+                        <ThemedText style={[styles.phoneText, { color: danger }]}>
+                          {activeJob.dropoffContactPhone}
+                        </ThemedText>
+                      </Pressable>
+                    </View>
                   ) : null}
                 </View>
               </View>
             </View>
+
+            {/* OTP Input for Deliveries */}
+            {!isRide && activeJob.requiresOtp && (
+              <View style={[styles.card, { backgroundColor: card, borderColor: border, gap: 12 }]}>
+                <ThemedText style={[styles.cardLabel, { color: textMuted }]}>
+                  DELIVERY VERIFICATION CODE
+                </ThemedText>
+                <ThemedText style={{ fontSize: 13, color: textSecondary }}>
+                  Ask the recipient for the 4-digit code provided in their app.
+                </ThemedText>
+                <ThemedInput
+                  placeholder="0000"
+                  value={otp}
+                  onChangeText={setOtp}
+                  keyboardType="number-pad"
+                  maxLength={4}
+                  style={{ fontSize: 24, fontWeight: "800", textAlign: "center", letterSpacing: 8 }}
+                />
+              </View>
+            )}
           </View>
 
           {/* Footer */}

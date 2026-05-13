@@ -138,11 +138,17 @@ export async function refreshAccessToken() {
     throw new Error("Failed to refresh token");
   }
 
-  const { accessToken } = await res.json();
+  const { accessToken, refreshToken: newRefreshToken } = await res.json();
 
   await SecureStore.setItemAsync(accessTokenKey(), accessToken, {
     keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
   });
+
+  if (newRefreshToken) {
+    await SecureStore.setItemAsync(refreshTokenKey(), newRefreshToken, {
+      keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+    });
+  }
 
   return accessToken;
 }

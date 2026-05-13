@@ -45,7 +45,7 @@ export class AuthService {
   /** Signs a refresh token embedding a unique JTI for individual revocation. */
   private signRefreshToken(
     payload: Record<string, unknown>,
-    expiresIn = '30d',
+    expiresIn = '90d',
   ): string {
     return this.jwtService.sign(
       { ...payload, jti: randomUUID() },
@@ -458,14 +458,23 @@ export class AuthService {
       if (!user || user.status !== 'ACTIVE') {
         throw new UnauthorizedException('Invalid user or inactive');
       }
-      // Generate new access token
+      // Generate new access and refresh tokens (Rotation)
       const newPayload = {
         sub: user.id,
         email: user.email,
         role: user.role,
       };
       const access_token = this.jwtService.sign(newPayload);
-      return { access_token };
+      const new_refresh_token = this.signRefreshToken(newPayload);
+
+      // Invalidate the old refresh token (optional but safer)
+      if (payload.jti) {
+        const now = Math.floor(Date.now() / 1000);
+        const ttl = payload.exp ? payload.exp - now : 30 * 24 * 60 * 60;
+        await this.tokenRevocation.revokeRefreshToken(payload.jti, ttl);
+      }
+
+      return { access_token, refresh_token: new_refresh_token };
     } catch (error) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }

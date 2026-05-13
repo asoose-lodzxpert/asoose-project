@@ -40,6 +40,11 @@ const accountManagementItems = [
     label: "Payment Methods",
     route: "/(profile)/payment-methods",
   },
+  {
+    icon: "headphones",
+    label: "Chat Support",
+    route: "/chat/admin",
+  },
 ];
 
 /* Skeleton Loaders */

@@ -58,6 +58,14 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
     Promise.resolve(),
   );
 
+  // Sync isOnline with user profile on boot
+  useEffect(() => {
+    if (user?.isOnline) {
+      setIsOnline(true);
+      checkAndRestoreActiveJob();
+    }
+  }, [user?.isOnline, checkAndRestoreActiveJob]);
+
   const handleJobAssigned = useCallback((job: IncomingJobOffer) => {
     if (__DEV__) console.log("Job assigned:", JSON.stringify(job, null, 2));
     setIncomingJob(job);
@@ -183,6 +191,19 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
+  const handleNewChatMessage = useCallback((message: any) => {
+    // Show toast only if not already on the chat screen for this user?
+    // For now, always show a brief toast
+    Toast.show({
+      type: "info",
+      text1: "New Message",
+      text2: message.message,
+      onPress: () => {
+        // Ideally navigate to chat screen here
+      }
+    });
+  }, []);
+
   const { reconnect, joinOrderRoom } = useJobEvents({
     enabled: isOnline,
     onJobAssigned: handleJobAssigned,
@@ -194,6 +215,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
     onForceLogout: handleForceLogout,
     onPaymentConfirmed: handlePaymentConfirmed,
     onRidePaymentCompleted: handleRidePaymentCompleted,
+    onNewChatMessage: handleNewChatMessage,
   });
 
   const locationStreamStatus = useLocationStream({

@@ -15,6 +15,8 @@ export interface CreateRidePayload {
   distanceKm: number;
   durationMin: number;
   notes?: string;
+  passengerName?: string;
+  passengerPhone?: string;
 }
 
 export function buildCreateRidePayload({
@@ -25,6 +27,8 @@ export function buildCreateRidePayload({
   distanceKm,
   durationMin,
   notes,
+  passengerName,
+  passengerPhone,
 }: Partial<CreateRidePayload>): CreateRidePayload {
   if (!pickupLocation || !pickupLocation.addressText) throw new Error('Pickup location required');
   if (!dropoffLocation || !dropoffLocation.addressText) throw new Error('Dropoff location required');
@@ -50,5 +54,7 @@ export function buildCreateRidePayload({
     distanceKm,
     durationMin,
     ...(notes ? { notes } : {}),
+    ...(passengerName ? { passengerName } : {}),
+    ...(passengerPhone ? { passengerPhone } : {}),
   };
 }

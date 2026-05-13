@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Linking, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import * as Location from "expo-location";
 
 import { ThemedText } from "@/components/themed-text";
@@ -19,6 +20,7 @@ export default function EnRouteToDropoff({
 }) {
   const { activeJob, arriveAtDropoff, cancelJob } = useJobs();
   const { bottom } = useSafeAreaInsets();
+  const router = useRouter();
 
   const colors = {
     bg: useThemeColor({}, "surfaceBackground"),
@@ -126,16 +128,34 @@ export default function EnRouteToDropoff({
         {(activeJob.dropoffContactPhone ||
           activeJob.customerPhone ||
           activeJob.dropoffAddress?.phone) && (
-          <Pressable
-            onPress={() =>
-              Linking.openURL(
-                `tel:${activeJob.dropoffContactPhone || activeJob.customerPhone || activeJob.dropoffAddress?.phone}`,
-              )
-            }
-            style={styles.callBtn}
-          >
-            <IconSymbol name="phone" size={18} color={colors.danger} />
-          </Pressable>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: "/chat/[id]",
+                  params: { 
+                    id: activeJob.customerId || activeJob.senderId,
+                    name: activeJob.recipientName || activeJob.customerName,
+                    orderId: activeJob.jobType === 'delivery' ? activeJob.id : undefined,
+                    rideId: activeJob.jobType === 'ride' ? activeJob.id : undefined
+                  }
+                })
+              }
+              style={styles.callBtn}
+            >
+              <IconSymbol name="bubble.left" size={18} color={colors.danger} />
+            </Pressable>
+            <Pressable
+              onPress={() =>
+                Linking.openURL(
+                  `tel:${activeJob.dropoffContactPhone || activeJob.customerPhone || activeJob.dropoffAddress?.phone}`,
+                )
+              }
+              style={styles.callBtn}
+            >
+              <IconSymbol name="phone" size={18} color={colors.danger} />
+            </Pressable>
+          </View>
         )}
       </View>
 
