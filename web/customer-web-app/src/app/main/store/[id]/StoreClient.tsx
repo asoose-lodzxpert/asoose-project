@@ -82,6 +82,8 @@ export default function StoreClient() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   // Auth & Edit States
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -94,6 +96,12 @@ export default function StoreClient() {
     getSession().then((session) => {
       setCurrentUserId(session?.user?.id ?? null);
     });
+
+    // Load recent searches
+    try {
+      const saved = localStorage.getItem("asoose_recent_store_searches");
+      if (saved) setRecentSearches(JSON.parse(saved));
+    } catch (e) { /* ignore */ }
   }, []);
 
   const fetchStoreData = useCallback(async () => {
@@ -199,6 +207,23 @@ export default function StoreClient() {
     fetchStoreData();
   };
 
+  const addRecentSearch = (term: string) => {
+    const trimmed = term.trim();
+    if (!trimmed) return;
+    setRecentSearches((prev) => {
+      const filtered = prev.filter((t) => t.toLowerCase() !== trimmed.toLowerCase());
+      const updated = [trimmed, ...filtered].slice(0, 10);
+      localStorage.setItem("asoose_recent_store_searches", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleRecentSelect = (term: string) => {
+    setSearchQuery(term);
+    addRecentSearch(term);
+    setIsSearchFocused(false);
+  };
+
   const categories = useMemo(() => {
     if (!store) return [];
     const uniqueCats = Array.from(
@@ -275,7 +300,16 @@ export default function StoreClient() {
                     placeholder={`Search in ${store.name}...`}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => setIsSearchFocused(true)}
+                    onBlur={() => setIsSearchFocused(false)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        addRecentSearch(searchQuery);
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
                     className="w-full bg-white dark:bg-[#151515] h-12 rounded-xl pl-12 pr-12 border border-gray-100 dark:border-white/5 focus:outline-none focus:border-yellow-500 transition-colors"
+                    autoComplete="off"
                   />
                   {searchQuery && (
                     <button
@@ -284,6 +318,52 @@ export default function StoreClient() {
                     >
                       <X className="w-5 h-5" />
                     </button>
+                  )}
+
+                  {/* Recent Searches Pills */}
+                  {isSearchFocused && recentSearches.length > 0 && (
+                    <div 
+                      onMouseDown={(e) => e.preventDefault()}
+                      className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-[#111] border border-gray-100 dark:border-white/10 rounded-xl p-4 shadow-xl z-50 animate-in fade-in slide-in-from-top-2"
+                    >
+                      {(() => {
+                        const suggestions = searchQuery.trim()
+                          ? recentSearches.filter(s => s.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 10)
+                          : recentSearches.slice(0, 10);
+                        
+                        if (suggestions.length === 0) return <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">No suggestions</div>;
+
+                        return (
+                          <>
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                {searchQuery.trim() ? "Search Suggestions" : "Recent Searches"}
+                              </div>
+                              <button 
+                                onClick={() => {
+                                  setRecentSearches([]);
+                                  localStorage.removeItem("asoose_recent_store_searches");
+                                }}
+                                className="text-[10px] font-bold text-gray-400 hover:text-red-500 transition-colors uppercase tracking-widest"
+                              >
+                                Clear
+                              </button>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {suggestions.map((term) => (
+                                <button
+                                  key={term}
+                                  onClick={() => handleRecentSelect(term)}
+                                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 rounded-full text-xs font-bold text-gray-700 dark:text-gray-300 transition-colors"
+                                >
+                                  {term}
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
                   )}
                 </div>
               </div>

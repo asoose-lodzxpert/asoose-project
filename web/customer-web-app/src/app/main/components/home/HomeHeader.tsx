@@ -39,6 +39,8 @@ function HomeHeaderInner() {
   } | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   
   const userLocation = useRideStore((state) => state.userLocation);
   const cityId = useRideStore((state) => state.cityId);
@@ -70,6 +72,14 @@ function HomeHeaderInner() {
 
   useEffect(() => {
     setMounted(true);
+    try {
+      const stored = localStorage.getItem("asoose_recent_searches");
+      if (stored) {
+        setRecentSearches(JSON.parse(stored));
+      }
+    } catch (e) {
+      // ignore
+    }
   }, []);
 
   // Sync search term from URL params
@@ -155,18 +165,83 @@ function HomeHeaderInner() {
     setTheme(theme === "dark" ? "light" : "dark");
   };
 
+  const addRecentSearch = (term: string) => {
+    const trimmed = term.trim();
+    if (!trimmed) return;
+    setRecentSearches((prev) => {
+      const filtered = prev.filter((t) => t.toLowerCase() !== trimmed.toLowerCase());
+      const updated = [trimmed, ...filtered].slice(0, 10); // Keep top 10
+      localStorage.setItem("asoose_recent_searches", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const sanitized = sanitizeInput(searchTerm);
     if (sanitized) {
+      addRecentSearch(sanitized);
       router.push(`/main/store?q=${encodeURIComponent(sanitized)}`);
     } else {
       router.push("/main/store");
     }
+    // Blur the active element to hide keyboard on mobile and hide dropdown
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    setIsSearchFocused(false);
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(sanitizeInput(e.target.value));
+  };
+
+  const handleSelectRecentSearch = (term: string) => {
+    setSearchTerm(term);
+    addRecentSearch(term);
+    router.push(`/main/store?q=${encodeURIComponent(term)}`);
+    setIsSearchFocused(false);
+  };
+
+  const RecentSearchesDropdown = () => {
+    const suggestions = searchTerm.trim() 
+      ? recentSearches.filter(s => s.toLowerCase().includes(searchTerm.toLowerCase())).slice(0, 10)
+      : recentSearches.slice(0, 10);
+
+    if (suggestions.length === 0) return null;
+    return (
+      <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-[#111] border border-gray-100 dark:border-white/10 rounded-xl p-4 shadow-xl z-50 animate-in fade-in slide-in-from-top-2">
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+            {searchTerm.trim() ? "Search Suggestions" : "Recent Searches"}
+          </div>
+          <button 
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              setRecentSearches([]);
+              localStorage.removeItem("asoose_recent_searches");
+            }}
+            className="text-[10px] font-bold text-gray-400 hover:text-red-500 transition-colors uppercase tracking-widest"
+          >
+            Clear
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {suggestions.map(term => (
+            <button
+              key={term}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()} // prevent input blur
+              onClick={() => handleSelectRecentSearch(term)}
+              className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 rounded-full text-xs font-bold text-gray-700 dark:text-gray-300 transition-colors"
+            >
+              {term}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -258,10 +333,14 @@ function HomeHeaderInner() {
                 type="search"
                 value={searchTerm}
                 onChange={handleSearchChange}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={() => setIsSearchFocused(false)}
                 placeholder="Search stores or items..."
                 className="w-full bg-gray-100 dark:bg-white/5 h-11 rounded-xl pl-10 pr-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-yellow-500/50 transition-all placeholder:text-gray-400 dark:placeholder:text-gray-600 dark:text-white"
                 maxLength={100}
+                autoComplete="off"
               />
+              {isSearchFocused && <RecentSearchesDropdown />}
             </form>
           )}
         </div>
@@ -354,10 +433,14 @@ function HomeHeaderInner() {
               type="search"
               value={searchTerm}
               onChange={handleSearchChange}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => setIsSearchFocused(false)}
               placeholder="What are you looking for?"
               className="w-full bg-gray-100 dark:bg-white/5 h-10 rounded-xl pl-10 pr-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-yellow-500/50 transition-all dark:text-white"
               maxLength={100}
+              autoComplete="off"
             />
+            {isSearchFocused && <RecentSearchesDropdown />}
           </form>
         </div>
       )}

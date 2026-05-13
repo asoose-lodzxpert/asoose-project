@@ -7,7 +7,7 @@ import { GoogleMap, Marker } from "@react-google-maps/api";
 import { CarMarker } from "@/app/main/ride/components/CarMarket";
 import { ArrowLeft, Car, Star, Navigation, CreditCard, CheckCircle2, Loader2, Route, Clock, MapPin } from "lucide-react";
 import Link from "next/link";
-import toast from "react-hot-toast";
+import { toast } from "react-toastify";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
 
