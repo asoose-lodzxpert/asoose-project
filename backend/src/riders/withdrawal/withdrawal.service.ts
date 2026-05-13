@@ -97,32 +97,38 @@ export class WithdrawalService {
       throw new BadRequestException('Insufficient balance');
     }
 
-    // 2. Create Payout Record (PENDING)
-    const withdrawal = await this.prisma.riderPayout.create({
-      data: {
-        riderId,
-        amount,
-        bankAccountId, // Ensure we track where the money is going
-        status: 'PENDING',
-      },
-      select: {
-        id: true,
-        amount: true,
-        status: true,
-        createdAt: true,
-        processedAt: true,
-      },
-    });
+    // Wrap Payout creation and Ledger invocation inside a single transaction
+    const withdrawal = await this.prisma.$transaction(async (tx) => {
+      // 2. Create Payout Record (PENDING)
+      const newWithdrawal = await tx.riderPayout.create({
+        data: {
+          riderId,
+          amount,
+          bankAccountId, // Ensure we track where the money is going
+          status: 'PENDING',
+        },
+        select: {
+          id: true,
+          amount: true,
+          status: true,
+          createdAt: true,
+          processedAt: true,
+        },
+      });
 
-    // 3. Call Ledger to Handle Debit & Audit (CRITICAL FIX)
-    // This replaces the unsafe `this.prisma.rider.update` balance decrement.
-    // The ledger service handles the decrement transactionally and creates the ledger entry.
-    await this.ledger.recordPayoutRequest(
-      riderId,
-      UserRole.RIDER,
-      amount,
-      withdrawal.id,
-    );
+      // 3. Call Ledger to Handle Debit & Audit (CRITICAL FIX)
+      // The ledger service handles the decrement transactionally, creates the ledger entry,
+      // and throws an exception if the balance drops below zero, rolling back everything.
+      await this.ledger.recordPayoutRequest(
+        riderId,
+        UserRole.RIDER,
+        amount,
+        newWithdrawal.id,
+        tx,
+      );
+
+      return newWithdrawal;
+    });
 
     return {
       message: 'Withdrawal request submitted successfully',

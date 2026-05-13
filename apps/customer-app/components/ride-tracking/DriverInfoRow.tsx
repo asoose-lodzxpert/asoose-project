@@ -2,19 +2,23 @@ import { View, StyleSheet, Pressable, Linking } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { useRouter } from "expo-router";
 
 type DriverInfoRowProps = {
   driver: any;
   driverPhone?: string;
+  rideId?: string;
 };
 
 export default function DriverInfoRow({
   driver,
   driverPhone,
+  rideId,
 }: DriverInfoRowProps) {
   const primaryColor = useThemeColor({}, "brandPrimary");
   const successColor = useThemeColor({}, "statusSuccess");
   const textSecondary = useThemeColor({}, "textSecondary");
+  const router = useRouter();
 
   const initial = (driver?.firstName ?? driver?.name ?? "D")[0].toUpperCase();
 
@@ -77,15 +81,32 @@ export default function DriverInfoRow({
         )}
       </View>
 
-      {/* Call button */}
-      {driverPhone && (
+      {/* Action buttons */}
+      <View style={{ flexDirection: "row", gap: 8 }}>
         <Pressable
-          onPress={() => Linking.openURL(`tel:${driverPhone}`)}
-          style={[styles.callBtn, { backgroundColor: successColor }]}
+          onPress={() =>
+            router.push({
+              pathname: "/chat/[id]",
+              params: {
+                id: driver.id,
+                name: fullName,
+                rideId: rideId,
+              },
+            })
+          }
+          style={[styles.callBtn, { backgroundColor: primaryColor + "15" }]}
         >
-          <IconSymbol name="phone.fill" size={16} color="#fff" />
+          <IconSymbol name="bubble.left.fill" size={16} color={primaryColor} />
         </Pressable>
-      )}
+        {driverPhone && (
+          <Pressable
+            onPress={() => Linking.openURL(`tel:${driverPhone}`)}
+            style={[styles.callBtn, { backgroundColor: successColor }]}
+          >
+            <IconSymbol name="phone.fill" size={16} color="#fff" />
+          </Pressable>
+        )}
+      </View>
     </View>
   );
 }

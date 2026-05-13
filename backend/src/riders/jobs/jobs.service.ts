@@ -22,7 +22,10 @@ function deliveryStatusToJobStatus(status: DeliveryStatus): string {
     case DeliveryStatus.ACCEPTED:
       return 'en-route-pickup';
     case DeliveryStatus.PICKED_UP:
+    case DeliveryStatus.IN_TRANSIT:
       return 'en-route-dropoff';
+    case DeliveryStatus.DELIVERED:
+      return 'payment-pending';
     default:
       return 'online-waiting';
   }
@@ -52,6 +55,8 @@ function rideStatusToJobStatus(status: RideStatus, isScheduled = false, schedule
       return 'at-pickup';
     case RideStatus.IN_PROGRESS:
       return 'en-route-dropoff';
+    case RideStatus.COMPLETED:
+      return 'payment-pending';
     case (RideStatus as any).DRIVER_ASSIGNED_SCHED:
       return 'incoming-job';
     default:
@@ -85,17 +90,24 @@ export class JobsService {
         DeliveryStatus.ACCEPTED,
         DeliveryStatus.PICKED_UP,
         DeliveryStatus.IN_TRANSIT,
+        DeliveryStatus.DELIVERED,
       ];
 
       const delivery = await this.prisma.delivery.findFirst({
         where: {
           riderId,
           status: { in: activeStatuses },
+          // If DELIVERED, only show if payment is still pending (if applicable)
+          OR: [
+            { status: { not: DeliveryStatus.DELIVERED } },
+            { payment: { status: { not: 'COMPLETED' } } },
+          ],
         },
         include: {
           customer: { select: { name: true, phone: true } },
           pickupAddress: true,
           dropoffAddress: true,
+          payment: true,
           order: {
             include: {
               store: { include: { vendor: true } },
@@ -150,7 +162,7 @@ export class JobsService {
         dropoffAddress: delivery.dropoffAddress,
         earnings: delivery.deliveryFee,
 
-        requiresOtp: false,
+        requiresOtp: !!(delivery as any).deliveryOtp,
         packageDetails: delivery.packageDetails ?? undefined,
         distanceKm: delivery.distanceKm ?? undefined,
         assignedAt: delivery.assignedAt ?? undefined,
@@ -174,6 +186,7 @@ export class JobsService {
         RideStatus.DRIVER_ACCEPTED,
         RideStatus.PAID,
         RideStatus.IN_PROGRESS,
+        RideStatus.COMPLETED,
         (RideStatus as any).DRIVER_ASSIGNED_SCHED,
         // Legacy statuses kept for backward compatibility
         RideStatus.REQUESTED,
@@ -185,11 +198,17 @@ export class JobsService {
         where: {
           riderId,
           status: { in: activeStatuses },
+          // If COMPLETED, only show if payment is still pending
+          OR: [
+            { status: { not: RideStatus.COMPLETED } },
+            { payment: { status: { not: 'COMPLETED' } } },
+          ],
         },
         include: {
           customer: { select: { id: true, name: true, phone: true } },
           pickupAddress: true,
           dropoffAddress: true,
+          payment: true,
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -1028,6 +1047,20 @@ export class JobsService {
         throw new BadRequestException(
           `Cannot complete delivery in status ${delivery.status}`,
         );
+      }
+
+      // Verify OTP if required
+      const deliveryWithOtp = await this.prisma.delivery.findUnique({
+        where: { id: jobId },
+        select: { deliveryOtp: true },
+      });
+
+      if (deliveryWithOtp?.deliveryOtp) {
+        const providedOtp = payload?.otp || payload?.deliveryOtp;
+        if (!providedOtp || providedOtp.trim() !== deliveryWithOtp.deliveryOtp.trim()) {
+          this.logger.warn(`Delivery completion failed: Invalid OTP for job ${jobId}`);
+          throw new BadRequestException('Invalid delivery OTP. Please ask the recipient for the 4-digit code.');
+        }
       }
 
       this.logger.debug(`Completing delivery ${jobId} → DELIVERED`);

@@ -10,6 +10,7 @@ import EnRouteToPickup from "./EnRouteToPickup";
 import IncomingOrderSheet from "./IncomingOrderSheet";
 import OfflineScreen from "./OfflineScreen";
 import OnlineWaitingScreen from "./OnlineWaitingScreen";
+import PaymentPendingScreen from "./PaymentPendingScreen";
 
 type Props = {
   onAnimateToPickup?: () => void;
@@ -41,6 +42,8 @@ export default function BottomOverlay({
       )}
 
       {status === "confirm-job" && activeJob && <ConfirmJobScreen />}
+
+      {status === "payment-pending" && activeJob && <PaymentPendingScreen />}
     </View>
   );
 }

@@ -304,13 +304,21 @@ export class PaymentStatusService {
               }
 
               // Mark ride as PAID so the customer UI navigates to the success screen.
-              await tx.ride.update({
-                where: { id: payment.rideId! },
-                data: { status: 'PAID' as any },
-              });
-              this.logger.log(
-                `Post-ride payment: ride ${payment.rideId} transitioned COMPLETED → PAID`,
-              );
+              // CRITICAL: Only transition to PAID if it's not already COMPLETED.
+              // If it's already COMPLETED (post-ride payment), we keep it as COMPLETED.
+              if ((currentRide.status as string) !== 'COMPLETED') {
+                await tx.ride.update({
+                  where: { id: payment.rideId! },
+                  data: { status: 'PAID' as any },
+                });
+                this.logger.log(
+                  `Post-ride payment: ride ${payment.rideId} transitioned ${currentRide.status} → PAID`,
+                );
+              } else {
+                this.logger.log(
+                  `Post-ride payment: ride ${payment.rideId} remains COMPLETED (payment verified)`,
+                );
+              }
             } else if (
               (currentRide?.status as string) === 'DRIVER_ACCEPTED' ||
               (currentRide?.status as string) === 'DRIVER_ASSIGNED'

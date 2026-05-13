@@ -43,6 +43,8 @@ interface ProductDetail {
     name: string;
     slug?: string;
     type: string;
+    rating?: number;
+    ratingCount?: number;
   };
   modifierGroups?: ModifierGroup[];
   createdAt?: string;
@@ -165,6 +167,7 @@ function buildProductSchema(
     ...(image && { image }),
     ...(product.category?.name && { category: product.category.name }),
     url: productUrl,
+    sku: product.id,
     brand: {
       "@type": "Brand",
       name: storeName,
@@ -180,7 +183,53 @@ function buildProductSchema(
         name: storeName,
         url: `${SITE_URL}/stores/${storeSlug}`,
       },
+      hasMerchantReturnPolicy: {
+        "@type": "MerchantReturnPolicy",
+        returnPolicyCategory: "https://schema.org/MerchantReturnNotPermitted"
+      },
+      shippingDetails: {
+        "@type": "OfferShippingDetails",
+        shippingRate: {
+          "@type": "MonetaryAmount",
+          value: 500,
+          currency: "NGN"
+        },
+        deliveryTime: {
+          "@type": "ShippingDeliveryTime",
+          handlingTime: {
+            "@type": "QuantitativeValue",
+            minValue: 0,
+            maxValue: 1,
+            unitCode: "d"
+          },
+          transitTime: {
+            "@type": "QuantitativeValue",
+            minValue: 0,
+            maxValue: 1,
+            unitCode: "d"
+          }
+        }
+      }
     },
+    ...(product.store?.rating && product.store?.ratingCount ? {
+      aggregateRating: {
+        "@type": "AggregateRating",
+        ratingValue: product.store.rating,
+        reviewCount: product.store.ratingCount
+      },
+      review: {
+        "@type": "Review",
+        reviewRating: {
+          "@type": "Rating",
+          ratingValue: product.store.rating,
+          bestRating: "5"
+        },
+        author: {
+          "@type": "Organization",
+          name: "Asoose Users"
+        }
+      }
+    } : {})
   };
 }
 

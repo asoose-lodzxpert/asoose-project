@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useJobs } from "@/context/JobContext";
@@ -21,6 +22,7 @@ const RIDE_OTP_LENGTH = 6;
 export default function AtPickupScreen() {
   const { activeJob, confirmPickup, cancelJob } = useJobs();
   const { bottom } = useSafeAreaInsets();
+  const router = useRouter();
   const [cancelVisible, setCancelVisible] = useState(false);
   const [otp, setOtp] = useState("");
   const [otpError, setOtpError] = useState<string | null>(null);
@@ -125,16 +127,34 @@ export default function AtPickupScreen() {
         {(activeJob.pickupContactPhone ||
           activeJob.customerPhone ||
           activeJob.pickupAddress?.phone) && (
-          <Pressable
-            onPress={() =>
-              Linking.openURL(
-                `tel:${activeJob.pickupContactPhone || activeJob.customerPhone || activeJob.pickupAddress?.phone}`,
-              )
-            }
-            style={styles.callBtn}
-          >
-            <IconSymbol name="phone" size={18} color={colors.primary} />
-          </Pressable>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: "/chat/[id]",
+                  params: { 
+                    id: activeJob.customerId || activeJob.senderId,
+                    name: storeName,
+                    orderId: activeJob.jobType === 'delivery' ? activeJob.id : undefined,
+                    rideId: activeJob.jobType === 'ride' ? activeJob.id : undefined
+                  }
+                })
+              }
+              style={styles.callBtn}
+            >
+              <IconSymbol name="bubble.left" size={18} color={colors.primary} />
+            </Pressable>
+            <Pressable
+              onPress={() =>
+                Linking.openURL(
+                  `tel:${activeJob.pickupContactPhone || activeJob.customerPhone || activeJob.pickupAddress?.phone}`,
+                )
+              }
+              style={styles.callBtn}
+            >
+              <IconSymbol name="phone" size={18} color={colors.primary} />
+            </Pressable>
+          </View>
         )}
       </View>
 

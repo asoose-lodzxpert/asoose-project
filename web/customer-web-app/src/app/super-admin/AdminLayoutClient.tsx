@@ -177,6 +177,12 @@ export default function AdminLayoutClient({
       href: "/super-admin/inquiries",
       allowed: ["ADMIN", "SUPER_ADMIN", "ADMIN_SUPPORT"],
     },
+    {
+      name: "Support Chats",
+      icon: MessageSquare,
+      href: "/super-admin/chats",
+      allowed: ["ADMIN", "SUPER_ADMIN", "ADMIN_SUPPORT"],
+    },
   ];
 
   const canViewUsers = hasAccess([

@@ -22,6 +22,7 @@ interface UseJobEventsOptions {
   onPaymentConfirmed?: (rideId: string) => void;
   /** Post-ride payment confirmed — driver earnings have been credited. */
   onRidePaymentCompleted?: (rideId: string) => void;
+  onNewChatMessage?: (message: any) => void;
   enabled?: boolean;
 }
 
@@ -37,6 +38,7 @@ export function useJobEvents(options: UseJobEventsOptions) {
     onForceLogout,
     onPaymentConfirmed,
     onRidePaymentCompleted,
+    onNewChatMessage,
     enabled = true,
   } = options;
   const serviceRef = useRef<JobEventsService | null>(null);
@@ -64,6 +66,7 @@ export function useJobEvents(options: UseJobEventsOptions) {
         onForceLogout,
         onPaymentConfirmed,
         onRidePaymentCompleted,
+        onNewChatMessage,
       });
     }
   }, [
@@ -77,6 +80,7 @@ export function useJobEvents(options: UseJobEventsOptions) {
     onForceLogout,
     onPaymentConfirmed,
     onRidePaymentCompleted,
+    onNewChatMessage,
   ]);
 
   const connect = useCallback(() => {

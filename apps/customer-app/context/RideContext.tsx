@@ -391,6 +391,14 @@ export function RideProvider({ children }: { children: ReactNode }) {
     });
 
     socketRef.current = socket;
+    socket.on("new_chat_message", (data: any) => {
+      if (__DEV__) console.log("[RideContext] New chat message:", data);
+      Toast.show({
+        type: "info",
+        text1: "New Message",
+        text2: data.message,
+      });
+    });
   }, [user?.id, refreshCurrentRide]);
 
   // Cleanup socket on unmount or when user changes

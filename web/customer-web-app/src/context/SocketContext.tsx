@@ -89,6 +89,16 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       setIsConnected(false);
     });
 
+    socket.on("new_chat_message", (data: any) => {
+      import("react-toastify").then(({ toast }) => {
+        toast.info(`New message from ${data.senderName}: ${data.message.substring(0, 50)}${data.message.length > 50 ? "..." : ""}`, {
+          onClick: () => {
+            window.location.href = "/super-admin/chats";
+          },
+        });
+      });
+    });
+
     socket.on("error", (error: Error) => {
       console.error("Socket error:", error);
     });

@@ -1,5 +1,5 @@
 import { PrismaService } from '../../prisma/prisma.service';
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { Prisma, UserRole, TransactionType } from '@prisma/client';
 
 /**
@@ -101,8 +101,9 @@ export class TransactionLedgerService {
     userRole: UserRole,
     amount: number,
     payoutId: string,
+    externalTx?: Prisma.TransactionClient,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.withTransaction(async (tx) => {
       // 1. Fetch current wallet balance for accurate ledger snapshot
       let balanceBefore = 0;
       if (userRole === UserRole.RIDER) {
@@ -147,16 +148,24 @@ export class TransactionLedgerService {
 
       // 3. DEBIT the Wallet (The ONLY Debit action in the lifecycle)
       if (userRole === UserRole.RIDER) {
-        await tx.rider.update({
+        const updatedRider = await tx.rider.update({
           where: { id: userId },
           data: { walletBalance: { decrement: amount } },
+          select: { walletBalance: true }
         });
+        if (updatedRider.walletBalance < 0) {
+          throw new BadRequestException('Insufficient balance. Please wait for previous transactions to clear.');
+        }
       } else {
         // For Vendors, usually the Vendor ID is passed, but we update the STORE wallet
-        await tx.store.update({
+        const updatedStore = await tx.store.update({
           where: { vendorId: userId },
           data: { walletBalance: { decrement: amount } },
+          select: { walletBalance: true }
         });
+        if (updatedStore.walletBalance < 0) {
+          throw new BadRequestException('Insufficient balance. Please wait for previous transactions to clear.');
+        }
       }
 
       return transaction;

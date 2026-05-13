@@ -84,6 +84,7 @@ export default function WithdrawEarningsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
+  const isWithdrawingRef = React.useRef(false);
 
   const [amountDisplay, setAmountDisplay] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -169,9 +170,10 @@ export default function WithdrawEarningsScreen() {
   };
 
   const withdraw = async () => {
-    if (error || numericAmount === 0 || !account) return;
+    if (error || numericAmount === 0 || !account || isWithdrawingRef.current) return;
 
     try {
+      isWithdrawingRef.current = true;
       setWithdrawing(true);
       await requestWithdrawal({
         amount: numericAmount,
@@ -183,6 +185,7 @@ export default function WithdrawEarningsScreen() {
       // ...existing code...
       setError(err?.message || "Failed to process withdrawal");
     } finally {
+      isWithdrawingRef.current = false;
       setWithdrawing(false);
     }
   };

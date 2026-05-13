@@ -54,6 +54,7 @@ export type JobEventCallbacks = {
   onPaymentConfirmed?: (rideId: string) => void;
   /** Post-ride payment confirmed by Paystack webhook — earnings credited to driver. */
   onRidePaymentCompleted?: (rideId: string) => void;
+  onNewChatMessage?: (message: any) => void;
 };
 
 export class JobEventsService {
@@ -300,6 +301,13 @@ export class JobEventsService {
       const rideId = data?.rideId as string | undefined;
       if (rideId && this.callbacks?.onRidePaymentCompleted) {
         this.callbacks.onRidePaymentCompleted(rideId);
+      }
+    });
+
+    // Real-time chat messages
+    this.socket.on("new_chat_message", (data: any) => {
+      if (this.callbacks?.onNewChatMessage) {
+        this.callbacks.onNewChatMessage(data);
       }
     });
   }
