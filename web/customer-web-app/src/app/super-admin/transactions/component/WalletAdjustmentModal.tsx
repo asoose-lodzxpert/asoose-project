@@ -1,9 +1,12 @@
 "use client";
 
+"use client";
+
 import React, { useState } from "react";
 import { X, Search, Loader2, AlertCircle, CheckCircle } from "lucide-react";
-import { getSession } from "next-auth/react"; // ✅ Import NextAuth
+import { getSession } from "next-auth/react";
 import Swal from "sweetalert2";
+import { validateWalletAdjustment, formatValidationErrors } from "@/utils/wallet-validation";
 
 interface WalletAdjustmentModalProps {
   isOpen: boolean;
@@ -65,10 +68,23 @@ export default function WalletAdjustmentModal({
     e.preventDefault();
     if (!selectedEntity || !amount || !description) return;
 
+    // ✅ FIXED: Add validation for amount and description
+    const validation = validateWalletAdjustment(parseFloat(amount), description);
+    if (!validation.valid) {
+      const errors = formatValidationErrors(validation.errors);
+      Swal.fire({
+        icon: "error",
+        title: "Validation Error",
+        text: errors,
+        background: "#1E293B",
+        color: "#fff",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      // ✅ Get Session from NextAuth
       const session = await getSession();
       const token = (session as any)?.accessToken;
       const API_URL =
@@ -101,10 +117,18 @@ export default function WalletAdjustmentModal({
         throw new Error(err.message || "Failed to adjust wallet");
       }
 
+      const amountNum = parseFloat(amount);
+      const formattedAmount = new Intl.NumberFormat("en-NG", {
+        style: "currency",
+        currency: "NGN",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(amountNum);
+
       Swal.fire({
         icon: "success",
         title: "Wallet Adjusted",
-        text: `Successfully ${type === "CREDIT" ? "credited" : "debited"} $${amount}`,
+        text: `Successfully ${type === "CREDIT" ? "credited" : "debited"} ${formattedAmount}`,
         background: "#1E293B",
         color: "#fff",
       });
@@ -262,17 +286,20 @@ export default function WalletAdjustmentModal({
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-400 mb-1">
-                    Amount
+                    Amount (₦)
                   </label>
                   <input
                     type="number"
-                    min="1"
+                    min="0.01"
                     step="0.01"
+                    max="100000000"
                     required
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
                     className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-blue-500 outline-none"
                   />
+                  <p className="text-xs text-gray-500 mt-1">Max: ₦100,000,000 | 2 decimal places</p>
                 </div>
               </div>
 
@@ -286,8 +313,11 @@ export default function WalletAdjustmentModal({
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="e.g., Compensation for order #1234..."
+                  minLength={5}
+                  maxLength={200}
                   className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-blue-500 outline-none resize-none"
                 />
+                <p className="text-xs text-gray-500 mt-1">{description.length}/200 characters</p>
               </div>
 
               <div className="pt-2 flex gap-3">

@@ -57,8 +57,19 @@ interface TransactionsApiResponse {
   };
 }
 
-// Helper to ensure Naira display even if backend hardcodes dollar signs
-const formatNairaString = (amountStr: string) => amountStr.replaceAll("$", "₦");
+// ✅ FIXED: Handle both string and numeric currency values
+const formatNairaString = (amount: string | number) => {
+  if (typeof amount === 'number') {
+    return new Intl.NumberFormat("en-NG", {
+      style: "currency",
+      currency: "NGN",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  }
+  // For strings, replace $ with ₦
+  return String(amount).replaceAll("$", "₦");
+};
 
 const StatsCard = ({
   title,
