@@ -113,6 +113,20 @@ export class TripsService {
     return this.ridesService.streamPublicTrackingData(rideId, otp);
   }
 
+  async guestConfirmRide(
+    rideId: string,
+    otp: string,
+    paymentMethod: string,
+    callbackUrl?: string,
+  ) {
+    return this.ridesService.guestConfirmRide(
+      rideId,
+      otp,
+      paymentMethod,
+      callbackUrl,
+    );
+  }
+
   async startDeliveryMatching(deliveryId: string) {
     return this.deliveriesService.startDeliveryMatching(deliveryId);
   }

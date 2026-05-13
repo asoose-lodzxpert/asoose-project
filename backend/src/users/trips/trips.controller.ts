@@ -166,6 +166,28 @@ export class TripsController {
   }
 
   /**
+   * Confirm payment for a ride as a guest (no auth required)
+   * POST /trips/rides/:id/guest-pay
+   */
+  @ApiOperation({ summary: 'Process payment for a ride as a guest' })
+  @Public()
+  @Post('rides/:id/guest-pay')
+  async guestConfirmRide(
+    @Param('id') rideId: string,
+    @Body('otp') otp: string,
+    @Body('paymentMethod') paymentMethod: string,
+    @Body('callbackUrl') callbackUrl?: string,
+  ) {
+    if (!otp) throw new BadRequestException('Ride code (otp) is required');
+    return this.tripsService.guestConfirmRide(
+      rideId,
+      otp,
+      paymentMethod,
+      callbackUrl,
+    );
+  }
+
+  /**
    * Get Driver Location for a specific ride
    * GET /trips/rides/:id/driver-location
    */

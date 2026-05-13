@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useGoogleMaps } from "@/providers/GoogleMapsProvider";
 import { GoogleMap, Marker } from "@react-google-maps/api";
 import { CarMarker } from "@/app/main/ride/components/CarMarket";
-import { ArrowLeft, Car, Star, Navigation } from "lucide-react";
+import { ArrowLeft, Car, Star, Navigation, CreditCard, CheckCircle2, Loader2, Route, Clock, MapPin } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 
@@ -43,6 +43,10 @@ interface TrackingData {
   driverLocation: Location | null;
   driver: Driver | null;
   routePolyline?: string | null;
+  fare?: number;
+  distance?: number;
+  duration?: number;
+  paymentStatus?: string;
 }
 
 const mapContainerStyle = {
@@ -85,6 +89,7 @@ export default function PublicTrackingPage() {
   const [otp, setOtp] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
   const [trackingData, setTrackingData] = useState<TrackingData | null>(null);
   
   const { isLoaded, loadError } = useGoogleMaps();
@@ -156,6 +161,49 @@ export default function PublicTrackingPage() {
     }
     verifyOtpAndStartTracking(otp);
   };
+
+  const handleGuestPay = async () => {
+    if (!trackingData) return;
+    setIsPaying(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/trips/rides/${id}/guest-pay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          otp,
+          paymentMethod: "CARD",
+          callbackUrl: window.location.href,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Payment initialization failed");
+      
+      const data = await res.json();
+      if (data.status === "ALREADY_PAID") {
+        toast.success("Payment already completed!");
+        setTrackingData({ ...trackingData, paymentStatus: "PAID" });
+        setIsPaying(false);
+        return;
+      }
+
+      if (data.authorizationUrl) {
+        window.location.href = data.authorizationUrl;
+      } else {
+        throw new Error("Missing authorization URL");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Could not process payment. Please try again.");
+      setIsPaying(false);
+    }
+  };
+
+  const formatMoney = (amount: number) =>
+    new Intl.NumberFormat("en-NG", {
+      style: "currency",
+      currency: "NGN",
+      maximumFractionDigits: 0,
+    }).format(amount);
 
   // Draw Polyline and fit bounds
   useEffect(() => {
@@ -303,8 +351,90 @@ export default function PublicTrackingPage() {
         )}
       </div>
 
-      {/* Driver Info Bottom Sheet */}
-      {trackingData?.driver && (
+      {/* Bottom Sheet logic */}
+      {trackingData?.status === "COMPLETED" ? (
+        <div className="bg-zinc-900 border-t border-white/10 p-6 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-20">
+          <div className="max-w-md mx-auto">
+            <div className="flex items-center gap-4 mb-5">
+              <div className="p-3 bg-green-500/20 rounded-full border border-green-500/30">
+                <CheckCircle2 className="text-green-500" size={24} />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white leading-tight">
+                  Trip Complete!
+                </h2>
+                <p className="text-sm text-zinc-400">
+                  {trackingData.paymentStatus === "PAID"
+                    ? "Thank you for riding with Asoose"
+                    : "Complete payment for your ride"}
+                </p>
+              </div>
+            </div>
+
+            {/* Trip Summary */}
+            <div className="grid grid-cols-3 gap-3 mb-5">
+              <div className="flex flex-col items-center bg-zinc-800/50 rounded-xl p-3 border border-zinc-700/50">
+                <Route size={16} className="text-zinc-400 mb-1" />
+                <span className="text-sm font-bold text-white">
+                  {trackingData.distance?.toFixed(1) || 0} km
+                </span>
+                <span className="text-xs text-zinc-500">Distance</span>
+              </div>
+              <div className="flex flex-col items-center bg-zinc-800/50 rounded-xl p-3 border border-zinc-700/50">
+                <Clock size={16} className="text-zinc-400 mb-1" />
+                <span className="text-sm font-bold text-white">
+                  {Math.ceil(trackingData.duration || 0)} min
+                </span>
+                <span className="text-xs text-zinc-500">Duration</span>
+              </div>
+              <div className="flex flex-col items-center bg-zinc-800/50 rounded-xl p-3 border border-zinc-700/50">
+                <MapPin size={16} className="text-zinc-400 mb-1" />
+                <span className="text-sm font-bold text-white">Arrived</span>
+                <span className="text-xs text-zinc-500">Status</span>
+              </div>
+            </div>
+
+            {/* Fare row */}
+            <div className="flex items-center justify-between bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-4 py-4 mb-5">
+              <div>
+                <p className="text-sm font-medium text-zinc-300">Trip Fare</p>
+                <p className="text-xs text-yellow-500 font-medium mt-0.5">
+                  Final fare
+                </p>
+              </div>
+              <span className="text-2xl font-black text-white ml-4">
+                {formatMoney(trackingData.fare || 0)}
+              </span>
+            </div>
+
+            {/* Pay Button / Completed Text */}
+            {trackingData.paymentStatus !== "PAID" ? (
+              <button
+                onClick={handleGuestPay}
+                disabled={isPaying}
+                className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-white text-zinc-900 font-bold text-base hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isPaying ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    <span>Redirecting to payment...</span>
+                  </>
+                ) : (
+                  <>
+                    <CreditCard size={18} />
+                    <span>Pay {formatMoney(trackingData.fare || 0)}</span>
+                  </>
+                )}
+              </button>
+            ) : (
+              <div className="w-full py-4 rounded-xl bg-green-500/10 border border-green-500/20 text-green-500 font-bold flex items-center justify-center gap-2">
+                <CheckCircle2 size={18} />
+                <span>Payment Confirmed</span>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : trackingData?.driver ? (
         <div className="bg-zinc-900 border-t border-white/10 p-6 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-20">
           <div className="max-w-md mx-auto">
             <div className="flex items-center gap-4 mb-6">
@@ -354,7 +484,7 @@ export default function PublicTrackingPage() {
             </a>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

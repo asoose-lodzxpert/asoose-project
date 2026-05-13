@@ -35,6 +35,7 @@ import { randomUUID } from 'crypto';
 import { rideToJobSummary } from '../../riders/jobs/job.dto';
 import { DriverStateService } from '../../matching/driver-state/driver-state.service';
 import { PaymentInitService } from '../../payment/payment-init.service';
+import { InitiatePaymentDto } from '../../payment/dto/payment.dto';
 import {
   PaymentGateway,
   PaymentMethod as GatewayPaymentMethod,
@@ -1160,6 +1161,7 @@ export class RidesService {
       include: {
         pickupAddress: true,
         dropoffAddress: true,
+        payment: true,
         rider: {
           include: { vehicle: true },
         },
@@ -1191,7 +1193,37 @@ export class RidesService {
           }
         : null,
       driverLocation,
+      fare: ride.totalFare || 0,
+      distance: ride.distanceKm || 0,
+      duration: ride.durationMin || 0,
+      paymentStatus: ride.payment?.status || 'PENDING',
     };
+  }
+
+  async guestConfirmRide(rideId: string, otp: string, paymentMethod: string, callbackUrl?: string) {
+    const ride = await this.prisma.ride.findUnique({
+      where: { id: rideId },
+      include: { customer: true, payment: true },
+    });
+
+    if (!ride) throw new NotFoundException('Ride not found');
+    if (ride.startOtp !== otp) throw new ForbiddenException('Invalid ride code');
+
+    if (ride.payment?.status === PaymentStatus.COMPLETED) {
+      return { status: 'ALREADY_PAID', rideId };
+    }
+
+    // Direct paystack initialization for the guest using the customer's email
+    const dto: InitiatePaymentDto = {
+      type: PaymentType.RIDE,
+      rideId: ride.id,
+      amount: ride.totalFare || 0,
+      gateway: PaymentGateway.PAYSTACK,
+      method: paymentMethod as any,
+      email: ride.customer.email,
+      callbackUrl,
+    };
+    return this.paymentInitService.initiatePayment(dto, ride.customerId);
   }
 
   streamPublicTrackingData(rideId: string, otp: string): Observable<any> {
