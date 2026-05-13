@@ -48,6 +48,7 @@ lerna-debug.log*
 *firebase-adminsdk*.json
 firebase-service-account*.json
 serviceAccountKey.json
+asoose-86e91-*.json
 
 # temp directory
 .temp

@@ -102,9 +102,9 @@ export class FcmService implements OnModuleInit {
       };
 
       const response = await admin.messaging().send(message);
-      this.logger.log(`✓ Push notification sent (ID: ${response})`);
+      this.logger.log(`✓ Push notification sent to token ${token.substring(0, 10)}... (ID: ${response})`);
     } catch (error) {
-      this.logger.error(`FCM Send Error: ${error.message}`);
+      this.logger.error(`FCM Send Error for token ${token.substring(0, 10)}...: ${error.message}`);
 
       if (error.code === 'messaging/registration-token-not-registered') {
         this.logger.warn(
