@@ -105,6 +105,14 @@ export class TripsService {
     return this.ridesService.getRideById(userId, rideId);
   }
 
+  async getPublicTrackingData(rideId: string, otp: string) {
+    return this.ridesService.getPublicTrackingData(rideId, otp);
+  }
+
+  streamPublicTrackingData(rideId: string, otp: string) {
+    return this.ridesService.streamPublicTrackingData(rideId, otp);
+  }
+
   async startDeliveryMatching(deliveryId: string) {
     return this.deliveriesService.startDeliveryMatching(deliveryId);
   }

@@ -10,7 +10,9 @@ import {
   Request,
   BadRequestException,
   Headers, // FIX: Added Headers import
+  Sse,
 } from '@nestjs/common';
+import { Public } from '../../auth/decorators/public.decorator';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
@@ -131,6 +133,36 @@ export class TripsController {
   @Get('rides/:id')
   async getRideById(@Request() req, @Param('id') rideId: string) {
     return this.tripsService.getRideById(req.user.id, rideId);
+  }
+
+  /**
+   * Get public tracking data for a ride using OTP
+   * GET /trips/rides/:id/track?otp=1234
+   */
+  @ApiOperation({ summary: 'Get public tracking data using ride code' })
+  @Public()
+  @Get('rides/:id/track')
+  async getPublicTrackingData(
+    @Param('id') rideId: string,
+    @Query('otp') otp: string,
+  ) {
+    if (!otp) throw new BadRequestException('Ride code (otp) is required');
+    return this.tripsService.getPublicTrackingData(rideId, otp);
+  }
+
+  /**
+   * SSE Stream for public tracking
+   * GET /trips/rides/:id/track/stream?otp=1234
+   */
+  @ApiOperation({ summary: 'SSE stream for public ride tracking' })
+  @Public()
+  @Sse('rides/:id/track/stream')
+  streamPublicTrackingData(
+    @Param('id') rideId: string,
+    @Query('otp') otp: string,
+  ) {
+    if (!otp) throw new BadRequestException('Ride code (otp) is required');
+    return this.tripsService.streamPublicTrackingData(rideId, otp);
   }
 
   /**
