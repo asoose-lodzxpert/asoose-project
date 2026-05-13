@@ -681,11 +681,35 @@ export class AuthService {
     const effectivePlatform = isExpoToken ? 'expo' : platform;
 
     try {
+      // 1. Upsert the current token
       await this.prisma.pushToken.upsert({
         where: { token },
         update: { userId, platform: effectivePlatform },
         create: { token, userId, platform: effectivePlatform },
       });
+
+      // 2. Enforce 3-device limit for ADMIN roles
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      });
+
+      const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role.startsWith('ADMIN');
+
+      if (isAdmin) {
+        const tokens = await this.prisma.pushToken.findMany({
+          where: { userId },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        if (tokens.length > 3) {
+          const tokensToDelete = tokens.slice(3).map((t) => t.id);
+          await this.prisma.pushToken.deleteMany({
+            where: { id: { in: tokensToDelete } },
+          });
+          this.logger.log(`Pruned ${tokensToDelete.length} old push tokens for admin ${userId}`);
+        }
+      }
 
       return { success: true, message: 'Push token saved' };
     } catch (error) {
