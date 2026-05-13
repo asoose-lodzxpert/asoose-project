@@ -114,7 +114,7 @@ export class SettingsService {
       // Logistics – Surcharges & Fees
       { key: 'ride_night_surcharge_per_km', value: '1000', category: 'Logistics' },
       { key: 'ride_business_multiplier', value: '1.5', category: 'Logistics' },
-      { key: 'ride_platform_fee_percent', value: '20', category: 'Logistics' },
+      { key: 'ride_platform_fee_percent', value: '16', category: 'Logistics' },
       // Logistics – Delivery pricing
       { key: 'delivery_base_fare', value: '700', category: 'Logistics' },
       { key: 'delivery_per_km', value: '400', category: 'Logistics' },

@@ -126,6 +126,15 @@ export class PaymentStatusService {
       ? new Date(verification.paidAt)
       : new Date();
 
+    // Fetch dynamic platform fee from system settings
+    const platformFeeSetting = await this.prisma.systemSetting.findUnique({
+      where: { key: 'ride_platform_fee_percent' },
+    });
+    // Default to 16% if setting is missing or invalid
+    const platformFeeRate = platformFeeSetting && !isNaN(Number(platformFeeSetting.value))
+      ? Number(platformFeeSetting.value) / 100 
+      : 0.16;
+
     // === ATOMIC TRANSACTION START ===
     // FIX: Added timeout configuration to handle long-running ledger updates
     const result = await this.prisma.$transaction(
@@ -242,7 +251,7 @@ export class PaymentStatusService {
               const ride = payment.ride;
 
               if (currentRide.riderId) {
-                const platformFeeRate = 0.2;
+                // platformFeeRate is dynamically fetched outside the transaction
                 const totalFare = Number(payment.amount) || 0;
                 const platformFee = Math.round(totalFare * platformFeeRate);
                 const earning = Math.max(0, totalFare - platformFee);
@@ -259,6 +268,7 @@ export class PaymentStatusService {
                   tx,
                 );
 
+                // This ledger call handles the transaction creation and wallet credit correctly
                 await this.ledger.recordRideEarnings(
                   {
                     id: payment.rideId,
@@ -270,36 +280,8 @@ export class PaymentStatusService {
                   tx,
                 );
 
-                // Credit driver wallet
-                const rider = await tx.rider.findUnique({
-                  where: { id: currentRide.riderId },
-                  select: { walletBalance: true },
-                });
-                if (rider) {
-                  const balanceBefore = Number(rider.walletBalance);
-                  const balanceAfter =
-                    Math.round((balanceBefore + earning) * 100) / 100;
-                  await tx.rider.update({
-                    where: { id: currentRide.riderId },
-                    data: { walletBalance: balanceAfter },
-                  });
-                  await tx.transaction.create({
-                    data: {
-                      type: 'RIDER_EARNING' as any,
-                      amount: earning,
-                      balanceBefore,
-                      balanceAfter,
-                      entityId: currentRide.riderId,
-                      entityType: 'RIDER' as any,
-                      rideId: payment.rideId,
-                      status: 'COMPLETED' as any,
-                      description: `Earnings for ride ${payment.rideId}`,
-                    },
-                  });
-                }
-
                 this.logger.log(
-                  `Post-ride payment: credited driver ${currentRide.riderId} ₦${earning} for ride ${payment.rideId}`,
+                  `Post-ride payment: recorded earnings for driver ${currentRide.riderId} ₦${earning} for ride ${payment.rideId} via Ledger`,
                 );
               }
 
@@ -334,7 +316,7 @@ export class PaymentStatusService {
             } else if (currentRide?.riderId) {
               // Catch-all for other statuses with a driver
               const ride = payment.ride;
-              const platformFeeRate = 0.2;
+              // platformFeeRate is dynamically fetched outside the transaction
 
               this.logger.log(
                 `Recording ledger for Ride ${payment.rideId} (Status: COMPLETED)`,

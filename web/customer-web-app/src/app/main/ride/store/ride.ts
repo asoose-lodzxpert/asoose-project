@@ -70,12 +70,13 @@ interface RideState {
   isConfiguring: "pickup" | "dropoff" | null;
   startOtp: string | null;
 
-  // --- Scheduled Ride & UI State ---
   activeTab: ActiveTab;
   bookingStage: BookingStage;
   scheduledAt: string | null;
   scheduledVehicleType: string | null;
   scheduledFare: number | null;
+  passengerName: string | null;
+  passengerPhone: string | null;
 
   // --- Setters ---
   setRideId: (id: string | null) => void;
@@ -120,6 +121,8 @@ interface RideState {
   setBookingStage: (stage: BookingStage) => void;
   setScheduledAt: (at: string | null) => void;
   setScheduledVehicle: (type: string, fare: number) => void;
+  setPassengerName: (name: string | null) => void;
+  setPassengerPhone: (phone: string | null) => void;
 
   // --- Clearing Actions ---
   clearPickupLocation: () => void;
@@ -171,6 +174,8 @@ const initialState = {
   scheduledAt: null,
   scheduledVehicleType: null,
   scheduledFare: null,
+  passengerName: null,
+  passengerPhone: null,
 };
 
 export const useRideStore = create<RideState>()(
@@ -214,6 +219,8 @@ export const useRideStore = create<RideState>()(
       setBookingStage: (stage) => set({ bookingStage: stage }),
       setScheduledAt: (at) => set({ scheduledAt: at }),
       setScheduledVehicle: (type, fare) => set({ scheduledVehicleType: type, scheduledFare: fare }),
+      setPassengerName: (name) => set({ passengerName: name }),
+      setPassengerPhone: (phone) => set({ passengerPhone: phone }),
 
       // --- Clear Actions ---
       clearPickupLocation: () =>
@@ -252,6 +259,8 @@ export const useRideStore = create<RideState>()(
           paymentConfirmed: false,
           lockedEstimate: null,
           rideId: null,
+          passengerName: null,
+          passengerPhone: null,
         }),
 
       resetRide: () =>
@@ -293,6 +302,8 @@ export const useRideStore = create<RideState>()(
         scheduledAt: state.scheduledAt,
         scheduledVehicleType: state.scheduledVehicleType,
         scheduledFare: state.scheduledFare,
+        passengerName: state.passengerName,
+        passengerPhone: state.passengerPhone,
       }),
     },
   ),

@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Pressable,
+  TextInput,
 } from "react-native";
 import { WhoIsRidingModalProps } from "./WhoIsRidingModal.types";
 
@@ -17,12 +18,14 @@ export default function WhoIsRidingModal({
   onSelectOther,
 }: WhoIsRidingModalProps) {
   const [selected, setSelected] = useState<"self" | "other">("self");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
 
   const handleContinue = () => {
     if (selected === "self") {
       onConfirmSelf();
     } else {
-      onSelectOther();
+      onSelectOther(name, phone);
     }
   };
 
@@ -57,7 +60,7 @@ export default function WhoIsRidingModal({
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.option, selected === "other" && styles.optionSelected]}
+          style={[styles.option, selected === "other" && styles.optionSelected, selected === "other" && { paddingBottom: 12 }]}
           onPress={() => setSelected("other")}
           accessibilityRole="radio"
           accessibilityState={{ checked: selected === "other" }}
@@ -65,9 +68,30 @@ export default function WhoIsRidingModal({
           <View style={[styles.radio, selected === "other" && styles.radioSelected]}>
             {selected === "other" && <View style={styles.radioDot} />}
           </View>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.optionLabel}>For Someone Else</Text>
             <Text style={styles.optionDesc}>Book a ride for another person</Text>
+            
+            {selected === "other" && (
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Passenger Name"
+                  placeholderTextColor="#9CA3AF"
+                  value={name}
+                  onChangeText={setName}
+                  autoCorrect={false}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Passenger Phone"
+                  placeholderTextColor="#9CA3AF"
+                  value={phone}
+                  onChangeText={setPhone}
+                  keyboardType="phone-pad"
+                />
+              </View>
+            )}
           </View>
         </TouchableOpacity>
 
@@ -159,5 +183,18 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "700",
+  },
+  inputContainer: {
+    marginTop: 12,
+    gap: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 14,
+    backgroundColor: "#fff",
+    color: "#111827",
   },
 });

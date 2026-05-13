@@ -410,7 +410,7 @@ export class TransactionLedgerService {
     },
     tx?: Prisma.TransactionClient,
   ) {
-    const riderEarning = ride.totalFare;
+    const riderEarning = ride.driverFee;
 
     return this.withTransaction(async (client) => {
       const rider = await client.rider.findUnique({

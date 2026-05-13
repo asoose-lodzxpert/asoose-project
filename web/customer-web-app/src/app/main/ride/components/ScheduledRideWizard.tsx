@@ -12,7 +12,9 @@ import {
   Navigation2,
   Wallet,
   AlertCircle,
-  Loader2
+  Loader2,
+  User,
+  Users
 } from 'lucide-react';
 import { useRideStore, BookingStage } from '../store/ride';
 import { LocationAutocompleteInput } from './LocationAutocompleteInput';
@@ -42,8 +44,14 @@ export function ScheduledRideWizard() {
     setScheduledAt,
     setScheduledVehicle,
     setActiveTab,
-    resetRide
+    resetRide,
+    passengerName,
+    passengerPhone,
+    setPassengerName,
+    setPassengerPhone
   } = useRideStore();
+  
+  const [bookingForOther, setBookingForOther] = useState(false);
 
   const [estimatedFare, setEstimatedFare] = useState<number | null>(null);
   const [fareBreakdown, setFareBreakdown] = useState<any>(null);
@@ -127,6 +135,8 @@ export function ScheduledRideWizard() {
         totalFare: estimatedFare || undefined,
         distanceKm: fareBreakdown?.distance,
         durationMin: fareBreakdown?.duration,
+        ...(bookingForOther && passengerName ? { passengerName } : {}),
+        ...(bookingForOther && passengerPhone ? { passengerPhone } : {}),
       }, accessToken, idempotencyKey);
 
       setBookingStage('SUCCESS');
@@ -256,6 +266,49 @@ export function ScheduledRideWizard() {
                   <p className="text-xl font-black">₦{scheduledFare?.toLocaleString()}</p>
                 </div>
                 <Wallet size={24} className="opacity-20" />
+              </div>
+
+              {/* Who Is Riding Toggle */}
+              <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 rounded-xl p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    {bookingForOther ? <Users size={16} className="text-zinc-500" /> : <User size={16} className="text-zinc-500" />}
+                    <span className="text-xs font-bold dark:text-white">Booking for someone else?</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={bookingForOther}
+                      onChange={(e) => {
+                        setBookingForOther(e.target.checked);
+                        if (!e.target.checked) {
+                          setPassengerName(null);
+                          setPassengerPhone(null);
+                        }
+                      }}
+                    />
+                    <div className="w-9 h-5 bg-zinc-200 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-zinc-600 peer-checked:bg-yellow-500"></div>
+                  </label>
+                </div>
+                {bookingForOther && (
+                  <div className="space-y-2 mt-3 pt-3 border-t border-zinc-100 dark:border-white/5">
+                    <input
+                      type="text"
+                      placeholder="Passenger Name"
+                      className="w-full px-3 py-2 text-xs border border-zinc-200 dark:border-white/10 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 focus:outline-none focus:ring-1 focus:ring-yellow-500 dark:text-white"
+                      value={passengerName || ""}
+                      onChange={(e) => setPassengerName(e.target.value)}
+                    />
+                    <input
+                      type="tel"
+                      placeholder="Passenger Phone"
+                      className="w-full px-3 py-2 text-xs border border-zinc-200 dark:border-white/10 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 focus:outline-none focus:ring-1 focus:ring-yellow-500 dark:text-white"
+                      value={passengerPhone || ""}
+                      onChange={(e) => setPassengerPhone(e.target.value)}
+                    />
+                  </div>
+                )}
               </div>
 
               {error && (
