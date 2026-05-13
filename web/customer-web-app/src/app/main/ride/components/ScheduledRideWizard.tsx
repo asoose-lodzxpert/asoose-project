@@ -292,18 +292,18 @@ export function ScheduledRideWizard() {
                   </label>
                 </div>
                 {bookingForOther && (
-                  <div className="space-y-2 mt-3 pt-3 border-t border-zinc-100 dark:border-white/5">
+                  <div className="space-y-4 mt-4 pt-4 border-t border-zinc-100 dark:border-white/5">
                     <input
                       type="text"
                       placeholder="Passenger Name"
-                      className="w-full px-3 py-2 text-xs border border-zinc-200 dark:border-white/10 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 focus:outline-none focus:ring-1 focus:ring-yellow-500 dark:text-white"
+                      className="w-full px-4 py-3 text-sm border border-zinc-200 dark:border-white/10 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 focus:outline-none focus:ring-1 focus:ring-yellow-500 dark:text-white"
                       value={passengerName || ""}
                       onChange={(e) => setPassengerName(e.target.value)}
                     />
                     <input
                       type="tel"
                       placeholder="Passenger Phone"
-                      className="w-full px-3 py-2 text-xs border border-zinc-200 dark:border-white/10 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 focus:outline-none focus:ring-1 focus:ring-yellow-500 dark:text-white"
+                      className="w-full px-4 py-3 text-sm border border-zinc-200 dark:border-white/10 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 focus:outline-none focus:ring-1 focus:ring-yellow-500 dark:text-white"
                       value={passengerPhone || ""}
                       onChange={(e) => setPassengerPhone(e.target.value)}
                     />
