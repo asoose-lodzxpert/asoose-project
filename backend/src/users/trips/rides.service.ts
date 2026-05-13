@@ -7,6 +7,8 @@ import {
   ForbiddenException,
   InternalServerErrorException,
 } from '@nestjs/common';
+import { Observable, interval, from } from 'rxjs';
+import { switchMap, map, distinctUntilChanged } from 'rxjs/operators';
 import {
   RideStatus,
   Prisma,
@@ -33,6 +35,7 @@ import { randomUUID } from 'crypto';
 import { rideToJobSummary } from '../../riders/jobs/job.dto';
 import { DriverStateService } from '../../matching/driver-state/driver-state.service';
 import { PaymentInitService } from '../../payment/payment-init.service';
+import { InitiatePaymentDto } from '../../payment/dto/payment.dto';
 import {
   PaymentGateway,
   PaymentMethod as GatewayPaymentMethod,
@@ -1151,6 +1154,86 @@ export class RidesService {
       },
     });
   }
+
+  async getPublicTrackingData(rideId: string, otp: string) {
+    const ride = await this.prisma.ride.findUnique({
+      where: { id: rideId },
+      include: {
+        pickupAddress: true,
+        dropoffAddress: true,
+        payment: true,
+        rider: {
+          include: { vehicle: true },
+        },
+      },
+    });
+
+    if (!ride) throw new NotFoundException('Ride not found');
+    if (ride.startOtp !== otp) throw new ForbiddenException('Invalid ride code');
+
+    let driverLocation: { lat: number; lng: number } | null = null;
+    if (ride.riderId) {
+      const state = await this.driverStateService.getState(ride.riderId);
+      if (state && state.location) {
+        driverLocation = state.location;
+      }
+    }
+
+    return {
+      id: ride.id,
+      status: ride.status,
+      pickup: ride.pickupAddress,
+      dropoff: ride.dropoffAddress,
+      driver: ride.rider
+        ? {
+            name: ride.rider.name,
+            phone: ride.rider.phone,
+            rating: ride.rider.rating,
+            vehicle: ride.rider.vehicle,
+          }
+        : null,
+      driverLocation,
+      fare: ride.totalFare || 0,
+      distance: ride.distanceKm || 0,
+      duration: ride.durationMin || 0,
+      paymentStatus: ride.payment?.status || 'PENDING',
+    };
+  }
+
+  async guestConfirmRide(rideId: string, otp: string, paymentMethod: string, callbackUrl?: string) {
+    const ride = await this.prisma.ride.findUnique({
+      where: { id: rideId },
+      include: { customer: true, payment: true },
+    });
+
+    if (!ride) throw new NotFoundException('Ride not found');
+    if (ride.startOtp !== otp) throw new ForbiddenException('Invalid ride code');
+
+    if (ride.payment?.status === PaymentStatus.COMPLETED) {
+      return { status: 'ALREADY_PAID', rideId };
+    }
+
+    // Direct paystack initialization for the guest using the customer's email
+    const dto: InitiatePaymentDto = {
+      type: PaymentType.RIDE,
+      rideId: ride.id,
+      amount: ride.totalFare || 0,
+      gateway: PaymentGateway.PAYSTACK,
+      method: paymentMethod as any,
+      email: ride.customer.email,
+      callbackUrl,
+    };
+    return this.paymentInitService.initiatePayment(dto, ride.customerId);
+  }
+
+  streamPublicTrackingData(rideId: string, otp: string): Observable<any> {
+    // Return an SSE stream that polls the driver location every 5 seconds
+    return interval(5000).pipe(
+      switchMap(() => from(this.getPublicTrackingData(rideId, otp))),
+      map((data) => ({ data })),
+    );
+  }
+
   async findIncomingRidesForDriver(driverId: string): Promise<any[]> {
     // This looks for rides where matching is in progress but this driver is targetable
     // or specifically locked for this driver.

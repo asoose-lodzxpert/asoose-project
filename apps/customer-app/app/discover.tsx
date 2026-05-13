@@ -6,7 +6,7 @@ import { useHomeContext } from "@/context/HomeContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import type { StoreFilterSlug, Vendor } from "@/types/home";
 import { RelativePathString, useRouter } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -14,10 +14,12 @@ import {
   Image,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -173,6 +175,50 @@ export default function DiscoverScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState("");
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [isFocused, setIsFocused] = useState(false);
+
+  // Load recent searches on mount
+  useEffect(() => {
+    loadRecentSearches();
+  }, []);
+
+  const loadRecentSearches = async () => {
+    try {
+      const saved = await AsyncStorage.getItem("recent_store_searches");
+      if (saved) {
+        setRecentSearches(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error("Failed to load recent searches", e);
+    }
+  };
+
+  const saveRecentSearch = async (term: string) => {
+    const trimmed = term.trim();
+    if (!trimmed) return;
+    
+    const updated = [
+      trimmed,
+      ...recentSearches.filter(s => s.toLowerCase() !== trimmed.toLowerCase())
+    ].slice(0, 10);
+    
+    setRecentSearches(updated);
+    try {
+      await AsyncStorage.setItem("recent_store_searches", JSON.stringify(updated));
+    } catch (e) {
+      console.error("Failed to save recent search", e);
+    }
+  };
+
+  const clearRecentSearches = async () => {
+    setRecentSearches([]);
+    try {
+      await AsyncStorage.removeItem("recent_store_searches");
+    } catch (e) {
+      console.error("Failed to clear recent searches", e);
+    }
+  };
 
   // Theme colors
   const primary = useThemeColor({}, "brandPrimary");
@@ -278,6 +324,9 @@ export default function DiscoverScreen() {
           <TextInput
             value={query}
             onChangeText={setQuery}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            onSubmitEditing={() => saveRecentSearch(query)}
             placeholder="Search stores or cuisine…"
             placeholderTextColor={mutedColor}
             style={[styles.searchInput, { color: text }]}
@@ -294,6 +343,55 @@ export default function DiscoverScreen() {
             </Pressable>
           )}
         </View>
+
+        {/* Recent Searches Pills */}
+        {isFocused && recentSearches.length > 0 && (
+          <View style={styles.recentSearchesContainer}>
+            {(() => {
+              const suggestions = query.trim()
+                ? recentSearches.filter(s => s.toLowerCase().includes(query.toLowerCase())).slice(0, 10)
+                : recentSearches.slice(0, 10);
+              
+              if (suggestions.length === 0) return null;
+
+              return (
+                <>
+                  <View style={styles.recentHeader}>
+                    <ThemedText style={[styles.recentTitle, { color: mutedColor }]}>
+                      {query.trim() ? "SUGGESTIONS" : "RECENT SEARCHES"}
+                    </ThemedText>
+                    <Pressable onPress={clearRecentSearches}>
+                      <ThemedText style={[styles.clearBtn, { color: primary }]}>
+                        Clear
+                      </ThemedText>
+                    </Pressable>
+                  </View>
+                  <ScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    contentContainerStyle={styles.recentPills}
+                  >
+                    {suggestions.map((item, idx) => (
+                      <Pressable
+                        key={idx}
+                        onPress={() => {
+                          setQuery(item);
+                          saveRecentSearch(item);
+                        }}
+                        style={[styles.recentPill, { backgroundColor: subtle, borderColor: border }]}
+                      >
+                        <ThemedText style={[styles.recentPillText, { color: text }]}>
+                          {item}
+                        </ThemedText>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </>
+              );
+            })()}
+          </View>
+        )}
 
         {/* Category pills */}
         <CategoryPillFilter
@@ -450,6 +548,39 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   searchInput: { flex: 1, fontSize: 14, padding: 0 },
+
+  /* Recent Searches */
+  recentSearchesContainer: {
+    marginBottom: 12,
+  },
+  recentHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  recentTitle: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  clearBtn: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  recentPills: {
+    gap: 8,
+  },
+  recentPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  recentPillText: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
 
   /* Grid */
   listContent: { paddingHorizontal: H_PAD, paddingTop: 16 },

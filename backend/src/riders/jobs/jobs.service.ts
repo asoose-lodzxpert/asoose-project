@@ -432,6 +432,21 @@ export class JobsService {
           this.logger.error('Failed to send acceptJob push to customer', e);
         }
 
+        // ── SMS for Guest Passenger ──
+        if (updatedRide.passengerPhone) {
+          try {
+            this.eventEmitter.emit('notification.send.sms', {
+              phone: updatedRide.passengerPhone,
+              message: `Your ride is on the way! Driver: ${updatedRide.rider.name} (${updatedRide.rider.vehicle?.plateNumber || 'Car'}). Track it live: https://asoose.com/track/${updatedRide.id}`,
+            });
+            this.logger.debug(
+              `Enqueued SMS to guest passenger ${updatedRide.passengerPhone} for ride ${jobId}`,
+            );
+          } catch (e) {
+            this.logger.error('Failed to enqueue SMS to guest passenger', e);
+          }
+        }
+
         // ── Admin Notification ──
         try {
           await this.notificationsService.createForAdmin({
