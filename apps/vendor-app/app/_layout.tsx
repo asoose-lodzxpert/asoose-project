@@ -12,6 +12,7 @@ import { NotificationProvider } from "@/context/NotificationContext";
 import { NotificationPreferencesProvider } from "@/context/NotificationPreferencesContext";
 import { BalanceProvider } from "@/context/BalanceContext";
 import { loadServiceBounds } from "@/constants/service-bounds";
+import { AppUpdateGuard } from "@/components/common/AppUpdateGuard";
 
 /**
  * RootNavigator now ALWAYS renders all routes.
@@ -62,6 +63,7 @@ export default function RootLayout() {
               <NotificationProvider>
                 <NotificationPreferencesProvider>
                   <RootNavigator />
+                  <AppUpdateGuard />
                   <Toast config={toastConfig} />
                 </NotificationPreferencesProvider>
               </NotificationProvider>

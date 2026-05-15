@@ -151,4 +151,56 @@ export class AppController {
 
     return { isEnabled };
   }
+
+  @ApiOperation({ summary: 'Get current app versions and release dates (public)' })
+  @Public()
+  @Get('settings/app-versions')
+  async getAppVersions() {
+    const cacheKey = 'system:app_versions';
+
+    // 1. Try Cache
+    const cachedValue = await this.redisClient.get(cacheKey);
+    if (cachedValue !== null) {
+      return JSON.parse(cachedValue);
+    }
+
+    // 2. Fetch all version settings
+    const settings = await this.prisma.systemSetting.findMany({
+      where: {
+        key: {
+          in: [
+            'customer_app_version',
+            'customer_app_release_date',
+            'rider_app_version',
+            'rider_app_release_date',
+            'vendor_app_version',
+            'vendor_app_release_date',
+          ],
+        },
+      },
+    });
+
+    // 3. Transform to easy-to-consume object
+    const versions = {
+      customer: {
+        version: settings.find((s) => s.key === 'customer_app_version')?.value || '1.0.0',
+        releaseDate: settings.find((s) => s.key === 'customer_app_release_date')?.value || new Date().toISOString(),
+      },
+      rider: {
+        version: settings.find((s) => s.key === 'rider_app_version')?.value || '1.0.0',
+        releaseDate: settings.find((s) => s.key === 'rider_app_release_date')?.value || new Date().toISOString(),
+      },
+      vendor: {
+        version: settings.find((s) => s.key === 'vendor_app_version')?.value || '1.0.0',
+        releaseDate: settings.find((s) => s.key === 'vendor_app_release_date')?.value || new Date().toISOString(),
+      },
+    };
+
+    // 4. Cache (1 hour)
+    await this.redisClient.set(cacheKey, JSON.stringify(versions), {
+      EX: 3600,
+    });
+
+    return versions;
+  }
 }
