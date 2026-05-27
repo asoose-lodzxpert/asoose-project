@@ -36,7 +36,7 @@ export class FareService {
   ];
   private readonly AIRPORT_RADIUS_KM = 3.0; // 3km radius
 
-  private isAirportDropoff(lat: number, lng: number): boolean {
+  private isAirportLocation(lat: number, lng: number): boolean {
     for (const airport of this.AIRPORT_LOCATIONS) {
       const distance = this.geoService.calculateDistance(lat, lng, airport.lat, airport.lng);
       if (distance <= this.AIRPORT_RADIUS_KM) {
@@ -128,13 +128,13 @@ export class FareService {
     const hours = lagosTime.getHours();
     const isNightRate = hours >= 22 || hours < 5;
 
-    const isAirportDrop = this.isAirportDropoff(lat2, lng2);
+    const isAirportTrip = this.isAirportLocation(lat1, lng1) || this.isAirportLocation(lat2, lng2);
 
     let economyPrice = 0;
     let baseBreakdown = 0;
 
     // 3. Apply Tiered Pricing Model
-    if (isAirportDrop) {
+    if (isAirportTrip) {
       baseBreakdown = airportBase10km;
       if (distanceKm <= 10) {
         economyPrice = airportBase10km;

@@ -11,12 +11,12 @@ import {
   Pressable,
   StyleSheet,
   View,
-  KeyboardAvoidingView,
   ScrollView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { ThemedInput } from "@/components/ThemedInput";
+import { RelativePathString } from "expo-router";
 
 export default function ConfirmJobScreen() {
   const [cancelVisible, setCancelVisible] = useState(false);
@@ -50,10 +50,7 @@ export default function ConfirmJobScreen() {
 
   return (
     <>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={[styles.wrapper, { backgroundColor: background }]}
-      >
+      <View style={[styles.wrapper, { backgroundColor: background }]}>
         <ScrollView
           contentContainerStyle={[
             styles.container,
@@ -120,7 +117,7 @@ export default function ConfirmJobScreen() {
                         style={styles.phoneRow}
                         onPress={() =>
                           router.push({
-                            pathname: "/chat/[id]",
+                            pathname: "/chat/[id]" as RelativePathString,
                             params: { 
                               id: activeJob.customerId || activeJob.senderId,
                               name: activeJob.recipientName || activeJob.customerName,
@@ -130,7 +127,7 @@ export default function ConfirmJobScreen() {
                           })
                         }
                       >
-                        <IconSymbol name="bubble.left" size={13} color={danger} />
+                        <IconSymbol name="chat" size={13} color={danger} />
                         <ThemedText style={[styles.phoneText, { color: danger }]}>
                           Chat
                         </ThemedText>
@@ -204,7 +201,7 @@ export default function ConfirmJobScreen() {
             </Pressable>
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </View>
 
       <CancelJobModal
         visible={cancelVisible}

@@ -88,4 +88,12 @@ export class RidesController {
     const adminId = req.user.id || req.user.sub;
     return this.ridesService.unassignDriver(id, adminId);
   }
+
+  @ApiOperation({ summary: 'Force-mark a ride payment as completed' })
+  @Patch(':id/force-payment')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
+  async forcePayment(@Param('id') id: string, @Req() req: any) {
+    const adminId = req.user.id || req.user.sub;
+    return this.ridesService.forcePayment(id, adminId);
+  }
 }

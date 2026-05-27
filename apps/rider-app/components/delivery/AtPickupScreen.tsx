@@ -6,6 +6,9 @@ import {
   StyleSheet,
   TextInput,
   View,
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -16,6 +19,7 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { resolveAddress } from "@/utils/address";
 import CancelJobModal from "@/components/delivery/CancelJobModal";
 import JobItemDetailsModal from "./JobItemDetailsModal";
+import { RelativePathString } from "expo-router";
 
 const RIDE_OTP_LENGTH = 6;
 
@@ -84,193 +88,199 @@ export default function AtPickupScreen() {
     <View
       style={[
         styles.wrapper,
-        { backgroundColor: colors.bg, paddingBottom: bottom + 16 },
+        { backgroundColor: colors.bg },
       ]}
     >
-      <View style={styles.header}>
-        <View style={styles.statusGroup}>
-          <View style={[styles.dot, { backgroundColor: colors.success }]} />
-          <ThemedText style={styles.statusText}>
-            {isMultiStop
-              ? `Stop ${currentStopIndex + 1}/${activeJob.stops?.length} • #${deliveryId}`
-              : `At Pickup • #${deliveryId}`}
-          </ThemedText>
-        </View>
-        <ThemedText style={[styles.instruction, { color: colors.muted }]}>
-          {isRide ? "Ready for passenger" : "Collect order"}
-        </ThemedText>
-      </View>
-
-      <View
-        style={[
-          styles.card,
-          { backgroundColor: colors.card, borderColor: colors.border },
-        ]}
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: bottom + 16, gap: 16 }}
+        bounces={false}
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.cardContent}>
-          <ThemedText style={[styles.label, { color: colors.muted }]}>
-            {isRide ? "PICKUP LOCATION" : "VENDOR"}
-          </ThemedText>
-          <ThemedText style={styles.name}>{storeName}</ThemedText>
-          <ThemedText
-            numberOfLines={1}
-            style={[styles.address, { color: colors.muted }]}
-          >
-            {pickup} -{" "}
-            {activeJob.pickupContactPhone ||
-              activeJob.customerPhone ||
-              activeJob.pickupAddress?.phone}{" "}
-            - Tap phone icon to call
+        <View style={styles.header}>
+          <View style={styles.statusGroup}>
+            <View style={[styles.dot, { backgroundColor: colors.success }]} />
+            <ThemedText style={styles.statusText}>
+              {isMultiStop
+                ? `Stop ${currentStopIndex + 1}/${activeJob.stops?.length} • #${deliveryId}`
+                : `At Pickup • #${deliveryId}`}
+            </ThemedText>
+          </View>
+          <ThemedText style={[styles.instruction, { color: colors.muted }]}>
+            {isRide ? "Ready for passenger" : "Collect order"}
           </ThemedText>
         </View>
 
-        {(activeJob.pickupContactPhone ||
-          activeJob.customerPhone ||
-          activeJob.pickupAddress?.phone) && (
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Pressable
-              onPress={() =>
-                router.push({
-                  pathname: "/chat/[id]",
-                  params: { 
-                    id: activeJob.customerId || activeJob.senderId,
-                    name: storeName,
-                    orderId: activeJob.jobType === 'delivery' ? activeJob.id : undefined,
-                    rideId: activeJob.jobType === 'ride' ? activeJob.id : undefined
-                  }
-                })
-              }
-              style={styles.callBtn}
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
+          <View style={styles.cardContent}>
+            <ThemedText style={[styles.label, { color: colors.muted }]}>
+              {isRide ? "PICKUP LOCATION" : "VENDOR"}
+            </ThemedText>
+            <ThemedText style={styles.name}>{storeName}</ThemedText>
+            <ThemedText
+              numberOfLines={1}
+              style={[styles.address, { color: colors.muted }]}
             >
-              <IconSymbol name="bubble.left" size={18} color={colors.primary} />
-            </Pressable>
-            <Pressable
-              onPress={() =>
-                Linking.openURL(
-                  `tel:${activeJob.pickupContactPhone || activeJob.customerPhone || activeJob.pickupAddress?.phone}`,
-                )
-              }
-              style={styles.callBtn}
+              {pickup} -{" "}
+              {activeJob.pickupContactPhone ||
+                activeJob.customerPhone ||
+                activeJob.pickupAddress?.phone}{" "}
+              - Tap phone icon to call
+            </ThemedText>
+          </View>
+
+          {(activeJob.pickupContactPhone ||
+            activeJob.customerPhone ||
+            activeJob.pickupAddress?.phone) && (
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: "/chat/[id]" as RelativePathString,
+                    params: { 
+                      id: activeJob.customerId || activeJob.senderId,
+                      name: storeName,
+                      orderId: activeJob.jobType === 'delivery' ? activeJob.id : undefined,
+                      rideId: activeJob.jobType === 'ride' ? activeJob.id : undefined
+                    }
+                  })
+                }
+                style={styles.callBtn}
+              >
+                <IconSymbol name="chat" size={18} color={colors.primary} />
+              </Pressable>
+              <Pressable
+                onPress={() =>
+                  Linking.openURL(
+                    `tel:${activeJob.pickupContactPhone || activeJob.customerPhone || activeJob.pickupAddress?.phone}`,
+                  )
+                }
+                style={styles.callBtn}
+              >
+                <IconSymbol name="phone" size={18} color={colors.primary} />
+              </Pressable>
+            </View>
+          )}
+        </View>
+
+        {!isRide && (
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 12 }]}>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+               <IconSymbol name="shippingbox" size={16} color={colors.muted} />
+               <ThemedText style={{ fontSize: 13, color: colors.text, flex: 1 }} numberOfLines={3}>
+                 {activeJob.orderItems?.length
+                   ? activeJob.orderItems.join(", ")
+                   : activeJob.packageDetails || "Package pickup"}
+               </ThemedText>
+            </View>
+            <Pressable 
+              style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.primary + '10' }}
+              onPress={() => setDetailsVisible(true)}
             >
-              <IconSymbol name="phone" size={18} color={colors.primary} />
+              <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Details</ThemedText>
             </Pressable>
           </View>
         )}
-      </View>
 
-      {!isRide && (
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 12 }]}>
-          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-             <IconSymbol name="shippingbox" size={16} color={colors.muted} />
-             <ThemedText style={{ fontSize: 13, color: colors.text, flex: 1 }} numberOfLines={3}>
-               {activeJob.orderItems?.length
-                 ? activeJob.orderItems.join(", ")
-                 : activeJob.packageDetails || "Package pickup"}
-             </ThemedText>
-          </View>
-          <Pressable 
-            style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.primary + '10' }}
-            onPress={() => setDetailsVisible(true)}
-          >
-            <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Details</ThemedText>
-          </Pressable>
-        </View>
-      )}
+        <JobItemDetailsModal
+          visible={detailsVisible}
+          onClose={() => setDetailsVisible(false)}
+          items={activeJob.itemDetails}
+          packageDetails={activeJob.packageDetails}
+        />
 
-      <JobItemDetailsModal
-        visible={detailsVisible}
-        onClose={() => setDetailsVisible(false)}
-        items={activeJob.itemDetails}
-        packageDetails={activeJob.packageDetails}
-      />
-
-      {/* OTP entry — rides only */}
-      {isRide && (
-        <View
-          style={[
-            styles.otpCard,
-            {
-              backgroundColor: colors.card,
-              borderColor: otpError ? colors.danger : colors.primary + "60",
-            },
-          ]}
-        >
-          <View style={styles.otpHeader}>
-            <IconSymbol name="lock.fill" size={14} color={colors.primary} />
-            <ThemedText style={[styles.otpLabel, { color: colors.muted }]}>
-              PASSENGER TRIP CODE
-            </ThemedText>
-          </View>
-          <TextInput
+        {/* OTP entry — rides only */}
+        {isRide && (
+          <View
             style={[
-              styles.otpInput,
+              styles.otpCard,
               {
-                color: colors.text,
-                borderColor: otpError ? colors.danger : colors.border,
+                backgroundColor: colors.card,
+                borderColor: otpError ? colors.danger : colors.primary + "60",
               },
             ]}
-            placeholder="Ask passenger for their code"
-            placeholderTextColor={colors.muted}
-            value={otp}
-            onChangeText={(v) => {
-              setOtp(v.replace(/[^0-9]/g, ""));
-              if (otpError) setOtpError(null);
-            }}
-            keyboardType="number-pad"
-            maxLength={RIDE_OTP_LENGTH}
-            autoCapitalize="none"
-          />
-          {otpError ? (
-            <ThemedText style={[styles.otpError, { color: colors.danger }]}>
-              {otpError}
+          >
+            <View style={styles.otpHeader}>
+              <IconSymbol name="lock.fill" size={14} color={colors.primary} />
+              <ThemedText style={[styles.otpLabel, { color: colors.muted }]}>
+                PASSENGER TRIP CODE
+              </ThemedText>
+            </View>
+            <TextInput
+              style={[
+                styles.otpInput,
+                {
+                  color: colors.text,
+                  borderColor: otpError ? colors.danger : colors.border,
+                },
+              ]}
+              placeholder="Ask passenger for their code"
+              placeholderTextColor={colors.muted}
+              value={otp}
+              onChangeText={(v) => {
+                setOtp(v.replace(/[^0-9]/g, ""));
+                if (otpError) setOtpError(null);
+              }}
+              keyboardType="number-pad"
+              maxLength={RIDE_OTP_LENGTH}
+              autoCapitalize="none"
+            />
+            {otpError ? (
+              <ThemedText style={[styles.otpError, { color: colors.danger }]}>
+                {otpError}
+              </ThemedText>
+            ) : (
+              <ThemedText style={[styles.otpHint, { color: colors.muted }]}>
+                The passenger sees this code on their screen.
+              </ThemedText>
+            )}
+          </View>
+        )}
+
+        <View style={styles.footer}>
+          <Pressable
+            onPress={handleConfirm}
+            disabled={!canConfirm || loading}
+            style={({ pressed }) => [
+              styles.mainBtn,
+              {
+                backgroundColor: colors.primary,
+                opacity: !canConfirm || loading ? 0.5 : pressed ? 0.9 : 1,
+              },
+            ]}
+          >
+            {loading ? (
+              <ActivityIndicator color={colors.onPrimary} />
+            ) : (
+              <ThemedText style={[styles.btnText, { color: colors.onPrimary }]}>
+                {btnLabel.toUpperCase()}
+              </ThemedText>
+            )}
+          </Pressable>
+
+          <Pressable
+            onPress={() => setCancelVisible(true)}
+            style={styles.cancelBtn}
+          >
+            <ThemedText style={[styles.cancelText, { color: colors.danger }]}>
+              Cancel Job
             </ThemedText>
-          ) : (
-            <ThemedText style={[styles.otpHint, { color: colors.muted }]}>
-              The passenger sees this code on their screen.
-            </ThemedText>
-          )}
+          </Pressable>
         </View>
-      )}
 
-      <View style={styles.footer}>
-        <Pressable
-          onPress={handleConfirm}
-          disabled={!canConfirm || loading}
-          style={({ pressed }) => [
-            styles.mainBtn,
-            {
-              backgroundColor: colors.primary,
-              opacity: !canConfirm || loading ? 0.5 : pressed ? 0.9 : 1,
-            },
-          ]}
-        >
-          {loading ? (
-            <ActivityIndicator color={colors.onPrimary} />
-          ) : (
-            <ThemedText style={[styles.btnText, { color: colors.onPrimary }]}>
-              {btnLabel.toUpperCase()}
-            </ThemedText>
-          )}
-        </Pressable>
-
-        <Pressable
-          onPress={() => setCancelVisible(true)}
-          style={styles.cancelBtn}
-        >
-          <ThemedText style={[styles.cancelText, { color: colors.danger }]}>
-            Cancel Job
-          </ThemedText>
-        </Pressable>
-      </View>
-
-      <CancelJobModal
-        visible={cancelVisible}
-        onClose={() => setCancelVisible(false)}
-        onConfirm={async (r) => {
-          await cancelJob(activeJob.id, activeJob.jobType, r);
-          setCancelVisible(false);
-        }}
-      />
+        <CancelJobModal
+          visible={cancelVisible}
+          onClose={() => setCancelVisible(false)}
+          onConfirm={async (r) => {
+            await cancelJob(activeJob.id, activeJob.jobType, r);
+            setCancelVisible(false);
+          }}
+        />
+      </ScrollView>
     </View>
   );
 }

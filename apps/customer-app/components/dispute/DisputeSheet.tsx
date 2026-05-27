@@ -119,7 +119,7 @@ export function DisputeSheet({
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: "images",
       quality: 0.7,
-      allowsEditing: true,
+      allowsEditing: false,
     });
     if (!res.canceled && res.assets[0]) {
       const newImages = [...images];

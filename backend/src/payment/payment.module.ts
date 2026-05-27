@@ -50,6 +50,7 @@ const webhookHandlers = [
   exports: [
     PaymentService,
     PaymentInitService,
+    PaymentStatusService,
     PaystackService,
     PaystackAccountService,
   ],

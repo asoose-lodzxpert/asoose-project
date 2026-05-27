@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ActivityIndicator, StyleSheet, View, KeyboardAvoidingView, Platform } from "react-native";
 
 import { ThemedView } from "@/components/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -31,12 +31,16 @@ export default function HomeScreen() {
       <FloatingHeader />
 
       {/* Bottom overlay pinned to bottom */}
-      <View style={styles.bottomOverlay}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.bottomOverlay}
+        pointerEvents="box-none"
+      >
         <BottomOverlay
           onAnimateToPickup={() => mapRef.current?.animateToPickup()}
           onAnimateToDropoff={() => mapRef.current?.animateToDropoff()}
         />
-      </View>
+      </KeyboardAvoidingView>
     </ThemedView>
   );
 }

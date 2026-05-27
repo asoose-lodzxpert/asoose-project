@@ -42,7 +42,7 @@ export const ImageUpload: React.FC<Props> = ({
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
-      allowsEditing: true,
+      allowsEditing: false,
       quality: 0.8,
       aspect: circular ? [1, 1] : [16, 9],
     });

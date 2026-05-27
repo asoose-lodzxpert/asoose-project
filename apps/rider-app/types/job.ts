@@ -29,6 +29,8 @@ export interface IncomingJobOffer {
   customerName: string;
   /** Direct customer contact phone (ride only) */
   customerPhone?: string;
+  customerId?: string;
+  senderId?: string;
 
   /** Phone of the pickup contact: vendor for deliveries, passenger for rides */
   pickupContactPhone?: string;
@@ -78,6 +80,8 @@ export interface CurrentJob {
 
   customerName: string;
   customerPhone?: string;
+  customerId?: string;
+  senderId?: string;
 
   /** Phone of the pickup contact: vendor for deliveries, passenger for rides */
   pickupContactPhone?: string;
