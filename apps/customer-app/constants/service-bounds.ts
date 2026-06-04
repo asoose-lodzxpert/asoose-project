@@ -141,7 +141,11 @@ export async function loadServiceBounds(): Promise<void> {
       if (Date.now() - timestamp < CACHE_TTL_MS) {
         applyPayload(payload);
         // Still refresh in background if older than 1 hour
-        if (Date.now() - timestamp > 60 * 60 * 1000) fetchAndCache();
+        if (Date.now() - timestamp > 60 * 60 * 1000) {
+          fetchAndCache().catch((err) =>
+            console.warn("Background service-bounds refresh failed:", err),
+          );
+        }
         return;
       }
     }

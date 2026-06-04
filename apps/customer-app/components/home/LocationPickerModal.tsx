@@ -165,7 +165,7 @@ export function LocationPickerModal() {
   );
 
   // Show current location row
-  const showCurrent = !searchQuery && !!location?.coords;
+  const showCurrent = !searchQuery;
   // No saved addresses in this modal, but you can add if needed
   const showEmpty = searchQuery && !searching && predictions.length === 0;
 
@@ -205,13 +205,17 @@ export function LocationPickerModal() {
           {showCurrent && (
             <Pressable
               style={[styles.locationItem, { backgroundColor: card }]}
-              onPress={() =>
-                confirmLocation({
-                  latitude: location.coords?.latitude ?? 0,
-                  longitude: location.coords?.longitude ?? 0,
-                  address: location.address || "Current Location",
-                })
-              }
+              onPress={async () => {
+                if (location?.coords) {
+                  confirmLocation({
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude,
+                    address: location.address || "Current Location",
+                  });
+                } else {
+                  await useCurrentLocation();
+                }
+              }}
             >
               <View
                 style={[
@@ -229,7 +233,7 @@ export function LocationPickerModal() {
                   style={[styles.itemSubtitle, { color: textSecondary }]}
                   numberOfLines={1}
                 >
-                  {location.address || "GPS Location"}
+                  {location?.address || "Tap to detect your location using GPS"}
                 </ThemedText>
               </View>
               <IconSymbol
