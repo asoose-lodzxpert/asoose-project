@@ -64,7 +64,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ["images"],
       quality: 0.7,
-      allowsEditing: true,
+      allowsEditing: false,
       aspect: [1, 1],
     });
 
@@ -78,7 +78,7 @@ export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       quality: 0.7,
-      allowsEditing: true,
+      allowsEditing: false,
       aspect: [1, 1],
     });
 

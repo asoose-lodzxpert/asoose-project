@@ -145,7 +145,7 @@ export default function AddEditItemScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       quality: 0.7,
-      allowsEditing: true,
+      allowsEditing: false,
       aspect: [1, 1],
     });
     return !result.canceled ? result.assets[0].uri : null;

@@ -85,7 +85,7 @@ export class RidesService {
     const estimates: Record<string, any> = {};
     const types = Object.values(VehicleType);
 
-    const distanceKm = this.geo.calculateDistance(
+    const distanceKm = await this.fareService.calculateRouteDistance(
       pickup.lat,
       pickup.lng,
       dropoff.lat,
@@ -295,7 +295,7 @@ export class RidesService {
           }
 
           // 🔐 Optional Anti-Tampering Check (Recommended)
-          const serverDistance = this.geo.calculateDistance(
+          const serverDistance = await this.fareService.calculateRouteDistance(
             pickupAddress.lat,
             pickupAddress.lng,
             dropoffAddress.lat,

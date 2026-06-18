@@ -250,7 +250,7 @@ export class DeliveriesService {
         // Calculate Distance & Fee securely from DB-verified addresses
         this.logger.log(`[requestDelivery] Calculating distance and fee`);
         const t3 = Date.now();
-        const distanceKm = this.fareService.calculateDistance(
+        const distanceKm = await this.fareService.calculateRouteDistance(
           pickupAddress.lat,
           pickupAddress.lng,
           dropoffAddress.lat,

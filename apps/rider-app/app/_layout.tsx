@@ -10,6 +10,7 @@ import { NotificationProvider } from "@/context/NotificationContext";
 import { NotificationPreferencesProvider } from "@/context/NotificationPreferencesContext";
 import { toastConfig } from "@/components/ThemedToast";
 import { loadServiceBounds } from "@/constants/service-bounds";
+import { AppUpdateGuard } from "@/components/common/AppUpdateGuard";
 
 function RootNavigator() {
   // Always render all routes - navigation logic is handled by index.tsx
@@ -48,6 +49,7 @@ export default function RootLayout() {
         <AuthProvider>
           <AuthDependentProviders>
             <RootNavigator />
+            <AppUpdateGuard />
             <Toast config={toastConfig} />
           </AuthDependentProviders>
         </AuthProvider>

@@ -3,6 +3,7 @@ import { RideFareDto } from './dto/ride-fare-dto';
 import { DeliveryFareDto } from './dto/delivery-fare-dto';
 import { GeoService } from '../matching/geo/geo.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { MapsService } from '../maps/maps.service';
 
 type DistanceResult = {
   distanceMeters: number;
@@ -18,6 +19,7 @@ export class FareService {
   constructor(
     private readonly geoService: GeoService,
     private readonly prisma: PrismaService,
+    private readonly mapsService: MapsService,
   ) { }
 
   // ── Hardcoded fallback constants (used when DB setting is not found) ─────────
@@ -36,10 +38,26 @@ export class FareService {
   ];
   private readonly AIRPORT_RADIUS_KM = 3.0; // 3km radius
 
-  private isAirportDropoff(lat: number, lng: number): boolean {
+  private isAirportLocation(lat: number, lng: number): boolean {
     for (const airport of this.AIRPORT_LOCATIONS) {
       const distance = this.geoService.calculateDistance(lat, lng, airport.lat, airport.lng);
       if (distance <= this.AIRPORT_RADIUS_KM) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Maimalari Barracks geofencing check
+  private readonly BARRACKS_LOCATIONS = [
+    { name: 'Maimalari Barracks', lat: 11.902845, lng: 13.108305 },
+  ];
+  private readonly BARRACKS_RADIUS_KM = 2.0; // 2km radius
+
+  private isBarracksLocation(lat: number, lng: number): boolean {
+    for (const barracks of this.BARRACKS_LOCATIONS) {
+      const distance = this.geoService.calculateDistance(lat, lng, barracks.lat, barracks.lng);
+      if (distance <= this.BARRACKS_RADIUS_KM) {
         return true;
       }
     }
@@ -108,7 +126,7 @@ export class FareService {
     const lng1 = Number(pickuplong);
     const lat2 = Number(dropofflat);
     const lng2 = Number(dropofflong);
-    const distanceKm = this.geoService.calculateDistance(
+    const distanceKm = await this.calculateRouteDistance(
       lat1,
       lng1,
       lat2,
@@ -128,13 +146,20 @@ export class FareService {
     const hours = lagosTime.getHours();
     const isNightRate = hours >= 22 || hours < 5;
 
-    const isAirportDrop = this.isAirportDropoff(lat2, lng2);
+    const isAirportTrip = this.isAirportLocation(lat1, lng1) || this.isAirportLocation(lat2, lng2);
+    const isPickupBarracks = this.isBarracksLocation(lat1, lng1);
+    const isDropoffBarracks = this.isBarracksLocation(lat2, lng2);
+    // Applies ONLY if trip starts/ends at barracks, NOT both (intra-barracks), and distance > 10km
+    const isBarracksTrip = (isPickupBarracks || isDropoffBarracks) && !(isPickupBarracks && isDropoffBarracks) && distanceKm > 10;
 
     let economyPrice = 0;
     let baseBreakdown = 0;
 
     // 3. Apply Tiered Pricing Model
-    if (isAirportDrop) {
+    if (isBarracksTrip) {
+      economyPrice = isNightRate ? 30000 : 20000;
+      baseBreakdown = economyPrice;
+    } else if (isAirportTrip) {
       baseBreakdown = airportBase10km;
       if (distanceKm <= 10) {
         economyPrice = airportBase10km;
@@ -166,13 +191,13 @@ export class FareService {
       }
     }
 
-    // 4. Optionally apply night surcharge
-    if (isNightRate) {
+    // 4. Optionally apply night surcharge (skipped for Barracks flat fee)
+    if (isNightRate && !isBarracksTrip) {
       economyPrice += Math.round(distanceKm * nightSurchargePerKm);
     }
 
-    // 5. Apply Class Multiplier
-    const businessPrice = Math.round(economyPrice * businessMultiplier);
+    // 5. Apply Class Multiplier (skipped for Barracks flat fee)
+    const businessPrice = isBarracksTrip ? economyPrice : Math.round(economyPrice * businessMultiplier);
     const price = dto.vehicleType === 'BUSINESS' ? businessPrice : economyPrice;
     
     // 6. Calculate Platform Fee
@@ -203,7 +228,7 @@ export class FareService {
     const lat2 = Number(dropofflat);
     const lng2 = Number(dropofflong);
 
-    const distanceKm = this.calculateDistance(lat1, lng1, lat2, lng2);
+    const distanceKm = await this.calculateRouteDistance(lat1, lng1, lat2, lng2);
     const price = await this.calcDeliveryFee(distanceKm);
 
     const distanceMeters = Math.round(distanceKm * 1000);
@@ -243,6 +268,30 @@ export class FareService {
     lng2: number,
   ): number {
     return this.geoService.calculateDistance(lat1, lng1, lat2, lng2);
+  }
+
+  /**
+   * Async driving route distance calculation using Google Maps.
+   * Fallback to Haversine if Google API fails.
+   */
+  async calculateRouteDistance(
+    lat1: number,
+    lng1: number,
+    lat2: number,
+    lng2: number,
+  ): Promise<number> {
+    try {
+      const distanceMeters = await this.mapsService.getDistance(
+        lat1.toString(),
+        lng1.toString(),
+        lat2.toString(),
+        lng2.toString(),
+      );
+      return distanceMeters / 1000;
+    } catch (err) {
+      this.logger.warn('Google Maps getDistance failed, falling back to Haversine', err);
+      return this.calculateDistance(lat1, lng1, lat2, lng2);
+    }
   }
 
   // ── Convenience accessors (kept for backward-compat; prefer calcDeliveryFee) ─

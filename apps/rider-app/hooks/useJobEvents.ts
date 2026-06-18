@@ -130,11 +130,11 @@ export function useJobEvents(options: UseJobEventsOptions) {
   }, [enabled]);
 
   // Expose joinOrderRoom for consumers
-  const joinOrderRoom = (orderId: string) => {
+  const joinOrderRoom = useCallback((orderId: string) => {
     if (serviceRef.current) {
       serviceRef.current.joinOrderRoom(orderId);
     }
-  };
+  }, []);
 
   return { disconnect, reconnect: connect, joinOrderRoom };
 }

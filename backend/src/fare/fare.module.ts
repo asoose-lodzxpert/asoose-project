@@ -6,8 +6,10 @@ import { GeoModule } from '../matching/geo/geo.module';
 import { AuthModule } from '../auth/auth.module';
 import { PrismaService } from '../prisma/prisma.service';
 
+import { MapsModule } from '../maps/maps.module';
+
 @Module({
-  imports: [GeoModule, AuthModule],
+  imports: [GeoModule, AuthModule, MapsModule],
   controllers: [FareConntroller],
   providers: [FareService, GeoService, PrismaService],
   exports: [FareService],

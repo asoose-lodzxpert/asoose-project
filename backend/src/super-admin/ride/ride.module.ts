@@ -5,9 +5,10 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { TransactionsModule } from '../transactions/transaction.module';
 import { TripsModule } from 'src/users/trips/trips.module';
 import { NotificationsModule } from 'src/notifications/notifications.module';
+import { PaymentModule } from 'src/payment/payment.module';
 
 @Module({
-  imports: [TransactionsModule, TripsModule, NotificationsModule],
+  imports: [TransactionsModule, TripsModule, NotificationsModule, PaymentModule],
   controllers: [RidesController],
   providers: [RidesService, PrismaService],
   exports: [RidesService],

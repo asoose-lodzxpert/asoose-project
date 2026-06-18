@@ -112,7 +112,29 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    useCurrentLocation().finally(() => setLoading(false));
+    const initializeLocation = async () => {
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status === "granted") {
+          const loc = await Location.getCurrentPositionAsync({});
+          const [resolved, resolvedCity] = await Promise.all([
+            resolveAddress(loc.coords),
+            resolveCity(loc.coords.latitude, loc.coords.longitude),
+          ]);
+          setLocation({
+            coords: loc.coords,
+            label: resolved?.label ?? "Current location",
+            address: resolved?.address ?? "Using GPS coordinates",
+          });
+          setCity(resolvedCity);
+        }
+      } catch (err) {
+        console.warn("Failed to retrieve initial location:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    initializeLocation();
   }, []);
 
   return (

@@ -11,6 +11,7 @@ import { TransactionLedgerService } from '../transactions/transaction-ledger.ser
 import { TripsService } from 'src/users/trips/trips.service';
 import { NotificationsGateway } from 'src/notifications/notifications.gateway';
 import { NotificationsService } from 'src/notifications/notifications.service';
+import { PaymentStatusService } from 'src/payment/payment-status.service';
 
 const rideListInclude = {
   include: {
@@ -57,6 +58,7 @@ export class RidesService {
     private tripsService: TripsService,
     private notificationsGateway: NotificationsGateway,
     private notificationsService: NotificationsService,
+    private paymentStatusService: PaymentStatusService,
   ) {}
 
   async findAll(query: RideFilterDto) {
@@ -103,6 +105,53 @@ export class RidesService {
         pages: Math.ceil(total / Number(limit)),
       },
     };
+  }
+
+  async forcePayment(id: string, adminId: string) {
+    const ride = await this.prisma.ride.findUnique({
+      where: { id },
+      include: { payment: true },
+    });
+
+    if (!ride) {
+      throw new NotFoundException('Ride not found');
+    }
+
+    if (!ride.payment) {
+      throw new BadRequestException('Ride has no associated payment record');
+    }
+
+    if (ride.payment.status === 'COMPLETED') {
+      throw new BadRequestException('Payment is already completed');
+    }
+
+    this.logger.log(`Admin ${adminId} is forcing payment completion for ride ${id}`);
+
+    // Call PaymentStatusService to process the status update properly, applying all ledger hooks
+    await this.paymentStatusService.updatePaymentStatus({
+      success: true,
+      gateway: (ride.payment.gateway || 'MANUAL') as any,
+      reference: ride.payment.reference,
+      status: 'COMPLETED' as any, // Simulate successful payment
+      amount: ride.payment.amount,
+      paidAt: new Date() as any,
+    });
+
+    // Log the admin override action
+    await this.prisma.activityLog.create({
+      data: {
+        userId: adminId,
+        action: 'RIDE_PAYMENT_FORCED',
+        target: id,
+        metadata: {
+          previousStatus: ride.payment.status,
+          paymentReference: ride.payment.reference,
+          amount: ride.payment.amount,
+        },
+      },
+    });
+
+    return { success: true, message: 'Ride payment forcefully marked as completed.' };
   }
 
   async findOne(id: string) {

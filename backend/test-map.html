@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Map Test</title>
+  <script>
+    // Capture errors
+    window.errors = [];
+    const originalError = console.error;
+    console.error = function(...args) {
+        window.errors.push(args.join(' '));
+        originalError.apply(console, args);
+    };
+    function initMap() {
+      new google.maps.Map(document.getElementById("map"), {
+        center: { lat: -34.397, lng: 150.644 },
+        zoom: 8,
+      });
+    }
+  </script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDr0dMWEWJ-Ly8F8MhbrztOXcFYnDcS4W8&callback=initMap" async defer></script>
+</head>
+<body>
+  <div id="map" style="height: 400px; width: 100%;"></div>
+</body>
+</html>

@@ -120,6 +120,13 @@ export class SettingsService {
       { key: 'delivery_per_km', value: '400', category: 'Logistics' },
       // Logistics – Operations
       { key: 'search_radius', value: '10', category: 'Logistics' },
+      // App Versions
+      { key: 'customer_app_version', value: '1.0.3', category: 'General' },
+      { key: 'customer_app_release_date', value: new Date().toISOString(), category: 'General' },
+      { key: 'rider_app_version', value: '1.0.0', category: 'General' },
+      { key: 'rider_app_release_date', value: new Date().toISOString(), category: 'General' },
+      { key: 'vendor_app_version', value: '1.0.0', category: 'General' },
+      { key: 'vendor_app_release_date', value: new Date().toISOString(), category: 'General' },
     ];
 
     for (const d of defaults) {

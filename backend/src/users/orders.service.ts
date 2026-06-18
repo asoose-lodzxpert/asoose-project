@@ -230,7 +230,7 @@ export class OrdersService {
         );
       }
 
-      const distance = this.fareService.calculateDistance(
+      const distance = await this.fareService.calculateRouteDistance(
         store.lat,
         store.lng,
         address.lat,
@@ -414,7 +414,7 @@ export class OrdersService {
         lng: s.lng,
       }));
 
-      const { sortedStoreIds, totalRouteKm } = this.optimizeRoute(
+      const { sortedStoreIds, totalRouteKm } = await this.optimizeRoute(
         dropoffAddress.lat,
         dropoffAddress.lng,
         storeCoords,
@@ -1154,11 +1154,11 @@ export class OrdersService {
    * Route: customer → storeA → storeB → … → customer
    * Returns stores sorted in visit order + total route distance in km.
    */
-  private optimizeRoute(
+  private async optimizeRoute(
     customerLat: number,
     customerLng: number,
     stores: Array<{ storeId: string; lat: number; lng: number }>,
-  ): { sortedStoreIds: string[]; totalRouteKm: number } {
+  ): Promise<{ sortedStoreIds: string[]; totalRouteKm: number }> {
     const unvisited = [...stores];
     const visited: string[] = [];
     let curLat = customerLat;
@@ -1198,22 +1198,28 @@ export class OrdersService {
       curLng = chosen.lng;
     }
 
-    // Final leg: last store to customer
-    const lastStore = storeMap.get(visited[visited.length - 1])!;
-    totalRouteKm += this.fareService.calculateDistance(
-      lastStore.lat,
-      lastStore.lng,
-      customerLat,
-      customerLng,
-    );
-
-    // Bill for the delivery route only (StoreA → StoreB → Customer),
-    // not the rider's trip TO the first store.
-    totalRouteKm = Math.max(0, totalRouteKm - firstLegDist);
+    // Recompute the exact driving distance for the final route using MapsService
+    let finalRouteKm = 0;
+    if (visited.length > 0) {
+      // For multi-store, bill for StoreA → StoreB → ... → Customer
+      for (let i = 0; i < visited.length - 1; i++) {
+        const s1 = storeMap.get(visited[i])!;
+        const s2 = storeMap.get(visited[i + 1])!;
+        finalRouteKm += await this.fareService.calculateRouteDistance(s1.lat, s1.lng, s2.lat, s2.lng);
+      }
+      // Last store to customer
+      const lastStoreObj = storeMap.get(visited[visited.length - 1])!;
+      finalRouteKm += await this.fareService.calculateRouteDistance(
+        lastStoreObj.lat,
+        lastStoreObj.lng,
+        customerLat,
+        customerLng
+      );
+    }
 
     return {
       sortedStoreIds: visited,
-      totalRouteKm: parseFloat(totalRouteKm.toFixed(2)),
+      totalRouteKm: parseFloat(finalRouteKm.toFixed(2)),
     };
   }
 
@@ -1437,7 +1443,7 @@ export class OrdersService {
       );
     } else if (isSingleStore) {
       const s = resolvedStores[0];
-      totalRouteKm = this.fareService.calculateDistance(
+      totalRouteKm = await this.fareService.calculateRouteDistance(
         s.pickupAddress.lat,
         s.pickupAddress.lng,
         dropoffAddress.lat,
@@ -1445,7 +1451,7 @@ export class OrdersService {
       );
       sortedStoreIds = [s.storeId];
     } else {
-      const route = this.optimizeRoute(
+      const route = await this.optimizeRoute(
         dropoffAddress.lat,
         dropoffAddress.lng,
         storeCoords,
@@ -1474,6 +1480,9 @@ export class OrdersService {
         const s = storeMap.get(storeId)!;
 
         // Distance is always computed from fresh coordinates (needed for Delivery record)
+        // Wait, since this is in a map we can't easily await. But we don't use this distance for billing group orders directly, we use totalDeliveryFee!
+        // Wait, actually `s.distance` is needed for the Delivery record (each stop's distance). Wait! The group delivery `distanceKm` is `totalRouteKm`.
+        // Let's use `calculateDistance` (haversine) here just for the individual `distance` context object since it's not the billed route total.
         const distance = this.fareService.calculateDistance(
           s.pickupAddress.lat,
           s.pickupAddress.lng,
