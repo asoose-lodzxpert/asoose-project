@@ -20,6 +20,22 @@ export class MapsService {
     this.apiKey = process.env.GOOGLE_MAPS_API_KEY!;
   }
 
+  private readonly MAIMALARI_SUGGESTIONS = [
+    { id: 'custom_maimalari_main_gate', title: 'Maimalari Barracks - Main Gate', subtitle: 'Maiduguri, Borno', lat: 11.892200, lng: 13.106019 },
+    { id: 'custom_maimalari_guest_house', title: 'Command Guest House, Damasak Street', subtitle: 'Maimalari Barracks', lat: 11.892100, lng: 13.109007 },
+    { id: 'custom_maimalari_church', title: 'St Bartholomew Military Church (PROT)', subtitle: 'Maimalari Barracks', lat: 11.902485, lng: 13.113904 },
+    { id: 'custom_maimalari_command_center', title: 'Operation Hadin Kai Command Center', subtitle: 'Maimalari Barracks', lat: 11.915981, lng: 13.108305 },
+    { id: 'custom_maimalari_officers_quarters', title: 'Officers Quarters', subtitle: 'Maimalari Barracks', lat: 11.896838, lng: 13.110495 },
+  ];
+
+  private getMaimalariSuggestions(query: string) {
+    const lowerQuery = query.toLowerCase();
+    if (lowerQuery.includes('maim') || lowerQuery.includes('maimalari') || lowerQuery.includes('command guest') || lowerQuery.includes('hadin kai') || lowerQuery.includes('barrack')) {
+      return this.MAIMALARI_SUGGESTIONS.map(s => ({ id: s.id, title: s.title, subtitle: s.subtitle }));
+    }
+    return [];
+  }
+
   // Used internally if needed
   async searchAddress(
     query: string,
@@ -27,6 +43,8 @@ export class MapsService {
     longitude?: string,
   ): Promise<Array<{ id: string; title: string; subtitle: string }>> {
     if (!query || query.length < 3) return [];
+
+    const customSuggestions = this.getMaimalariSuggestions(query);
 
     const bias =
       latitude && longitude
@@ -37,16 +55,15 @@ export class MapsService {
 
     try {
       const res = await axios.get(url);
-      return (
-        res.data.predictions?.map((p: any) => ({
-          id: p.place_id,
-          title: p.structured_formatting.main_text,
-          subtitle: p.structured_formatting.secondary_text,
-        })) ?? []
-      );
+      const googleSuggestions = res.data.predictions?.map((p: any) => ({
+        id: p.place_id,
+        title: p.structured_formatting.main_text,
+        subtitle: p.structured_formatting.secondary_text,
+      })) ?? [];
+      return [...customSuggestions, ...googleSuggestions];
     } catch (error) {
       this.appLogger.error('Error searching address', error?.stack, { error });
-      return [];
+      return customSuggestions;
     }
   }
 
@@ -57,22 +74,23 @@ export class MapsService {
   ): Promise<Array<{ id: string; title: string; subtitle: string }>> {
     if (!query || query.length < 3) return [];
 
+    const customSuggestions = this.getMaimalariSuggestions(query);
+
     const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&key=${this.apiKey}&location=${location ?? ''}&radius=30000`;
 
     try {
       const res = await axios.get(url);
-      return (
-        res.data.predictions?.map((p: any) => ({
-          id: p.place_id,
-          title: p.structured_formatting.main_text,
-          subtitle: p.structured_formatting.secondary_text,
-        })) ?? []
-      );
+      const googleSuggestions = res.data.predictions?.map((p: any) => ({
+        id: p.place_id,
+        title: p.structured_formatting.main_text,
+        subtitle: p.structured_formatting.secondary_text,
+      })) ?? [];
+      return [...customSuggestions, ...googleSuggestions];
     } catch (error) {
       this.appLogger.error('Error in places autocomplete', error?.stack, {
         error,
       });
-      return [];
+      return customSuggestions;
     }
   }
 
@@ -84,6 +102,15 @@ export class MapsService {
   ): Promise<{ lat: number; lng: number; address: string }> {
     if (!placeId) {
       throw new BadRequestException('Place ID is required');
+    }
+
+    const customPlace = this.MAIMALARI_SUGGESTIONS.find(s => s.id === placeId);
+    if (customPlace) {
+      return {
+        lat: customPlace.lat,
+        lng: customPlace.lng,
+        address: customPlace.title,
+      };
     }
 
     const url = `https://maps.googleapis.com/maps/api/geocode/json?place_id=${encodeURIComponent(placeId)}&key=${this.apiKey}`;
