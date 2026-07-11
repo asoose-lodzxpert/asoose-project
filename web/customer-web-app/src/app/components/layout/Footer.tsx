@@ -28,7 +28,7 @@ function Facebook() {
 }
 
 export default function Footer() {
-  const CUSTOMER_IOS_URL = "https://apps.apple.com/ng/app/asoose/id6761648911";
+  const CUSTOMER_IOS_URL = "https://apps.apple.com/ng/app/asoose/id6781271502";
   const CUSTOMER_ANDROID_URL =
     "https://play.google.com/store/apps/details?id=com.asoose.app";
 

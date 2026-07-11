@@ -123,15 +123,15 @@ export default function AsooseLanding() {
 
   const CUSTOMER_ANDROID_URL =
     "https://play.google.com/store/apps/details?id=com.asoose.app";
-  const CUSTOMER_IOS_URL = "https://apps.apple.com/ng/app/asoose/id6761648911";
+  const CUSTOMER_IOS_URL = "https://apps.apple.com/ng/app/asoose/id6781271502";
   const RIDER_ANDROID_URL =
     "https://play.google.com/store/apps/details?id=com.asoose.rider.app";
   const RIDER_IOS_URL =
-    "https://apps.apple.com/ng/app/asoose-rider/id6761644378";
+    "https://apps.apple.com/ng/app/asoose/id6781271502";
   const MERCHANT_ANDROID_URL =
     "https://play.google.com/store/apps/details?id=com.asoose.vendor.app";
   const MERCHANT_IOS_URL =
-    "https://apps.apple.com/ng/app/asoose-vendor/id6761610909";
+    "https://apps.apple.com/ng/app/asoose/id6781271502";
 
   const SERVICE_KEYS = ["food", "ride", "package"] as const;
 
