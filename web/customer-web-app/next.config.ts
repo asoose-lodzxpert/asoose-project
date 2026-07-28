@@ -32,8 +32,8 @@ const apiOrigin = (() => {
 const CSP = [
   // Default: only this origin
   "default-src 'self'",
-  // Scripts: this origin + Google Maps SDK + Firebase SDK (gstatic CDN used by firebase-messaging-sw.js importScripts) + Vercel Live feedback widget
-  "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://maps.googleapis.com https://maps.gstatic.com https://www.gstatic.com https://vercel.live",
+  // Scripts: this origin + Google Maps SDK + Firebase SDK (gstatic CDN used by firebase-messaging-sw.js importScripts) + Vercel Live feedback widget + Meta Pixel
+  "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://maps.googleapis.com https://maps.gstatic.com https://www.gstatic.com https://vercel.live https://connect.facebook.net",
   // Workers: 'self' allows same-origin service workers (Firebase SW); blob: for Maps SDK workers
   "worker-src 'self' blob:",
   // Styles: inline styles used by Maps + our Tailwind
@@ -41,9 +41,9 @@ const CSP = [
   // Fonts
   "font-src 'self' https://fonts.gstatic.com",
   // Images: self + Maps tiles + placeholder services used in next.config images
-  "img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://maps.gstatic.com https://*.googleusercontent.com https://*.openstreetmap.org https://asoose-storage.s3.eu-north-1.amazonaws.com https://asoose-storage-migration.s3.us-east-1.amazonaws.com https://ffyfvbgcbvbgnmopmmhi.supabase.co https://avatars.githubusercontent.com https://stackable-eclair-kzms-p62.storage.railway.app https://loremflickr.com https://picsum.photos https://placehold.co https://via.placeholder.com",
-  // XHR/Fetch: backend API + Google Maps XHR calls (geocoding relay etc.)
-  `connect-src 'self' ${apiOrigin} https://*.googleapis.com https://maps.googleapis.com wss: ws:`,
+  "img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://maps.gstatic.com https://*.googleusercontent.com https://*.openstreetmap.org https://asoose-storage.s3.eu-north-1.amazonaws.com https://asoose-storage-migration.s3.us-east-1.amazonaws.com https://ffyfvbgcbvbgnmopmmhi.supabase.co https://avatars.githubusercontent.com https://stackable-eclair-kzms-p62.storage.railway.app https://loremflickr.com https://picsum.photos https://placehold.co https://via.placeholder.com https://www.facebook.com",
+  // XHR/Fetch: backend API + Google Maps XHR calls (geocoding relay etc.) + Meta Pixel events
+  `connect-src 'self' ${apiOrigin} https://*.googleapis.com https://maps.googleapis.com https://connect.facebook.net https://www.facebook.com wss: ws:`,
   // Frames: block all
   "frame-src 'none'",
   // Objects: block all
