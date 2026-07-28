@@ -10,6 +10,7 @@ import JsonLd from "@/components/JsonLd";
 const inter = Inter({ subsets: ["latin"] });
 
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://asoose.com";
+const META_PIXEL_ID = "1290880229579446";
 
 // ── Sitewide JSON-LD: WebSite + Organization ─────────────────────────────────
 // The WebSite schema with a SearchAction enables Google Sitelinks Search Box
@@ -134,7 +135,37 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Meta Pixel Code */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              !function(f,b,e,v,n,t,s)
+              {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+              n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+              if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+              n.queue=[];t=b.createElement(e);t.async=!0;
+              t.src=v;s=b.getElementsByTagName(e)[0];
+              s.parentNode.insertBefore(t,s)}(window, document,'script',
+              'https://connect.facebook.net/en_US/fbevents.js');
+              fbq('init', '${META_PIXEL_ID}');
+              fbq('track', 'PageView');
+            `,
+          }}
+        />
+        {/* End Meta Pixel Code */}
+      </head>
       <body className={inter.className}>
+        <noscript>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            height="1"
+            width="1"
+            style={{ display: "none" }}
+            src={`https://www.facebook.com/tr?id=${META_PIXEL_ID}&ev=PageView&noscript=1`}
+            alt=""
+          />
+        </noscript>
         {/* Sitewide structured data — injected once in the root layout */}
         <JsonLd data={websiteSchema} />
         <JsonLd data={organizationSchema} />
