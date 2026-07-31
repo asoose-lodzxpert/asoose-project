@@ -87,7 +87,7 @@ export default function PrivacyLayout({ sections, children }: PrivacyLayoutProps
           <div className="flex items-center gap-3 mb-10 text-yellow-600 dark:text-yellow-500">
             <Shield className="w-6 h-6" />
             <h2 className="text-sm font-black uppercase tracking-[0.2em] opacity-80">
-              Guidance
+              On this page
             </h2>
           </div>
 
@@ -129,10 +129,10 @@ export default function PrivacyLayout({ sections, children }: PrivacyLayoutProps
         
         {/* Simple Footer for Document */}
         <div className="w-full max-w-4xl px-12 pb-20 border-t border-gray-100 dark:border-white/5 mt-12 pt-12 flex flex-col md:flex-row justify-between items-center gap-6 text-[10px] font-black uppercase tracking-widest opacity-30">
-          <span>© 2026 Asoose Technologies Inc.</span>
+          <span>© {new Date().getFullYear()} Asoose Technologies Inc.</span>
           <div className="flex gap-8">
             <Link href="/terms" className="hover:text-yellow-500 transition-colors">Terms</Link>
-            <Link href="/privacy" className="hover:text-yellow-500 transition-colors">Privacy</Link>
+            <Link href="/privacy-policy" className="hover:text-yellow-500 transition-colors">Privacy</Link>
           </div>
         </div>
       </main>
