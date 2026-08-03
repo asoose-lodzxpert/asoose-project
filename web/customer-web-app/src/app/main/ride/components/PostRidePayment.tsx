@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useRideStore } from "../store/ride";
 import { RideService } from "@/services/ride.service";
+import { savePurchaseContext } from "@/lib/meta-pixel";
 
 /**
  * PostRidePayment
@@ -84,6 +85,12 @@ export function PostRidePayment() {
       // Persist ride context so the callback page can restore state on return
       localStorage.setItem("pending_ride", "true");
       localStorage.setItem("pending_ride_id", rideId);
+      savePurchaseContext({
+        value: fare,
+        currency: "NGN",
+        contentCategory: "ride",
+        contentId: rideId,
+      });
 
       // Mark payment confirmed so the callback page maps COMPLETED → 'finished'
       setPaymentConfirmed(true);

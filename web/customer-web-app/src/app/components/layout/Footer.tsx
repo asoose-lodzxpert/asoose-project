@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { trackMetaCustomEvent, trackMetaEvent } from "@/lib/meta-pixel";
 
 // Social icon SVGs
 function TwitterX() {
@@ -84,6 +85,14 @@ export default function Footer() {
                 {/* App Store */}
                 <a
                   href={CUSTOMER_IOS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() =>
+                    trackMetaCustomEvent("AppDownloadClick", {
+                      app: "customer",
+                      platform: "ios",
+                    })
+                  }
                   className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-white/10 hover:border-yellow-400 dark:hover:border-yellow-400 hover:text-yellow-500 transition-all text-zinc-700 dark:text-zinc-300"
                 >
                   <svg className="w-4 h-4 fill-current flex-shrink-0" viewBox="0 0 24 24">
@@ -97,6 +106,12 @@ export default function Footer() {
                   href={CUSTOMER_ANDROID_URL}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() =>
+                    trackMetaCustomEvent("AppDownloadClick", {
+                      app: "customer",
+                      platform: "android",
+                    })
+                  }
                   className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-white/10 hover:border-yellow-400 dark:hover:border-yellow-400 hover:text-yellow-500 transition-all text-zinc-700 dark:text-zinc-300"
                 >
                   <svg className="w-4 h-4 fill-current flex-shrink-0" viewBox="0 0 24 24">
@@ -137,6 +152,14 @@ export default function Footer() {
                     <Link
                       key={j}
                       href={link.h}
+                      onClick={() => {
+                        if (link.h === "/contact") {
+                          trackMetaEvent("Contact", {
+                            content_name: "contact_navigation",
+                            contact_method: "contact_page",
+                          });
+                        }
+                      }}
                       className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 hover:text-yellow-500 dark:hover:text-yellow-400 transition-colors w-fit"
                     >
                       {link.n}

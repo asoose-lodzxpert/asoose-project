@@ -17,6 +17,7 @@ import {
   type PlaceSuggestion,
 } from "@/services/maps-api.service";
 import { toast } from "react-toastify";
+import { trackMetaEvent } from "@/lib/meta-pixel";
 
 interface LocationAutocompleteInputProps {
   onLocationSelect: (
@@ -96,6 +97,10 @@ export function LocationAutocompleteInput({
     setSuggestions([]);
     setInputValue(description);
     setGeoError(null);
+    trackMetaEvent("Search", {
+      content_category: "ride",
+      search_type: type,
+    });
 
     geocodePlace(placeId)
       .then((place) => {

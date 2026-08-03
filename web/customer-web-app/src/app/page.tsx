@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
+import { trackMetaCustomEvent } from "@/lib/meta-pixel";
 
 // ── Per-image blur placeholders ───────────────────────────────────────────────
 const BLUR_MAP: Record<string, string> = {
@@ -55,11 +56,13 @@ function StoreButtons({
   androidUrl,
   iosUrl,
   darkMode,
+  appName = "customer",
   size = "sm",
 }: {
   androidUrl: string;
   iosUrl: string;
   darkMode: boolean;
+  appName?: "customer" | "merchant" | "rider";
   size?: "sm" | "lg";
 }) {
   const isLg = size === "lg";
@@ -82,7 +85,18 @@ function StoreButtons({
     // `sm:w-auto` on ≥640 px so they shrink to content width and sit side-by-side
     <div className="flex w-full sm:w-auto gap-3">
       {/* App Store */}
-      <a href={iosUrl} target="_blank" rel="noopener noreferrer" className={`${btnBase} flex-1 sm:flex-none`}>
+      <a
+        href={iosUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() =>
+          trackMetaCustomEvent("AppDownloadClick", {
+            app: appName,
+            platform: "ios",
+          })
+        }
+        className={`${btnBase} flex-1 sm:flex-none`}
+      >
         <AppleIcon className={iconCls} />
         <div className="text-left leading-none">
           <div className={`${sublabel} uppercase tracking-widest opacity-50 font-semibold mb-0.5`}>
@@ -93,7 +107,18 @@ function StoreButtons({
       </a>
 
       {/* Google Play */}
-      <a href={androidUrl} target="_blank" rel="noopener noreferrer" className={`${btnBase} flex-1 sm:flex-none`}>
+      <a
+        href={androidUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() =>
+          trackMetaCustomEvent("AppDownloadClick", {
+            app: appName,
+            platform: "android",
+          })
+        }
+        className={`${btnBase} flex-1 sm:flex-none`}
+      >
         <PlayIcon className={iconCls} />
         <div className="text-left leading-none">
           <div className={`${sublabel} uppercase tracking-widest opacity-50 font-semibold mb-0.5`}>
@@ -412,6 +437,7 @@ export default function AsooseLanding() {
               androidUrl={MERCHANT_ANDROID_URL}
               iosUrl={MERCHANT_IOS_URL}
               darkMode={darkMode}
+              appName="merchant"
               size="sm"
             />
           </div>
@@ -475,6 +501,7 @@ export default function AsooseLanding() {
                 androidUrl={RIDER_ANDROID_URL}
                 iosUrl={RIDER_IOS_URL}
                 darkMode={darkMode}
+                appName="rider"
                 size="sm"
               />
             </div>

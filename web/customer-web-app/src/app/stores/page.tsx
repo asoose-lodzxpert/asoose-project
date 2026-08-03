@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import JsonLd from "@/components/JsonLd";
+import { MetaSearchEvent } from "@/components/MetaSearchEvent";
 
 export const revalidate = 3600; // Rebuild page every hour (ISR)
 
@@ -216,6 +217,7 @@ export default async function StoresPage({
 
   return (
     <>
+      {query && <MetaSearchEvent category="marketplace" />}
       {/* JSON-LD structured data */}
       <JsonLd data={buildItemListSchema(displayVendors)} />
       <JsonLd data={buildBreadcrumbSchema()} />

@@ -27,6 +27,10 @@ import { ReviewModal } from "@/store/ReviewModal";
 import { paymentService } from "@/services/payment.service";
 import { DeliveryService } from "@/services/delivery.service";
 import { socketService } from "@/services/socket.service";
+import {
+  savePurchaseContext,
+  trackMetaCustomEvent,
+} from "@/lib/meta-pixel";
 
 // CONSTANTS & TYPES
 // Stage names aligned with backend DeliveryStatus enum where applicable.
@@ -526,6 +530,15 @@ export default function DeliveryPage() {
       );
 
       if (deliveryRes?.delivery?.id) {
+        trackMetaCustomEvent(
+          "DispatchRequest",
+          {
+            package_type: packageInfo.type,
+            value: deliveryRes.deliveryFee,
+            currency: "NGN",
+          },
+          `dispatch:${deliveryRes.delivery.id}`,
+        );
         useDeliveryStore.setState({
           activeDeliveryId: deliveryRes.delivery.id,
         });
@@ -590,6 +603,12 @@ export default function DeliveryPage() {
       );
 
       if (paymentRes.authorizationUrl && paymentRes.reference) {
+        savePurchaseContext({
+          value: calculatedFee,
+          currency: "NGN",
+          contentCategory: "dispatch",
+          contentId: activeDeliveryId,
+        });
         // Store gateway alongside reference so verifyPayment can use the correct
         // gateway during recovery — without it the backend throws a validation error.
         localStorage.setItem(

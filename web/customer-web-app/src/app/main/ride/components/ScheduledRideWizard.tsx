@@ -23,6 +23,7 @@ import { RideService } from '@/services/ride.service';
 import { toast } from 'react-toastify';
 import { SidebarSection, SidebarDivider } from './Sidebar';
 import { useSession } from 'next-auth/react';
+import { trackMetaCustomEvent } from '@/lib/meta-pixel';
 
 export function ScheduledRideWizard() {
   const { data: session } = useSession();
@@ -115,7 +116,7 @@ export function ScheduledRideWizard() {
       }
 
       const idempotencyKey = crypto.randomUUID();
-      await ScheduledRideService.bookRide({
+      const scheduledRide: any = await ScheduledRideService.bookRide({
         scheduledAt,
         pickupLocation: {
           addressText: pickupAddress || 'Resolved Location',
@@ -138,6 +139,17 @@ export function ScheduledRideWizard() {
         ...(bookingForOther && passengerName ? { passengerName } : {}),
         ...(bookingForOther && passengerPhone ? { passengerPhone } : {}),
       }, accessToken, idempotencyKey);
+
+      trackMetaCustomEvent(
+        'RideBooking',
+        {
+          booking_type: bookingForOther ? 'scheduled_guest' : 'scheduled_self',
+          vehicle_type: 'ECONOMY',
+          value: estimatedFare || 0,
+          currency: 'NGN',
+        },
+        scheduledRide?.id ? `scheduled-ride:${scheduledRide.id}` : undefined,
+      );
 
       setBookingStage('SUCCESS');
       toast.success('Ride scheduled successfully!');

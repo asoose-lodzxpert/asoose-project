@@ -9,6 +9,10 @@ import { useCartStore } from "@/store/useCartStore";
 import { useDeliveryStore } from "@/store/useDeliveryStore";
 import { useRideStore, type RideStage } from "@/app/main/ride/store/ride";
 import { RideService } from "@/services/ride.service";
+import {
+  clearPurchaseContext,
+  trackVerifiedPurchase,
+} from "@/lib/meta-pixel";
 
 // Use the same base URL as ApiService so the versioned path is always correct.
 // NEXT_PUBLIC_API_URL is expected to be "https://host/api/v1" (with prefix+version).
@@ -50,6 +54,7 @@ function CallbackContent() {
     const handleCancellation = () => {
       // ✅ FIXED: Explicit handler for user-cancelled payments with appropriate messaging
       toast.warn("Payment cancelled. You can try again whenever you're ready.");
+      clearPurchaseContext();
 
       if (isRide) {
         localStorage.removeItem("pending_ride");
@@ -73,6 +78,7 @@ function CallbackContent() {
 
     /** Route the user to the correct page on payment failure */
     const handleFailure = () => {
+      clearPurchaseContext();
       if (isRide) {
         localStorage.removeItem("pending_ride");
         localStorage.removeItem("pending_ride_id");
@@ -194,6 +200,20 @@ function CallbackContent() {
         const pendingDeliveryData = localStorage.getItem(
           "pending_delivery_data",
         );
+
+        const purchaseContentId =
+          metaRideId || metaDeliveryId || metaOrderGroupId || metaOrderId;
+        const fallbackCategory = metaRideId || isRide
+          ? "ride"
+          : metaDeliveryId || pendingDeliveryData
+            ? "dispatch"
+            : "shopping";
+        trackVerifiedPurchase(reference, {
+          value: Number(data.amount ?? data.data?.amount),
+          currency: data.currency ?? data.data?.currency ?? "NGN",
+          contentCategory: fallbackCategory,
+          contentId: purchaseContentId,
+        });
 
         if (metaRideId || isRide) {
           // Restore ride context into Zustand before navigating so the ride
