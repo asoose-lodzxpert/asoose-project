@@ -13,6 +13,7 @@ import {
 import { useEffect, useState } from "react";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
+import { trackMetaEvent } from "@/lib/meta-pixel";
 
 export default function ContactPage() {
   const { resolvedTheme } = useTheme();
@@ -63,6 +64,11 @@ export default function ContactPage() {
 
       if (!response.ok) throw new Error("Failed to send message");
 
+      trackMetaEvent("Contact", {
+        content_name: "support_form",
+        contact_method: "form",
+      });
+
       setStatus({
         type: "success",
         message: "Message sent! Our team will get back to you soon.",
@@ -104,12 +110,14 @@ export default function ContactPage() {
                 label="Email"
                 value="hello@asoose.com"
                 href="mailto:hello@asoose.com"
+                method="email"
               />
               <ContactInfo
                 icon={<Phone />}
                 label="Phone"
                 value="+234 (0) 8061966145"
                 href="tel:+2348061966145"
+                method="phone"
               />
               <div className="flex gap-4 items-start">
                 <MapPin className="text-yellow-500 shrink-0" size={20} />
@@ -234,11 +242,13 @@ function ContactInfo({
   label,
   value,
   href,
+  method,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   href: string;
+  method: "email" | "phone";
 }) {
   return (
     <div className="flex gap-4 items-center">
@@ -247,6 +257,12 @@ function ContactInfo({
         <div className="text-sm opacity-60">{label}</div>
         <a
           href={href}
+          onClick={() =>
+            trackMetaEvent("Contact", {
+              content_name: "contact_link",
+              contact_method: method,
+            })
+          }
           className="text-yellow-500 hover:underline font-medium break-all"
         >
           {value}

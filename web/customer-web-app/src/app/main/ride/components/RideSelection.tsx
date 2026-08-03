@@ -14,6 +14,7 @@ import { useDebounce } from "../hooks/useDebounce";
 import { SidebarSection, SidebarDivider } from "./Sidebar";
 import { PrimaryButton, SecondaryButton, Text } from "@/components/ui";
 import { X, RotateCcw, Loader2, Car, User, Users } from "lucide-react";
+import { trackMetaCustomEvent } from "@/lib/meta-pixel";
 
 /**
  * Retry a transient-failure-prone async operation (H2 fix).
@@ -311,6 +312,16 @@ export function RideSelection() {
         () => RideService.createRide(payload, accessToken, idempotencyKey),
         3,
         1000,
+      );
+      trackMetaCustomEvent(
+        "RideBooking",
+        {
+          booking_type: bookingForOther ? "guest" : "self",
+          vehicle_type: vehicleKey,
+          value: selectedEstimate.estimatedFare,
+          currency: "NGN",
+        },
+        `ride:${response.ride.id}`,
       );
       if (setRideId) setRideId(response.ride.id);
       // Store OTP so it can be shown to the driver when they arrive

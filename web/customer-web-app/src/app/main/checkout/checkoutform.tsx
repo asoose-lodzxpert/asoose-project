@@ -13,6 +13,7 @@ import {
   InitiatePaymentPayload,
 } from "@/services/payment.service";
 import { DEFAULT_PAYMENT_METHOD } from "../ride/constants/config";
+import { savePurchaseContext } from "@/lib/meta-pixel";
 
 // Components
 import { Address } from "./types";
@@ -414,6 +415,12 @@ export default function CheckoutForm() {
       );
 
       if (paymentRes.authorizationUrl) {
+        savePurchaseContext({
+          value: orderTotal,
+          currency: "NGN",
+          contentCategory: "shopping",
+          contentId: id,
+        });
         window.location.href = paymentRes.authorizationUrl;
       } else {
         throw new Error("Payment authorization URL not received");

@@ -5,6 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
+import { trackMetaEvent } from "@/lib/meta-pixel";
 
 // ─── Validation Rules ────────────────────────────────────────────────────────
 
@@ -134,6 +135,11 @@ const SignUpPage = () => {
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "Registration failed");
+
+      trackMetaEvent("CompleteRegistration", {
+        content_name: "customer_account",
+        status: "completed",
+      });
 
       // Auto sign-in after successful registration
       const signInResult = await signIn("credentials", {

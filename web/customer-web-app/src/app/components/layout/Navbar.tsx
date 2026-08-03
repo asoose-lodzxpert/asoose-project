@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Sun, Moon, Menu, X } from "lucide-react";
 import Image from "next/image";
+import { trackMetaEvent } from "@/lib/meta-pixel";
 
 export default function Navbar() {
   const { resolvedTheme, setTheme } = useTheme();
@@ -66,6 +67,14 @@ export default function Navbar() {
                 <Link
                   key={link.name}
                   href={link.href}
+                  onClick={() => {
+                    if (link.href === "/contact") {
+                      trackMetaEvent("Contact", {
+                        content_name: "contact_navigation",
+                        contact_method: "contact_page",
+                      });
+                    }
+                  }}
                   className={`transition-colors hover:text-yellow-500 ${
                     isActive
                       ? "text-yellow-500"
@@ -138,7 +147,15 @@ export default function Navbar() {
                 <Link
                   key={link.name}
                   href={link.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    if (link.href === "/contact") {
+                      trackMetaEvent("Contact", {
+                        content_name: "contact_navigation",
+                        contact_method: "contact_page",
+                      });
+                    }
+                  }}
                   className={`transition-colors ${isActive ? "text-yellow-500" : darkMode ? "text-zinc-300" : "text-zinc-600"}`}
                 >
                   {link.name}

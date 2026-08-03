@@ -7,6 +7,7 @@ import { Loader2, CheckCircle2, AlertCircle, Upload, MapPin, Clock, ArrowRight, 
 import { toast } from "react-toastify";
 import { ApiService } from "@/services/api.service";
 import { useRouter } from "next/navigation";
+import { trackMetaEvent } from "@/lib/meta-pixel";
 
 // --- Components for steps will be defined here or imported ---
 
@@ -151,6 +152,10 @@ export default function VendorRegistrationPage() {
       if (data.step3.cityId) formData.append("cityId", data.step3.cityId);
 
       await ApiService.postFormData("/auth/vendor/register", formData);
+      trackMetaEvent("CompleteRegistration", {
+        content_name: "vendor_application",
+        status: "completed",
+      });
       
       setShowSuccessModal(true);
     } catch (err: any) {
