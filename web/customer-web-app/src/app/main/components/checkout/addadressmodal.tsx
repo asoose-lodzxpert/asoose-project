@@ -61,7 +61,9 @@ export const AddAddressModal = ({
       await onSave({
         street: formData.street,
         phone: formData.phone,
-        label: formData.label,
+        // Backend AddressLabel enum is uppercase ("HOME"|"WORK"|"OTHER");
+        // the picker below displays Title Case.
+        label: formData.label.toUpperCase(),
         lat: coords!.lat,
         lng: coords!.lng,
       });

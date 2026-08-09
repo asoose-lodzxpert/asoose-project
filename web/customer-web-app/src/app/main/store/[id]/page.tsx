@@ -7,11 +7,13 @@ const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://asoose.com";
 
 async function getStore(slugOrId: string) {
   try {
-    const res = await fetch(`${API_URL}/marketplace/vendor/${slugOrId}`, {
+    const res = await fetch(`${API_URL}/catalog/storefronts/${slugOrId}`, {
       next: { revalidate: 3600 },
     });
     if (!res.ok) return null;
-    return res.json();
+    const body = await res.json();
+    const store = body?.data ?? body;
+    return { ...store, image: store?.logo || store?.banner, type: store?.kind };
   } catch {
     return null;
   }

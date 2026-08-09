@@ -28,13 +28,14 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
       setIsResolving(true);
       try {
         setUserLocation({ lat: details.lat, lng: details.lng });
-        
+
         // Resolve cityId
-        const cityData: any = await ApiService.get(
-          `/maps/city-by-coords?lat=${details.lat}&lng=${details.lng}`,
-        );
-        if (cityData && cityData.id) {
-          setCityId(cityData.id);
+        const resolved: any = await ApiService.post("/locations/resolve-city", {
+          latitude: details.lat,
+          longitude: details.lng,
+        });
+        if (resolved?.city?.id) {
+          setCityId(resolved.city.id);
         }
         onClose();
       } catch (error) {

@@ -37,12 +37,15 @@ export interface Product {
 interface ProductModalProps {
   product: Product | null;
   storeId: string;
+  /** RESTAURANT storefronts add dishes (menuItemId); STORE storefronts add products (productId). */
+  kind?: "PRODUCT" | "DISH";
   onClose: () => void;
 }
 
 export const ProductModal = ({
   product,
   storeId,
+  kind = "PRODUCT",
   onClose,
 }: ProductModalProps) => {
   const [mounted, setMounted] = useState(false);
@@ -133,30 +136,26 @@ export const ProductModal = ({
     setIsSubmitting(true);
 
     try {
-      // 2. Backend Enforcement (Critical) — ApiService handles 401 redirect automatically
       const token =
         (session as any)?.accessToken || (session as any)?.user?.accessToken;
 
-      // Flatten all selected modifier IDs across all groups into a single array.
-      // Backend expects `modifierIds: string[]` — an array of Modifier record UUIDs.
+      // Flatten all selected modifier IDs — kept for local display only.
+      // The backend cart has no modifier concept, so this never reaches the API;
+      // checkout re-syncs quantity/kind only, and pricing there is base-price.
       const modifierIds: string[] = Object.values(selectedModifiers).flat();
 
-      await ApiService.post(
-        "/cart/add",
-        {
-          productId: product.id,
-          quantity,
-          // Only include modifierIds when present — backend treats absence as "no modifiers".
-          ...(modifierIds.length > 0 && { modifierIds }),
-        },
+      // Best-effort server sync — the local cart (synced again in full at
+      // checkout) is the source of truth for the shopping session, so a
+      // failure here shouldn't block the user from adding the item.
+      ApiService.post(
+        "/cart/items",
+        kind === "DISH"
+          ? { menuItemId: product.id, quantity }
+          : { productId: product.id, quantity },
         token,
         {},
-      );
+      ).catch(() => {});
 
-      // Success: sync local cart store for immediate UI update.
-      // Price stored here is display-only — the backend is the authoritative pricing source.
-
-      // Collect human-readable modifier names for display in checkout.
       const modifierNames: string[] = (product.modifierGroups || []).flatMap(
         (group) =>
           group.modifiers
@@ -171,6 +170,7 @@ export const ProductModal = ({
         quantity,
         restaurantId: storeId,
         image: product.image,
+        kind,
         modifierIds: modifierIds.length > 0 ? modifierIds : undefined,
         modifierNames: modifierNames.length > 0 ? modifierNames : undefined,
       });

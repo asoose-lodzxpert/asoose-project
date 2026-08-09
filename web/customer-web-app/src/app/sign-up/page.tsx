@@ -13,9 +13,16 @@ const PHONE_RE = /^(\+234|0)[789][01]\d{8}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_STRENGTH_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 
+function splitName(v: string): { firstName: string; lastName: string } {
+  const parts = v.trim().split(/\s+/);
+  return { firstName: parts[0] ?? "", lastName: parts.slice(1).join(" ") };
+}
+
 function validateName(v: string): string {
   if (!v.trim()) return "Full name is required";
-  if (v.trim().length < 2) return "Name must be at least 2 characters";
+  const { firstName, lastName } = splitName(v);
+  if (firstName.length < 2 || lastName.length < 2)
+    return "Enter both your first and last name";
   if (v.trim().length > 100) return "Name is too long";
   return "";
 }
@@ -26,11 +33,18 @@ function validateEmail(v: string): string {
   return "";
 }
 
+// UI-facing form: accepts either 0-prefixed or +234 input, displayed as typed.
 function normalizePhone(v: string) {
   let p = v.replace(/[\s\-]/g, "");
   if (p.startsWith("+234")) p = "0" + p.slice(4);
   else if (p.startsWith("234")) p = "0" + p.slice(3);
   return p;
+}
+
+// Backend requires E.164-style international format (no leading 0).
+function toApiPhone(v: string) {
+  const norm = normalizePhone(v);
+  return norm.startsWith("0") ? `+234${norm.slice(1)}` : norm;
 }
 
 function validatePhone(v: string): string {
@@ -122,19 +136,23 @@ const SignUpPage = () => {
       const API_URL =
         process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
-      const response = await fetch(`${API_URL}/auth/user/register`, {
+      const { firstName, lastName } = splitName(fields.name);
+
+      const response = await fetch(`${API_URL}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: fields.name.trim(),
+          firstName,
+          lastName,
           email: fields.email.trim(),
           password: fields.password,
-          phone: normalizePhone(fields.phone.trim()),
+          phone: toApiPhone(fields.phone.trim()),
         }),
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || "Registration failed");
+      if (!response.ok || !data.success)
+        throw new Error(data.message || "Registration failed");
 
       trackMetaEvent("CompleteRegistration", {
         content_name: "customer_account",
@@ -170,9 +188,13 @@ const SignUpPage = () => {
       const { getSession } = await import("next-auth/react");
       const session = await getSession();
       const role = session?.user?.role as string | undefined;
+      // New accounts are never pre-verified — send regular customers to
+      // confirm their email (backend already emailed them a code at
+      // registration). Verification isn't enforced for login, so this is a
+      // nudge, not a gate — the page itself offers a "skip for now" option.
       const destination = role && ADMIN_ROLES.has(role)
         ? "/super-admin/dashboard"
-        : "/main/store";
+        : "/verify-email";
 
       router.push(destination);
     } catch (err: any) {

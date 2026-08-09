@@ -160,21 +160,27 @@ function ProfilePageContent() {
         let data;
         switch (tab) {
           case "orders":
-            data = await fetchWithAuth("/users/orders", accessToken);
+            data = await fetchWithAuth("/orders", accessToken);
             if (activeTabRef.current === "orders") {
-              setOrders(data?.data || []);
+              setOrders(data?.orders || []);
             }
             break;
           case "rides":
-            data = await fetchWithAuth("/users/rides", accessToken);
-            if (activeTabRef.current === "rides") setRides(data || []);
+            data = await fetchWithAuth("/rides", accessToken);
+            if (activeTabRef.current === "rides") setRides(data?.rides || []);
             break;
           case "deliveries":
-            data = await fetchWithAuth("/users/deliveries", accessToken);
+            // "Deliveries" here means parcels the customer has sent — the
+            // backend's separate /deliveries module is for order-delivery
+            // tracking, not for listing a customer's own send-a-package history.
+            data = await fetchWithAuth("/parcels", accessToken);
             if (activeTabRef.current === "deliveries")
-              setDeliveries(data || []);
+              setDeliveries(data?.parcels || []);
             break;
           case "disputes":
+            // TODO: no confirmed customer-facing "my disputes" endpoint yet —
+            // leaving this tab pointed at its old (wrong) path rather than
+            // guessing one, so it fails visibly instead of silently.
             data = await fetchWithAuth(
               "/super-admin/disputes/mine",
               accessToken,
@@ -223,8 +229,8 @@ function ProfilePageContent() {
         setToken(accessToken);
 
         const [prof, addr] = await Promise.all([
-          fetchWithAuth("/users/profile", accessToken),
-          fetchWithAuth("/users/addresses", accessToken),
+          fetchWithAuth("/users/me", accessToken),
+          fetchWithAuth("/addresses", accessToken),
         ]);
 
         // Handle profile data properly
@@ -272,10 +278,15 @@ function ProfilePageContent() {
     }
 
     try {
-      const updatedProfile = await fetchWithAuth("/users/profile", token, {
+      const parts = data.name.trim().split(/\s+/);
+      const updatedProfile = await fetchWithAuth("/users/me/profile", token, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          firstName: parts[0] ?? "",
+          lastName: parts.slice(1).join(" ") || parts[0] || "",
+          phone: data.phone,
+        }),
       });
 
       setProfile((prev: any) => ({ ...prev, ...updatedProfile }));
@@ -293,14 +304,19 @@ function ProfilePageContent() {
       return;
     }
 
+    // AddAddressModal collects { street, isDefault, lat, lng } — backend
+    // requires latitude/longitude.
+    const { lat, lng, ...rest } = addressData;
+    addressData = { ...rest, latitude: lat, longitude: lng };
+
     try {
-      await fetchWithAuth("/users/addresses", token, {
+      await fetchWithAuth("/addresses", token, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(addressData),
       });
 
-      const updatedAddresses = await fetchWithAuth("/users/addresses", token);
+      const updatedAddresses = await fetchWithAuth("/addresses", token);
       setAddresses(updatedAddresses || []);
       setIsAddressModalOpen(false);
       toast.success("Address added successfully");
@@ -332,7 +348,7 @@ function ProfilePageContent() {
 
     if (result.isConfirmed) {
       try {
-        await fetchWithAuth("/users/profile", token, {
+        await fetchWithAuth("/users/me", token, {
           method: "DELETE",
         });
 
@@ -374,7 +390,7 @@ function ProfilePageContent() {
 
     if (result.isConfirmed) {
       try {
-        await fetchWithAuth(`/users/addresses/${id}`, token, {
+        await fetchWithAuth(`/addresses/${id}`, token, {
           method: "DELETE",
         });
 
@@ -386,7 +402,7 @@ function ProfilePageContent() {
 
         // Refresh addresses on error
         try {
-          const refreshed = await fetchWithAuth("/users/addresses", token);
+          const refreshed = await fetchWithAuth("/addresses", token);
           setAddresses(refreshed || []);
         } catch (refreshErr) {
           console.error("Failed to refresh addresses:", refreshErr);

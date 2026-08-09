@@ -35,6 +35,8 @@ export interface ProductProps {
    */
   href?: string;
   isSoldOut?: boolean;
+  /** RESTAURANT storefronts add dishes (menuItemId); STORE storefronts add products (productId). */
+  kind?: "PRODUCT" | "DISH";
 }
 
 export const ProductCard = ({
@@ -51,6 +53,7 @@ export const ProductCard = ({
   href,
   isAvailable = true,
   isSoldOut = false,
+  kind = "PRODUCT",
 }: ProductProps) => {
   const addItem = useCartStore((state) => state.addItem);
   const { data: session, status } = useSession();
@@ -73,18 +76,17 @@ export const ProductCard = ({
       return;
     }
 
-    // If the parent provided an onClick handler (e.g., to open a ProductModal),
-    // delegate to it so modifier groups with required selections can be satisfied.
-    // This prevents bypassing backend modifier validation.
-    if (onClick) {
-      onClick();
-      return;
-    }
-
-    // Block direct-add for products that require modifier selections.
-    // Without a modal, we cannot collect the required modifierIds and the
-    // backend will reject the request (minSelect enforcement).
+    // Only route through the details modal when there's actually something
+    // to collect — otherwise every quick-add click opened the full product
+    // modal on top of the page instead of just adding the item.
     if (hasRequiredModifiers) {
+      if (onClick) {
+        onClick();
+        return;
+      }
+      // No modal opener available and modifiers are required — we can't
+      // collect the required modifierIds, and the backend will reject the
+      // request (minSelect enforcement).
       toast.info("Please tap the item to choose your options", {
         position: "bottom-center",
         autoClose: 3000,
@@ -109,12 +111,16 @@ export const ProductCard = ({
       const token =
         (session as any)?.accessToken || (session as any)?.user?.accessToken;
 
-      await ApiService.post(
-        "/cart/add",
-        { productId: id, quantity: 1 },
+      // Best-effort server sync — the local cart (re-synced in full at
+      // checkout) is the source of truth for the shopping session.
+      ApiService.post(
+        "/cart/items",
+        kind === "DISH"
+          ? { menuItemId: id, quantity: 1 }
+          : { productId: id, quantity: 1 },
         token,
         {},
-      );
+      ).catch(() => {});
 
       // 3. Success: Update Local Store (Optimistic or Sync)
       addItem({
@@ -125,6 +131,7 @@ export const ProductCard = ({
         image: image,
         restaurantId: storeId,
         cityId, // ✅ Store cityId in cart
+        kind,
       });
 
       toast.success("Added to basket");

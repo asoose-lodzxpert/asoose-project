@@ -201,11 +201,26 @@ export class ApiService {
     }
 
     const text = await response.text();
+    let parsed: unknown;
     try {
-      return text ? JSON.parse(text) : ({} as T);
+      parsed = text ? JSON.parse(text) : {};
     } catch {
       return {} as T;
     }
+
+    // The backend wraps every response as { success, message, data } —
+    // unwrap here so every caller can type T as the actual payload instead
+    // of repeating this check at every call site.
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      "success" in parsed &&
+      "data" in parsed
+    ) {
+      return (parsed as { data: T }).data;
+    }
+
+    return parsed as T;
   }
 
 

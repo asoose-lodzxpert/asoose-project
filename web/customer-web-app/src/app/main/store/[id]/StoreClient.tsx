@@ -18,8 +18,6 @@ import { ProductModal, ModifierGroup } from "@/store/ProductModal";
 import { ApiService } from "@/services/api.service";
 import { useRideStore } from "@/app/main/ride/store/ride";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 const POPULAR_ITEMS_COUNT = 6;
 
 interface Product {
@@ -111,29 +109,59 @@ export default function StoreClient() {
       const locQuery = userLocation
         ? `?lat=${userLocation.lat}&lng=${userLocation.lng}`
         : "";
-      const data = await ApiService.get<Store>(
-        `/marketplace/vendor/${slugOrId}${locQuery}`,
-      );
-      // Normalise: API returns `images: string[]`; components expect `image: string`
-      const normalizedProducts = (data.products || []).map((p: any) => ({
-        ...p,
-        image:
-          p.image ||
-          (Array.isArray(p.images) && p.images.length > 0
-            ? p.images[0]
-            : undefined),
-        stock: p.stock,
-        status: p.status,
-        manageStock: p.manageStock,
-      }));
-      setStore({ ...data, products: normalizedProducts });
+
+      const [detail, items] = await Promise.all([
+        ApiService.get<any>(`/catalog/storefronts/${slugOrId}${locQuery}`),
+        ApiService.get<any>(`/catalog/storefronts/${slugOrId}/items?limit=100`),
+      ]);
+
+      // Backend splits detail (name/rating/hours) from items (products, or a
+      // menu grouped by category for restaurants) — flatten both into the
+      // single flat product list this UI already expects.
+      let normalizedProducts: Product[] = [];
+      if (items?.kind === "RESTAURANT" && items.menu) {
+        normalizedProducts = Object.entries(items.menu as Record<string, any[]>).flatMap(
+          ([categoryName, dishes]) =>
+            dishes.map((d: any) => ({
+              ...d,
+              category: { name: categoryName },
+              image: d.image || (Array.isArray(d.images) && d.images[0]) || undefined,
+            })),
+        );
+      } else if (items?.kind === "STORE" && items.products) {
+        normalizedProducts = items.products.map((p: any) => ({
+          ...p,
+          category: { name: "All" },
+          image: p.image || (Array.isArray(p.images) && p.images[0]) || undefined,
+          stock: p.stock,
+          status: p.status,
+          manageStock: p.manageStock,
+        }));
+      }
+
+      const mappedStore: Store = {
+        id: detail.id,
+        name: detail.name,
+        image: detail.logo || detail.banner,
+        rating: detail.rating,
+        type: detail.kind,
+        deliveryTime: `${detail.preparationTime || 20} min`,
+        address: detail.address,
+        isAvailableInLocation: detail.isOpen,
+        products: normalizedProducts,
+        reviews: [],
+      };
+
+      setStore(mappedStore);
       setMenuItems(normalizedProducts);
-      setReviews(data.reviews || []);
+      // Reviews live under a separate module not yet wired up here — the UI
+      // stays functional (empty state) rather than erroring.
+      setReviews([]);
 
       // Set default tab on first load based on store type
       setActiveTab((prev) =>
         prev === "All" || prev === "Popular"
-          ? data.type === "RESTAURANT"
+          ? mappedStore.type === "RESTAURANT"
             ? "Popular"
             : "All"
           : prev,
@@ -175,36 +203,19 @@ export default function StoreClient() {
     });
 
     if (result.isConfirmed) {
-      try {
-        // ✅ Get NextAuth Session
-        const session = await getSession();
-        const token = (session as any)?.accessToken;
-
-        await ApiService.delete(`/marketplace/reviews/${store.id}`, token);
-        fetchStoreData();
-      } catch (err) {
-        console.error(err);
-      }
+      // Reviews aren't wired to a backend endpoint yet — see handleReviewSubmit.
+      Swal.fire("Coming soon", "Review management isn't available yet.", "info");
     }
   };
 
   const handleReviewSubmit = async (
-    rating: number,
-    comment: string,
+    _rating: number,
+    _comment: string,
     _orderId?: string, // reserved for future backend support
   ) => {
-    // ✅ Get NextAuth Session
-    const session = await getSession();
-    const token = (session as any)?.accessToken;
-
-    if (!token) throw new Error("Not logged in");
-
-    await ApiService.post(
-      "/marketplace/reviews",
-      { storeId: store?.id, rating, comment: comment.trim() },
-      token,
-    );
-    fetchStoreData();
+    // TODO: wire up once the /reviews module's request/response contract is
+    // confirmed — this UI already renders an empty review list gracefully.
+    throw new Error("Reviews aren't available yet — check back soon.");
   };
 
   const addRecentSearch = (term: string) => {
@@ -390,6 +401,7 @@ export default function StoreClient() {
                         key={item.id}
                         {...item}
                         storeId={store.id}
+                        kind={store.type === "RESTAURANT" ? "DISH" : "PRODUCT"}
                         isAvailable={store.isAvailableInLocation}
                         isSoldOut={item.manageStock && ((item.stock || 0) <= 0 || item.status === "OUT_OF_STOCK")}
                         href={
@@ -450,6 +462,7 @@ export default function StoreClient() {
         <ProductModal
           product={selectedProduct}
           storeId={store?.id || ""}
+          kind={store?.type === "RESTAURANT" ? "DISH" : "PRODUCT"}
           onClose={() => setSelectedProduct(null)}
         />
       )}

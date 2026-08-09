@@ -12,6 +12,9 @@ export interface CartItem {
   image?: string | null;
   modifierIds?: string[];
   modifierNames?: string[];
+  /** Which backend cart-item field this maps to: menuItemId (DISH) vs productId (PRODUCT).
+   *  Missing on old persisted carts — treated as "PRODUCT" wherever read. */
+  kind?: "PRODUCT" | "DISH";
 }
 
 export function computeLineId(

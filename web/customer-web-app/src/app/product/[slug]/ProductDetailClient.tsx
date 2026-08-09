@@ -76,16 +76,21 @@ export default function ProductDetailClient({ product }: { product: Product }) {
           (session as any)?.accessToken || (session as any)?.user?.accessToken;
         const modifierIds: string[] = Object.values(mods).flat();
 
-        await ApiService.post(
-          "/cart/add",
+        // The backend cart doesn't have a modifier/options concept yet —
+        // only productId/quantity/instructions are persisted server-side.
+        // Selected modifiers still affect price and are still shown locally
+        // (below), but aren't sent to the server cart. Best-effort sync —
+        // checkout re-syncs the full local cart, so a failure here shouldn't
+        // block adding the item locally.
+        ApiService.post(
+          "/cart/items",
           {
             productId: product.id,
             quantity: 1,
-            ...(modifierIds.length > 0 && { modifierIds }),
           },
           token,
           {},
-        );
+        ).catch(() => {});
 
         const validImages = (product.images ?? []).filter((u) =>
           u?.startsWith("http"),
@@ -103,6 +108,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
           quantity: 1,
           restaurantId: product.store?.id ?? "",
           image: validImages[0] ?? null,
+          kind: "PRODUCT",
           ...(modifierIds.length > 0 && { modifierIds }),
           ...(modifierNames.length > 0 && { modifierNames }),
         });

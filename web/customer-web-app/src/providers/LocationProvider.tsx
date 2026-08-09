@@ -37,12 +37,13 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
 
         // Resolve cityId from coordinates
         try {
-          const cityData: any = await ApiService.get(
-            `/maps/city-by-coords?lat=${coords.lat}&lng=${coords.lng}`,
-          );
-          if (cityData && cityData.id) {
-            useRideStore.getState().setCityId(cityData.id);
-            console.log("🏙️ City detected:", cityData.name);
+          const result: any = await ApiService.post("/locations/resolve-city", {
+            latitude: coords.lat,
+            longitude: coords.lng,
+          });
+          if (result?.city?.id) {
+            useRideStore.getState().setCityId(result.city.id);
+            console.log("🏙️ City detected:", result.city.name);
           }
         } catch (cityErr) {
           console.error("Failed to resolve city from coordinates:", cityErr);

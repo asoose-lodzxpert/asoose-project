@@ -29,6 +29,8 @@ export interface ProductProps {
   manageStock?: boolean;
   /** Modifier groups passed through so the card can gate direct-add for required-modifier products. */
   modifierGroups?: ModifierGroupRef[];
+  /** RESTAURANT storefronts add dishes (menuItemId); STORE storefronts add products (productId). */
+  kind?: "PRODUCT" | "DISH";
   onClick?: () => void;
 }
 
@@ -46,6 +48,7 @@ export const ProductCard = ({
   status = "ACTIVE",
   manageStock = false,
   modifierGroups,
+  kind = "PRODUCT",
   onClick,
 }: ProductProps) => {
   const addItem = useCartStore((state) => state.addItem);
@@ -77,16 +80,17 @@ export const ProductCard = ({
       return;
     }
 
-    // Delegate to modal opener if available, to ensure modifier selections are collected.
-    if (onClick) {
-      onClick();
-      return;
-    }
-
-    // Block direct-add for products that require modifier selections.
-    // Without a modal, we cannot collect the required modifierIds and the
-    // backend will reject the request (minSelect enforcement).
+    // Only route through the details modal when there's actually something
+    // to collect — otherwise every quick-add click opened the full product
+    // modal on top of the page instead of just adding the item.
     if (hasRequiredModifiers) {
+      if (onClick) {
+        onClick();
+        return;
+      }
+      // No modal opener available and modifiers are required — we can't
+      // collect the required modifierIds, and the backend will reject the
+      // request (minSelect enforcement).
       toast.info("Please tap the item to choose your options", {
         position: "bottom-center",
         autoClose: 3000,
@@ -109,30 +113,20 @@ export const ProductCard = ({
       const token =
         (session as any)?.accessToken || (session as any)?.user?.accessToken;
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/cart/add`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-
-          },
-          body: JSON.stringify({ productId: id, quantity: 1 }),
+      // Best-effort server sync — the local cart (re-synced in full at
+      // checkout) is the source of truth for the shopping session.
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/cart/items`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      );
-
-      if (!res.ok) {
-        if (res.status === 401) {
-          router.push("/sign-in");
-          throw new Error("Session expired");
-        }
-        const errorData = await res.json().catch(() => ({}));
-        const rawMsg = errorData.message;
-        throw new Error(
-          Array.isArray(rawMsg) ? rawMsg.join("; ") : rawMsg || "Failed to add to cart"
-        );
-      }
+        body: JSON.stringify(
+          kind === "DISH"
+            ? { menuItemId: id, quantity: 1 }
+            : { productId: id, quantity: 1 },
+        ),
+      }).catch(() => {});
 
       addItem({
         id,
@@ -142,6 +136,7 @@ export const ProductCard = ({
         image,
         restaurantId: storeId,
         cityId,
+        kind,
       });
 
       toast.success("Added to basket");

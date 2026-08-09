@@ -108,8 +108,8 @@ function HomeHeaderInner() {
     const fetchAddressAndNotifications = async () => {
       try {
         const [addressResult, notifResult] = await Promise.allSettled([
-          ApiService.get<any[]>("/users/addresses", accessToken),
-          ApiService.get<any>("/notifications", accessToken),
+          ApiService.get<any[]>("/addresses", accessToken),
+          ApiService.get<{ unreadCount: number }>("/notifications/unread-count", accessToken),
         ]);
 
         if (cancelled) return;
@@ -125,13 +125,14 @@ function HomeHeaderInner() {
             });
 
             // Resolve cityId from the coordinates of the selected address
-            ApiService.get<any>(
-              `/maps/city-by-coords?lat=${active.lat}&lng=${active.lng}`,
-            )
-              .then((cityData) => {
-                if (cityData && cityData.id) {
+            ApiService.post<any>("/cities/resolve-city", {
+              latitude: active.latitude,
+              longitude: active.longitude,
+            })
+              .then((resolved) => {
+                if (resolved?.city?.id) {
                   import("@/app/main/ride/store/ride").then((module) => {
-                    module.useRideStore.getState().setCityId(cityData.id);
+                    module.useRideStore.getState().setCityId(resolved.city.id);
                   });
                 }
               })
@@ -142,12 +143,7 @@ function HomeHeaderInner() {
         }
 
         if (notifResult.status === "fulfilled") {
-          const response = notifResult.value;
-          const notificationsList = Array.isArray(response)
-            ? response
-            : response?.data || [];
-          const unread = notificationsList.filter((n: any) => !n.isRead).length;
-          setUnreadCount(unread);
+          setUnreadCount(notifResult.value?.unreadCount ?? 0);
         }
       } catch (error) {
         console.error("Header data load failed:", error);

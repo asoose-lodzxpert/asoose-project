@@ -3,16 +3,12 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useCartStore } from "@/store/useCartStore";
+import { useCartStore, CartItem } from "@/store/useCartStore";
 import { useSession } from "next-auth/react";
 import { WifiOff, Loader2, Phone, MapPin, Plus } from "lucide-react";
 import Swal from "sweetalert2";
 import { toast } from "react-toastify";
-import {
-  paymentService,
-  InitiatePaymentPayload,
-} from "@/services/payment.service";
-import { DEFAULT_PAYMENT_METHOD } from "../ride/constants/config";
+import { ApiService } from "@/services/api.service";
 import { savePurchaseContext } from "@/lib/meta-pixel";
 
 // Components
@@ -22,9 +18,21 @@ import { CartItemsList } from "@/app/main/components/checkout/cartitemslist";
 import { OrderSummary } from "@/app/main/components/checkout/ordersummary";
 import { AddressPickerModal } from "@/app/main/components/checkout/address-picker-modal";
 
-// Constants
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+// The backend prices and places orders from its own server-side cart
+// (/cart/items), not from a list of items sent with the request — the local
+// Zustand cart is the source of truth during shopping, so this pushes it to
+// the server right before quoting/checking out. Modifiers aren't synced —
+// the backend cart has no modifier concept yet.
+async function syncCartToServer(items: CartItem[], token: string) {
+  await ApiService.delete("/cart", token).catch(() => {});
+  for (const item of items) {
+    const body =
+      item.kind === "DISH"
+        ? { menuItemId: item.id, quantity: item.quantity }
+        : { productId: item.id, quantity: item.quantity };
+    await ApiService.post("/cart/items", body, token);
+  }
+}
 
 export default function CheckoutForm() {
   const router = useRouter();
@@ -54,14 +62,12 @@ export default function CheckoutForm() {
   // Backend-authoritative grand total from the quote. Used as the single source
   // of truth for display — prevents discrepancies from client-side subtotal recomputation.
   const [quoteGrandTotal, setQuoteGrandTotal] = useState<number | null>(null);
-  // Price-lock token returned by the quote endpoint. Must be sent back with the
-  // order so the backend uses the exact same amounts without recalculating.
-  const [quoteToken, setQuoteToken] = useState<string | null>(null);
   const [isLoadingFee, setIsLoadingFee] = useState(false);
   const quoteAbortRef = useRef<AbortController | null>(null);
 
-  // Paystack is the only payment method
-  const selectedPaymentMethod = DEFAULT_PAYMENT_METHOD;
+  // Orders only support WALLET or CARD server-side — CARD (Paystack checkout
+  // link) is the only one this UI offers right now.
+  const selectedPaymentMethod = "CARD" as const;
 
   const {
     items: cartItems,
@@ -89,80 +95,44 @@ export default function CheckoutForm() {
         setDeliveryFee(null);
         setServiceFee(null);
         setVatAmount(null);
+        setQuoteGrandTotal(null);
         return;
       }
       const token = session?.accessToken;
       if (!token) return;
 
-      quoteAbortRef.current?.abort();
-      quoteAbortRef.current = new AbortController();
       setIsLoadingFee(true);
 
       try {
-        const res = await fetch(`${API_URL}/users/cart/quote`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          signal: quoteAbortRef.current.signal,
-          body: JSON.stringify({
-            addressId: address.id,
-            items: cartItems.map((item) => ({
-              id: item.id,
-              quantity: item.quantity,
-              ...(item.modifierIds && item.modifierIds.length > 0
-                ? { modifierIds: item.modifierIds }
-                : {}),
-            })),
-          }),
-        });
+        // The backend prices from its own server-side cart, not from a list
+        // of items we send — push the local cart there first so the quote
+        // reflects what's actually in it.
+        await syncCartToServer(cartItems, token);
 
-        if (res.ok) {
-          const data = await res.json();
-          // data.totalDeliveryFee is the route-optimized total
-          // data.groups[*].serviceFee summed = total service fee
-          // data.groups[*].vatAmount summed = total VAT
-          const totalServiceFee = (data.groups ?? []).reduce(
-            (sum: number, g: any) => sum + (g.serviceFee ?? 0),
-            0,
-          );
-          const totalVatAmount = (data.groups ?? []).reduce(
-            (sum: number, g: any) => sum + (g.vatAmount ?? 0),
-            0,
-          );
-          setDeliveryFee(data.totalDeliveryFee ?? null);
-          setServiceFee(totalServiceFee || null);
-          setVatAmount(totalVatAmount || null);
-          // Use the backend-computed grand total as the single source of truth.
-          setQuoteGrandTotal(data.grandTotal ?? null);
-          // Store the price-lock token so we can send it back with the order.
-          setQuoteToken(data.quoteToken ?? null);
-        } else {
-          const errData = await res.json().catch(() => ({}));
-          console.error("[CheckoutForm] Quote API error:", res.status, errData);
-          
-          // Display the specific backend error (e.g. "Store does not deliver to your current city")
-          const errorMsg = errData.message || "Could not calculate delivery fee. Please double check your address.";
-          toast.error(errorMsg);
+        const data = await ApiService.post<{
+          pricing: {
+            deliveryFee: number;
+            serviceFee: number;
+            vat: number;
+            total: number;
+          };
+        }>("/orders/quote", { deliveryAddressId: address.id }, token);
 
-          setDeliveryFee(null);
-          setServiceFee(null);
-          setVatAmount(null);
-          setQuoteGrandTotal(null);
-          setQuoteToken(null);
-        }
+        setDeliveryFee(data.pricing.deliveryFee ?? null);
+        setServiceFee(data.pricing.serviceFee ?? null);
+        setVatAmount(data.pricing.vat ?? null);
+        setQuoteGrandTotal(data.pricing.total ?? null);
       } catch (err: any) {
-        if (err.name !== "AbortError") {
-          toast.warn(
-            "Could not calculate delivery fee. You can still place your order.",
-          );
-          setDeliveryFee(null);
-          setServiceFee(null);
-          setVatAmount(null);
-          setQuoteGrandTotal(null);
-          setQuoteToken(null);
-        }
+        // Display the specific backend error when there is one (e.g. "Store
+        // does not deliver to your current city"), otherwise a generic notice.
+        toast.error(
+          err?.message ||
+            "Could not calculate delivery fee. Please double check your address.",
+        );
+        setDeliveryFee(null);
+        setServiceFee(null);
+        setVatAmount(null);
+        setQuoteGrandTotal(null);
       } finally {
         setIsLoadingFee(false);
       }
@@ -212,15 +182,10 @@ export default function CheckoutForm() {
       return;
     }
     try {
-      const res = await fetch(`${API_URL}/users/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const saved = data.phone || "";
-        profilePhoneRef.current = saved;
-        setPhone(saved);
-      }
+      const data = await ApiService.get<{ phone?: string }>("/users/me", token);
+      const saved = data.phone || "";
+      profilePhoneRef.current = saved;
+      setPhone(saved);
     } catch {
       // Non-fatal — user can still enter phone manually
     } finally {
@@ -241,28 +206,25 @@ export default function CheckoutForm() {
     }
 
     try {
-      abortControllerRef.current?.abort();
-      abortControllerRef.current = new AbortController();
-
       setIsLoadingAddresses(true);
 
-      const res = await fetch(`${API_URL}/users/addresses`, {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: abortControllerRef.current.signal,
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setAddresses(data);
-        const defaultAddr = data.find((a: Address) => a.isDefault) || data[0];
-        if (defaultAddr) setSelectedAddress(defaultAddr);
-      } else {
-        toast.error("Failed to load addresses");
-      }
+      const data = await ApiService.get<any[]>("/addresses", token);
+      // Backend uses latitude/longitude; this form's Address type uses lat/lng.
+      const mapped: Address[] = data.map((a) => ({
+        id: a.id,
+        label: a.label,
+        street: a.street,
+        city: a.city,
+        state: a.state,
+        isDefault: a.isDefault,
+        lat: a.latitude,
+        lng: a.longitude,
+      }));
+      setAddresses(mapped);
+      const defaultAddr = mapped.find((a) => a.isDefault) || mapped[0];
+      if (defaultAddr) setSelectedAddress(defaultAddr);
     } catch (error: any) {
-      if (error.name !== "AbortError") {
-        toast.error("Failed to load addresses");
-      }
+      toast.error(error?.message || "Failed to load addresses");
     } finally {
       setIsLoadingAddresses(false);
     }
@@ -308,31 +270,28 @@ export default function CheckoutForm() {
         }
 
         // Check order status to see if payment was cancelled
-        const orderRes = await fetch(`${API_URL}/users/orders/${lastOrderId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const order = await ApiService.get<{ paymentStatus: string }>(
+          `/orders/${lastOrderId}`,
+          token,
+        );
 
-        if (orderRes.ok) {
-          const order = await orderRes.json();
-
-          // Only show message if order is in pending/cancelled state
-          // (i.e., payment was not completed)
-          if (
-            order.paymentStatus === "CANCELLED" ||
-            order.paymentStatus === "FAILED" ||
-            order.paymentStatus === "PENDING"
-          ) {
-            toast.warn(
-              "Previous payment was " +
-                (order.paymentStatus === "CANCELLED"
-                  ? "cancelled"
-                  : "not completed") +
-                ". Your cart is ready for a fresh order.",
-            );
-            // Clear the pending context but preserve cart for immediate retry
-            localStorage.removeItem("pending_checkout");
-            localStorage.removeItem("last_order_id");
-          }
+        // Only show message if order is in pending/cancelled state
+        // (i.e., payment was not completed)
+        if (
+          order.paymentStatus === "CANCELLED" ||
+          order.paymentStatus === "FAILED" ||
+          order.paymentStatus === "PENDING"
+        ) {
+          toast.warn(
+            "Previous payment was " +
+              (order.paymentStatus === "CANCELLED"
+                ? "cancelled"
+                : "not completed") +
+              ". Your cart is ready for a fresh order.",
+          );
+          // Clear the pending context but preserve cart for immediate retry
+          localStorage.removeItem("pending_checkout");
+          localStorage.removeItem("last_order_id");
         }
       } catch (err) {
         // Non-fatal error — user can still proceed
@@ -352,91 +311,34 @@ export default function CheckoutForm() {
     if (!token) return;
 
     try {
-      const res = await fetch(`${API_URL}/users/addresses`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+      const created = await ApiService.post<any>(
+        "/addresses",
+        {
+          label: addressData.label,
+          street: addressData.street,
+          city: addressData.city,
+          state: addressData.state,
+          latitude: addressData.lat,
+          longitude: addressData.lng,
         },
-        body: JSON.stringify(addressData),
-      });
-
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message || "Failed to add address");
+        token,
+      );
 
       await fetchAddresses();
-      setSelectedAddress(json);
+      setSelectedAddress({
+        id: created.id,
+        label: created.label,
+        street: created.street,
+        city: created.city,
+        state: created.state,
+        isDefault: created.isDefault,
+        lat: created.latitude,
+        lng: created.longitude,
+      });
       toast.success("Address added successfully");
       setShowAddAddressModal(false);
     } catch (error: any) {
       toast.error(error.message || "Failed to save address");
-    }
-  };
-
-  const processPayment = async (
-    id: string,
-    orderTotal: number,
-    isGroup = false,
-  ) => {
-    try {
-      if (!selectedPaymentMethod) return;
-
-      localStorage.setItem("pending_checkout", "true");
-      // For groups, we might need to handle differently in "orders/confirmed"
-      // But for now, we just save the ID.
-      localStorage.setItem("last_order_id", id);
-
-      const paymentPayload: InitiatePaymentPayload = {
-        amount: orderTotal,
-        email: session?.user?.email || "customer@example.com",
-        gateway: selectedPaymentMethod.gateway as any,
-        method: selectedPaymentMethod.type as "CARD" | "BANK_TRANSFER",
-        type: "ORDER",
-        // Send just the app origin — the backend GET /callback/paystack handler
-        // appends "/payment/callback" itself before redirecting the browser.
-        callbackUrl: (
-          process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"
-        ).replace(/\/+$/, ""),
-      };
-
-      // FIX: Distinguish between single Order ID and OrderGroup ID
-      if (isGroup) {
-        paymentPayload.orderGroupId = id;
-      } else {
-        paymentPayload.orderId = id;
-      }
-
-      const token = session?.accessToken;
-      if (!token) throw new Error("Authentication missing");
-
-      const paymentRes = await paymentService.initiatePayment(
-        paymentPayload,
-        token,
-      );
-
-      if (paymentRes.authorizationUrl) {
-        savePurchaseContext({
-          value: orderTotal,
-          currency: "NGN",
-          contentCategory: "shopping",
-          contentId: id,
-        });
-        window.location.href = paymentRes.authorizationUrl;
-      } else {
-        throw new Error("Payment authorization URL not received");
-      }
-    } catch (paymentError: any) {
-      console.error("Payment initialization error:", paymentError);
-
-      toast.warn(
-        "Payment initialization failed. Please check your order history.",
-      );
-      // If group, maybe redirect to orders list?
-      if (isGroup) {
-        router.push("/main/orders");
-      } else {
-        router.push(`/main/orders/confirmed?id=${id}`);
-      }
     }
   };
 
@@ -474,11 +376,6 @@ export default function CheckoutForm() {
       return;
     }
 
-    // FIX: Don't force restaurantId if multi-vendor.
-    // The backend's createMultiOrder groups items itself.
-    // However, if we are hitting 'createOrder' endpoint it might expect one.
-    // We'll trust the payload construction handles it.
-
     const token = session?.accessToken;
 
     if (!token) {
@@ -492,73 +389,56 @@ export default function CheckoutForm() {
       // Persist phone to user profile if it was added or changed
       const normalizedPhone = phone.trim();
       if (normalizedPhone !== profilePhoneRef.current) {
-        if (token) {
-          const profileRes = await fetch(`${API_URL}/users/profile`, {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              name: session?.user?.name || "",
-              phone: normalizedPhone,
-            }),
-          });
-          if (profileRes.ok) {
-            profilePhoneRef.current = normalizedPhone;
-          } else {
-            const err = await profileRes.json().catch(() => ({}));
-            throw new Error(err?.message || "Failed to save phone number");
-          }
+        try {
+          await ApiService.patch("/users/me/profile", { phone: normalizedPhone }, token);
+          profilePhoneRef.current = normalizedPhone;
+        } catch (err: any) {
+          throw new Error(err?.message || "Failed to save phone number");
         }
       }
 
+      // Re-sync cart (in case it changed since the last quote) then check out
+      // in one call — the backend creates the order from its own cart and,
+      // for CARD, returns a Paystack authorizationUrl directly. There's no
+      // separate payment-initialize step.
+      await syncCartToServer(cartItems, token);
+
       const idempotencyKey = crypto.randomUUID();
-      const payload = {
-        addressId: selectedAddress.id,
-        restaurantId: cartItems[0].restaurantId, // Kept for backward compat with single-order endpoint logic
-        items: cartItems.map((item) => ({
-          id: item.id,
-          quantity: item.quantity,
-          // Forward modifier selections so the backend can price and persist them correctly
-          ...(item.modifierIds && item.modifierIds.length > 0
-            ? { modifierIds: item.modifierIds }
-            : {}),
-        })),
-        // Send price-lock token so the backend uses the exact quoted amounts.
-        // If quote expired (>15 min) the backend returns a clear error message.
-        ...(quoteToken ? { quoteToken } : {}),
-      };
-
-      const res = await fetch(`${API_URL}/users/orders`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          "Idempotency-Key": idempotencyKey,
+      const data = await ApiService.post<{
+        orderId: string;
+        total?: number;
+        pricing?: { total: number };
+        authorizationUrl?: string;
+      }>(
+        "/orders/checkout",
+        {
+          deliveryAddressId: selectedAddress.id,
+          paymentMethod: selectedPaymentMethod,
+          idempotencyKey,
         },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Order creation failed");
+        token,
+      );
 
       isOrderCreated.current = true;
-      // FIX C1: Do NOT clear cart here — cart is cleared in /payment/callback
-      // only after payment is verified successfully. Clearing before payment
-      // means the user loses items if they cancel or payment fails.
+      // Cart is cleared after payment is verified (payment callback), not here —
+      // clearing early would lose items if the user cancels or payment fails.
 
-      // Paystack (CARD) is the only payment method — always redirect to checkout
-      if (data.orderGroupId) {
-        // Multi-order group
-        await processPayment(
-          data.orderGroupId,
-          data.grandTotal || data.total,
-          true,
-        );
+      const orderTotal = data.pricing?.total ?? data.total ?? 0;
+
+      if (data.authorizationUrl) {
+        localStorage.setItem("pending_checkout", "true");
+        localStorage.setItem("last_order_id", data.orderId);
+        savePurchaseContext({
+          value: orderTotal,
+          currency: "NGN",
+          contentCategory: "shopping",
+          contentId: data.orderId,
+        });
+        window.location.href = data.authorizationUrl;
       } else {
-        // Single order
-        await processPayment(data.id, data.total, false);
+        // WALLET — already paid, nothing further to redirect to a gateway for.
+        clearCart();
+        router.push(`/main/orders/confirmed?id=${data.orderId}`);
       }
     } catch (error: any) {
       console.error("Order placement error:", error);

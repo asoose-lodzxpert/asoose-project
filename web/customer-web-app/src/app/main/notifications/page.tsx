@@ -26,12 +26,22 @@ interface Notification {
   createdAt: string;
 }
 
-interface PaginatedNotifications {
-  data: Notification[];
-  meta: {
-    total: number;
-    page: number;
-    pages: number;
+// `fetcher` (shared with super-admin) returns the raw parsed body — the
+// backend wraps every response as { success, message, data }, so the actual
+// payload is one level deeper than the old flat { data, meta } shape.
+interface NotificationsResponse {
+  success: boolean;
+  message: string;
+  data: {
+    notifications: Array<{
+      id: string;
+      title: string;
+      body: string;
+      type: string;
+      isRead: boolean;
+      createdAt: string;
+    }>;
+    pagination: { page: number; limit: number; total: number; totalPages: number };
   };
 }
 
@@ -42,9 +52,11 @@ export default function NotificationsPage() {
     data: response,
     mutate,
     isLoading,
-  } = useSWR<PaginatedNotifications>("/notifications", fetcher);
+  } = useSWR<NotificationsResponse>("/notifications", fetcher);
 
-  const notifications = response?.data || [];
+  const notifications: Notification[] = (response?.data?.notifications ?? []).map(
+    (n) => ({ ...n, message: n.body }),
+  );
 
   const handleMarkAsRead = async (id: string, currentReadStatus: boolean) => {
     // Prevent API call if already read
@@ -55,9 +67,12 @@ export default function NotificationsPage() {
       mutate(
         {
           ...response,
-          data: response.data.map((n) =>
-            n.id === id ? { ...n, isRead: true } : n,
-          ),
+          data: {
+            ...response.data,
+            notifications: response.data.notifications.map((n) =>
+              n.id === id ? { ...n, isRead: true } : n,
+            ),
+          },
         },
         false,
       );
@@ -79,7 +94,10 @@ export default function NotificationsPage() {
         mutate(
           {
             ...response,
-            data: response.data.map((n) => ({ ...n, isRead: true })),
+            data: {
+              ...response.data,
+              notifications: response.data.notifications.map((n) => ({ ...n, isRead: true })),
+            },
           },
           false,
         );
@@ -93,26 +111,22 @@ export default function NotificationsPage() {
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation(); // Prevent triggering handleMarkAsRead when deleting
-
-    try {
-      // Optimistic Update
-      if (response) {
-        mutate(
-          {
-            ...response,
-            data: response.data.filter((n) => n.id !== id),
-          },
-          false,
-        );
-      }
-
-      await fetcher(`/notifications/${id}`, { method: "DELETE" });
-    } catch (err) {
-      toast.error("Could not delete notification");
-      mutate();
-    }
+  // The backend has no per-notification delete endpoint yet — this is a
+  // local-only dismiss (won't survive a refresh) rather than a broken call
+  // to an endpoint that doesn't exist.
+  const handleDelete = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!response) return;
+    mutate(
+      {
+        ...response,
+        data: {
+          ...response.data,
+          notifications: response.data.notifications.filter((n) => n.id !== id),
+        },
+      },
+      false,
+    );
   };
 
   const getIcon = (type: string) => {

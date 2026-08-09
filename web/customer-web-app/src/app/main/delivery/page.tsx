@@ -24,8 +24,7 @@ import { LocationInput } from "@/components/shared/LocationInput";
 import DeliveryProgressUI from "./components/DeliveryProgressUi";
 import PackageForm from "./components/PackageForm"; // ✅ Imported new component
 import { ReviewModal } from "@/store/ReviewModal";
-import { paymentService } from "@/services/payment.service";
-import { DeliveryService } from "@/services/delivery.service";
+import { DeliveryService, weightToParcelSize } from "@/services/delivery.service";
 import { socketService } from "@/services/socket.service";
 import {
   savePurchaseContext,
@@ -121,7 +120,6 @@ export default function DeliveryPage() {
     stage,
     courierInfo,
     activeDeliveryId,
-    setAddressIds,
     setCalculatedFee,
     calculatedFee,
     resetDelivery,
@@ -466,87 +464,30 @@ export default function DeliveryPage() {
     setApiError(false);
 
     try {
-      setStage(DeliveryStage.PROCESSING_ADDRESS);
-
-      // `label` is required (non-nullable String) by the Address Prisma model.
-      // Omitting it causes a DB constraint violation on every delivery attempt.
-      const pickupRes = await DeliveryService.saveAddress(
-        {
-          label: "Pickup Location",
-          street: sanitizeInput(packageInfo.pickupAddress),
-          lat: pickupPos.lat,
-          lng: pickupPos.lng,
-        },
-        token,
-      );
-
-      const dropoffRes = await DeliveryService.saveAddress(
-        {
-          label: "Delivery Address",
-          street: sanitizeInput(packageInfo.destinationAddress),
-          lat: dropoffPos.lat,
-          lng: dropoffPos.lng,
-        },
-        token,
-      );
-
-      setAddressIds(pickupRes.id, dropoffRes.id);
       setStage(DeliveryStage.CALCULATING_FEE);
 
-      // Use user-provided exact weight if available, else fallback to package type logic
-      const finalWeight =
-        typeof packageInfo.weightKg === "number" && packageInfo.weightKg > 0
-          ? packageInfo.weightKg
-          : 2.5; // Default fallback
-
-      const deliveryRes = await DeliveryService.createDelivery(
+      // The backend prices and creates the parcel from pickup/dropoff
+      // coordinates directly — no separate "save address, get an ID back"
+      // step. Estimate here just previews the fare; the parcel itself (and
+      // payment) is created in handlePayment once the user confirms.
+      const size = weightToParcelSize(packageInfo.weightKg);
+      const estimate = await DeliveryService.estimateParcel(
         {
-          pickupAddressId: pickupRes.id,
-          dropoffAddressId: dropoffRes.id,
-          recipientName: sanitizeInput(packageInfo.recipientName),
-          recipientPhone: normalizePhoneNumber(packageInfo.recipientPhone),
-          senderName: packageInfo.senderName.trim() || undefined,
-          senderPhone: packageInfo.senderPhone
-            ? normalizePhoneNumber(packageInfo.senderPhone)
-            : undefined,
-          // Avoid a trailing dash ("Document - ") when instructions are empty.
-          packageDetails: sanitizeInput(
-            packageInfo.instructions
-              ? `${packageInfo.type} - ${packageInfo.instructions}`
-              : packageInfo.type,
-          ),
-
-          // Optional Metadata Fields
-          weightKg: finalWeight,
-          declaredValue:
-            typeof packageInfo.declaredValue === "number"
-              ? packageInfo.declaredValue
-              : undefined,
-          fragile: packageInfo.isFragile,
-          perishable: packageInfo.isPerishable,
-          containsLiquid: packageInfo.containsLiquid,
+          latitude: pickupPos.lat,
+          longitude: pickupPos.lng,
+          address: sanitizeInput(packageInfo.pickupAddress),
         },
+        {
+          latitude: dropoffPos.lat,
+          longitude: dropoffPos.lng,
+          address: sanitizeInput(packageInfo.destinationAddress),
+        },
+        size,
         token,
       );
 
-      if (deliveryRes?.delivery?.id) {
-        trackMetaCustomEvent(
-          "DispatchRequest",
-          {
-            package_type: packageInfo.type,
-            value: deliveryRes.deliveryFee,
-            currency: "NGN",
-          },
-          `dispatch:${deliveryRes.delivery.id}`,
-        );
-        useDeliveryStore.setState({
-          activeDeliveryId: deliveryRes.delivery.id,
-        });
-        setCalculatedFee(deliveryRes.deliveryFee);
-        setStage(DeliveryStage.REVIEW_PAYMENT);
-      } else {
-        throw new Error("Invalid server response");
-      }
+      setCalculatedFee(estimate.fare);
+      setStage(DeliveryStage.REVIEW_PAYMENT);
     } catch (error: any) {
       console.error("Init Error:", error);
       toast.error(error.message || "Failed to initialize delivery.");
@@ -556,7 +497,7 @@ export default function DeliveryPage() {
   };
 
   const handlePayment = async () => {
-    if (!activeDeliveryId || !calculatedFee) return;
+    if (!pickupPos || !dropoffPos || !calculatedFee) return;
     const token = getAuthToken(session);
     if (!token) {
       toast.error("Session expired. Please login again.");
@@ -565,67 +506,75 @@ export default function DeliveryPage() {
 
     try {
       setStage(DeliveryStage.PAYMENT_PENDING);
-      const userEmail =
-        session?.user?.email || `guest-${Date.now()}@asoose.com`;
 
-      // Build the frontend callback URL explicitly.
-      // The backend stores this in payment.metadata and uses it to redirect
-      // the user's browser BACK to the frontend after verifying with Paystack.
-      // Without this, the backend falls back to process.env.FRONTEND_URL which
-      // may be unset or wrong. NEXT_PUBLIC_APP_URL must be this app's port (3001),
-      // NOT the backend port (3000).
-      const appUrl = (
-        process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"
-      ).replace(/\/+$/, "");
-      // Send just the base URL — the backend GET /callback/paystack handler
-      // appends "/payment/callback" itself before redirecting the browser.
-      const frontendCallbackUrl = appUrl;
-
-      const paymentRes = await paymentService.initiatePayment(
+      // The backend creates the parcel AND initiates payment in one call —
+      // there's no separate "create, then initiate payment" step. For CARD
+      // it returns a Paystack authorizationUrl directly.
+      const size = weightToParcelSize(packageInfo.weightKg);
+      const result = await DeliveryService.createDelivery(
         {
-          amount: calculatedFee,
-          email: userEmail,
-          gateway: "PAYSTACK",
-          method: "CARD",
-          type: "DELIVERY",
-          // deliveryId at the top level is used by the backend to look up the
-          // delivery record and authoritative fee — amount above is a hint only.
-          deliveryId: activeDeliveryId,
-          // callbackUrl goes into payment.metadata so the backend GET callback
-          // handler knows where to redirect the browser after verification.
-          callbackUrl: frontendCallbackUrl,
-          metadata: {
-            deliveryId: activeDeliveryId,
-            purpose: "DELIVERY_REQUEST",
+          pickup: {
+            latitude: pickupPos.lat,
+            longitude: pickupPos.lng,
+            address: sanitizeInput(packageInfo.pickupAddress),
           },
+          dropoff: {
+            latitude: dropoffPos.lat,
+            longitude: dropoffPos.lng,
+            address: sanitizeInput(packageInfo.destinationAddress),
+          },
+          size,
+          recipientName: sanitizeInput(packageInfo.recipientName),
+          recipientPhone: normalizePhoneNumber(packageInfo.recipientPhone),
+          // Avoid a trailing dash ("Document - ") when instructions are empty.
+          description: sanitizeInput(
+            packageInfo.instructions
+              ? `${packageInfo.type} - ${packageInfo.instructions}`
+              : packageInfo.type,
+          ),
+          paymentMethod: "CARD",
         },
         token,
       );
 
-      if (paymentRes.authorizationUrl && paymentRes.reference) {
+      useDeliveryStore.setState({ activeDeliveryId: result.delivery.id });
+      trackMetaCustomEvent(
+        "DispatchRequest",
+        {
+          package_type: packageInfo.type,
+          value: result.deliveryFee,
+          currency: "NGN",
+        },
+        `dispatch:${result.delivery.id}`,
+      );
+
+      if (result.authorizationUrl) {
         savePurchaseContext({
           value: calculatedFee,
           currency: "NGN",
           contentCategory: "dispatch",
-          contentId: activeDeliveryId,
+          contentId: result.delivery.id,
         });
-        // Store gateway alongside reference so verifyPayment can use the correct
-        // gateway during recovery — without it the backend throws a validation error.
-        localStorage.setItem(
-          PENDING_DELIVERY_KEY,
-          JSON.stringify({
-            id: activeDeliveryId,
-            reference: paymentRes.reference,
-            gateway: "PAYSTACK",
-          }),
-        );
-        window.location.href = paymentRes.authorizationUrl;
+        if (result.reference) {
+          localStorage.setItem(
+            PENDING_DELIVERY_KEY,
+            JSON.stringify({
+              id: result.delivery.id,
+              reference: result.reference,
+              gateway: "PAYSTACK",
+            }),
+          );
+        }
+        window.location.href = result.authorizationUrl;
       } else {
-        throw new Error("Invalid payment response");
+        // WALLET — already paid, nothing to redirect to a gateway for.
+        toast.success("Parcel requested and paid from your wallet!");
+        resetDelivery();
+        router.push(`/main/delivery/${result.delivery.id}`);
       }
     } catch (error: any) {
       console.error("Payment Error:", error);
-      toast.error("Payment initialization failed");
+      toast.error(error.message || "Payment initialization failed");
       setStage(DeliveryStage.REVIEW_PAYMENT);
     }
   };

@@ -13,6 +13,7 @@ import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ApiService } from "@/services/api.service";
 import { useRideStore } from "@/app/main/ride/store/ride";
+import { requestGeolocation } from "@/services/geolocation.service";
 import {
   Store,
   ChevronRight,
@@ -71,6 +72,12 @@ interface Vendor {
   isNew?: boolean;
 }
 
+interface CategoryTile {
+  id: string;
+  title: string;
+  code: string;
+}
+
 interface VerticalSection {
   id: string;
   title: string;
@@ -80,6 +87,33 @@ interface VerticalSection {
 interface SearchResults {
   stores: Vendor[];
   products: ProductProps[];
+}
+
+// Backend StorefrontCard -> UI Vendor
+function toVendor(s: any): Vendor {
+  return {
+    id: s.id,
+    name: s.name,
+    slug: s.slug,
+    image: s.logo || s.banner || undefined,
+    rating: s.rating || 0,
+    deliveryTime: `${s.preparationTime || 20} min`,
+    deliveryFee: s.deliveryFee ?? 0,
+    type: s.type,
+  };
+}
+
+// Backend ProductSearchResult | DishSearchResult -> UI ProductProps
+function toProductProps(p: any): ProductProps {
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description || "",
+    price: p.price ?? p.basePrice ?? 0,
+    image: p.image || undefined,
+    storeId: p.store?.id || "",
+    storeName: p.store?.name,
+  };
 }
 
 // --- HELPER: GET CATEGORY ICON ---
@@ -107,24 +141,38 @@ const getCategoryIcon = (title: string) => {
 // --- DATA HOOK ---
 function useStoreData(query: string | null) {
   const [data, setData] = useState<{
+    categories: CategoryTile[];
     verticals: VerticalSection[];
     banners: BannerData[];
-    searchResults: SearchResults | null; // Added Search Results State
-  }>({ verticals: [], banners: [], searchResults: null });
+    searchResults: SearchResults | null;
+  }>({ categories: [], verticals: [], banners: [], searchResults: null });
 
   const [loading, setLoading] = useState(true);
   const userLocation = useRideStore((state) => state.userLocation);
-  
+  const setUserLocation = useRideStore((state) => state.setUserLocation);
+
   const cacheRef = useRef<Map<string, { data: any; timestamp: number }>>(
     new Map(),
   );
 
+  // The store page is often the first screen a user lands on — don't rely
+  // on having visited /main/ride or the location picker first. If we don't
+  // have a location yet, request one now so the catalog is always scoped
+  // to where the user actually is.
+  useEffect(() => {
+    if (userLocation) return;
+    requestGeolocation()
+      .then((coords) => setUserLocation({ lat: coords.lat, lng: coords.lng }))
+      .catch(() => {
+        /* user denied/unavailable — home feed falls back to unscoped results */
+      });
+  }, [userLocation, setUserLocation]);
+
   const fetchData = useCallback(async (q: string | null) => {
-    // Include location in cache key so switching locations refreshes the data
-    const cacheKey = q 
-      ? `search:${q}:${userLocation?.lat}:${userLocation?.lng}` 
+    const cacheKey = q
+      ? `search:${q}:${userLocation?.lat}:${userLocation?.lng}`
       : `home:${userLocation?.lat}:${userLocation?.lng}`;
-    
+
     const cached = cacheRef.current.get(cacheKey);
 
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
@@ -135,53 +183,57 @@ function useStoreData(query: string | null) {
 
     setLoading(true);
     try {
-      const locQuery = userLocation 
-        ? `&lat=${userLocation.lat}&lng=${userLocation.lng}` 
+      const locParams = userLocation
+        ? `&lat=${userLocation.lat}&lng=${userLocation.lng}`
         : "";
-
-      const endpoint = q
-        ? `/marketplace/search?q=${encodeURIComponent(q)}${locQuery}`
-        : `/marketplace/home?${locQuery.slice(1)}`; // Remove leading & if no search query
-      
-      const json = await ApiService.get<any>(endpoint);
 
       let processedData;
 
       if (q) {
-        // Handle Search Response (stores, products)
+        // Stores matching the query + products/dishes matching the query,
+        // fetched in parallel — the backend doesn't have one combined
+        // "search everything" endpoint.
+        const [storefronts, items] = await Promise.all([
+          ApiService.get<any>(
+            `/catalog/storefronts?search=${encodeURIComponent(q)}&limit=20${locParams}`,
+          ),
+          ApiService.get<any>(
+            `/catalog/search?q=${encodeURIComponent(q)}&kind=ALL${locParams}`,
+          ),
+        ]);
+
+        const products = [
+          ...(items?.products?.items ?? []),
+          ...(items?.dishes?.items ?? []),
+        ].map(toProductProps);
+
         processedData = {
+          categories: [],
           verticals: [],
           banners: [],
           searchResults: {
-            stores: json.stores.map((s: any) => ({
-              id: s.id,
-              name: s.name,
-              slug: s.slug,
-              image: s.logo || s.banner, // Map backend logo to image
-              rating: s.rating || 0,
-              deliveryTime: `${s.prepTime || 20} min`,
-              deliveryFee: s.deliveryFee ?? 0, // Use backend value
-              type: s.type,
-            })),
-            products: json.products.map((p: any) => ({
-              id: p.id,
-              name: p.name,
-              description: p.description || "",
-              price: p.price,
-              image: p.images?.[0] || null,
-              storeId: p.storeId,
-              storeName: p.store?.name,
-              stock: p.stock,
-              status: p.status,
-              manageStock: p.manageStock,
-            })),
+            stores: (storefronts?.storefronts ?? []).map(toVendor),
+            products,
           },
         };
       } else {
-        // Handle Home Response (verticals)
+        const home = await ApiService.get<any>(`/catalog/home?limit=10${locParams}`);
+
+        const sections: VerticalSection[] = [
+          { id: "open-now", title: "Open Now", vendors: (home.openNow ?? []).map(toVendor) },
+          { id: "top-rated", title: "Top Rated", vendors: (home.topRatedStorefronts ?? []).map(toVendor) },
+          { id: "featured", title: "Featured", vendors: (home.featuredStorefronts ?? []).map(toVendor) },
+          { id: "new", title: "New On Asoose", vendors: (home.newStorefronts ?? []).map(toVendor) },
+        ].filter((s) => s.vendors.length > 0);
+
         processedData = {
-          verticals: json.verticals || [],
-          banners: json.banners || [],
+          categories: (home.storeTypes ?? []).map((t: any) => ({
+            id: t.id,
+            title: t.name,
+            code: t.code,
+          })),
+          verticals: sections,
+          banners: [],
           searchResults: null,
         };
       }
@@ -193,7 +245,7 @@ function useStoreData(query: string | null) {
       setData(processedData);
     } catch (err) {
       console.error(err);
-      setData({ verticals: [], banners: [], searchResults: null });
+      setData({ categories: [], verticals: [], banners: [], searchResults: null });
     } finally {
       setLoading(false);
     }
@@ -211,6 +263,7 @@ function StorePage() {
 
   // Data
   const {
+    categories,
     verticals,
     banners,
     searchResults,
@@ -329,17 +382,17 @@ function StorePage() {
                 </Link>
               </div>
               <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-6 lg:grid-cols-8">
-                {verticals.map((v) => (
+                {categories.map((c) => (
                   <Link
-                    key={v.id}
-                    href={`/main/store/category/${v.id}${userLocation ? `?lat=${userLocation.lat}&lng=${userLocation.lng}` : ""}`}
+                    key={c.id}
+                    href={`/main/store/category/${c.code}${userLocation ? `?lat=${userLocation.lat}&lng=${userLocation.lng}` : ""}`}
                     className="min-w-[72px] snap-start flex flex-col items-center gap-2 group cursor-pointer"
                   >
                     <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-white dark:bg-[#151515] border border-gray-100 dark:border-white/5 flex items-center justify-center text-gray-400 group-hover:bg-yellow-500 group-hover:text-black group-hover:border-yellow-500 transition-all shadow-sm">
-                      {getCategoryIcon(v.title)}
+                      {getCategoryIcon(c.title)}
                     </div>
                     <span className="text-[11px] sm:text-xs font-bold text-center truncate w-full text-gray-600 dark:text-gray-400 group-hover:text-black dark:group-hover:text-white transition-colors capitalize">
-                      {v.title}
+                      {c.title}
                     </span>
                   </Link>
                 ))}
