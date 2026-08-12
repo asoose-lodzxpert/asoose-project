@@ -1,12 +1,12 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { X, Loader2 } from "lucide-react";
 
 interface EditProfileModalProps {
   isOpen: boolean;
-  initialData: { name: string; phone: string };
+  initialData: { firstName: string; lastName: string; phone: string };
   onClose: () => void;
-  onSave: (data: { name: string; phone: string }) => Promise<void>;
+  onSave: (data: { firstName: string; lastName: string; phone: string }) => Promise<void>;
 }
 
 export const EditProfileModal = ({
@@ -18,9 +18,21 @@ export const EditProfileModal = ({
   const [loading, setLoading] = useState(false);
   // Ensure fields are empty strings, not null/undefined
   const [formData, setFormData] = useState({
-    name: initialData.name || "",
+    firstName: initialData.firstName || "",
+    lastName: initialData.lastName || "",
     phone: initialData.phone || "",
   });
+
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        firstName: initialData.firstName || "",
+        lastName: initialData.lastName || "",
+        phone: initialData.phone || "",
+      });
+    }
+  }, [initialData.firstName, initialData.lastName, initialData.phone, isOpen]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -42,14 +54,25 @@ export const EditProfileModal = ({
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-xs font-bold text-gray-500 uppercase">
-              Full Name
-            </label>
+            <label className="text-xs font-bold text-gray-500 uppercase">First name</label>
             <input
               type="text"
-              value={formData.name}
+              required
+              value={formData.firstName}
               onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
+                setFormData({ ...formData, firstName: e.target.value })
+              }
+              className="w-full mt-1 p-3 bg-gray-50 dark:bg-white/5 rounded-xl outline-none focus:ring-2 ring-yellow-500"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-500 uppercase">Last name</label>
+            <input
+              type="text"
+              required
+              value={formData.lastName}
+              onChange={(e) =>
+                setFormData({ ...formData, lastName: e.target.value })
               }
               className="w-full mt-1 p-3 bg-gray-50 dark:bg-white/5 rounded-xl outline-none focus:ring-2 ring-yellow-500"
             />

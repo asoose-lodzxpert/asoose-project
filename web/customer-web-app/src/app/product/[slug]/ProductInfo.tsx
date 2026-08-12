@@ -40,7 +40,7 @@ export function ProductInfo({
   return (
     <>
       {/* Core info: category, title, price, stock */}
-      <div className="bg-white dark:bg-[#151515] lg:rounded-2xl p-4 sm:p-5 space-y-3">
+      <section className="space-y-3 rounded-2xl border border-black/[0.06] bg-white p-4 shadow-sm sm:p-5 dark:border-white/[0.07] dark:bg-[#151515]">
         <div className="flex items-center gap-2 flex-wrap">
           {product.category && (
             <span className="text-xs font-semibold uppercase tracking-widest text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-500/10 px-2.5 py-0.5 rounded-full">
@@ -84,11 +84,11 @@ export function ProductInfo({
                 : "In stock"}
           </p>
         )}
-      </div>
+      </section>
 
       {/* Description */}
       {product.description && (
-        <div className="bg-white dark:bg-[#151515] lg:rounded-2xl p-4 sm:p-5">
+        <section className="rounded-2xl border border-black/[0.06] bg-white p-4 shadow-sm sm:p-5 dark:border-white/[0.07] dark:bg-[#151515]">
           <h2 className="font-bold text-base mb-2">Product Details</h2>
           <p
             className={`text-sm text-gray-500 dark:text-gray-400 leading-relaxed ${
@@ -113,12 +113,12 @@ export function ProductInfo({
               )}
             </button>
           )}
-        </div>
+        </section>
       )}
 
       {/* Modifier groups — interactive when onToggleModifier is provided */}
       {hasModifiers && (
-        <div className="bg-white dark:bg-[#151515] lg:rounded-2xl p-4 sm:p-5 space-y-3">
+        <section className="space-y-3 rounded-2xl border border-black/[0.06] bg-white p-4 shadow-sm sm:p-5 dark:border-white/[0.07] dark:bg-[#151515]">
           <div className="flex items-center justify-between">
             <h2 className="font-bold text-base">Customise your order</h2>
             {isInteractive && (
@@ -132,7 +132,7 @@ export function ProductInfo({
               const isRequired = group.minSelect > 0;
               return (
                 <div key={group.id}>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                     <span className="font-semibold text-sm">{group.name}</span>
                     <span
                       className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -171,7 +171,7 @@ export function ProductInfo({
                                 group.maxSelect,
                               )
                             }
-                            className={`flex items-center gap-1.5 rounded-xl px-3 py-2 border text-xs font-semibold transition-all ${
+                            className={`flex min-h-10 items-center gap-1.5 rounded-xl border px-3 py-2 text-left text-xs font-semibold transition-all ${
                               selected
                                 ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-300"
                                 : "border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 hover:border-yellow-400 hover:text-yellow-600"
@@ -217,7 +217,7 @@ export function ProductInfo({
               );
             })}
           </div>
-        </div>
+        </section>
       )}
     </>
   );

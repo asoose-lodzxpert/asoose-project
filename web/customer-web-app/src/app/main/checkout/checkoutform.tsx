@@ -5,11 +5,25 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCartStore, CartItem } from "@/store/useCartStore";
 import { useSession } from "next-auth/react";
-import { WifiOff, Loader2, Phone, MapPin, Plus } from "lucide-react";
-import Swal from "sweetalert2";
+import {
+  WifiOff,
+  Loader2,
+  Phone,
+  MapPin,
+  Plus,
+  CreditCard,
+  Wallet,
+  NotebookPen,
+} from "lucide-react";
 import { toast } from "react-toastify";
 import { ApiService } from "@/services/api.service";
 import { savePurchaseContext } from "@/lib/meta-pixel";
+import { WalletService } from "@/services/wallet.service";
+import { CartService, mapServerCartItems } from "@/services/cart.service";
+import {
+  AddressService,
+  type AddressLabel,
+} from "@/services/address.service";
 
 // Components
 import { Address } from "./types";
@@ -24,21 +38,21 @@ import { AddressPickerModal } from "@/app/main/components/checkout/address-picke
 // the server right before quoting/checking out. Modifiers aren't synced —
 // the backend cart has no modifier concept yet.
 async function syncCartToServer(items: CartItem[], token: string) {
-  await ApiService.delete("/cart", token).catch(() => {});
+  await CartService.clear(token).catch(() => {});
   for (const item of items) {
     const body =
       item.kind === "DISH"
         ? { menuItemId: item.id, quantity: item.quantity }
         : { productId: item.id, quantity: item.quantity };
-    await ApiService.post("/cart/items", body, token);
+    await CartService.add(body, token);
   }
 }
 
 export default function CheckoutForm() {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const abortControllerRef = useRef<AbortController | null>(null);
   const isOrderCreated = useRef(false);
+  const idempotencyKeyRef = useRef<string | null>(null);
 
   const [mounted, setMounted] = useState(false);
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -48,12 +62,20 @@ export default function CheckoutForm() {
   const [isOnline, setIsOnline] = useState(true);
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
   const [showAddressPicker, setShowAddressPicker] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"CARD" | "WALLET">(
+    "CARD",
+  );
+  const [deliveryNote, setDeliveryNote] = useState("");
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [showTopup, setShowTopup] = useState(false);
+  const [topupAmount, setTopupAmount] = useState("20000");
+  const [topupLoading, setTopupLoading] = useState(false);
 
   // Phone number state – prefilled from user profile, required for checkout
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
-  const profilePhoneRef = useRef<string>(""); // track the phone already saved on the backend
 
   // Live fee state fetched from backend
   const [deliveryFee, setDeliveryFee] = useState<number | null>(null);
@@ -63,11 +85,6 @@ export default function CheckoutForm() {
   // of truth for display — prevents discrepancies from client-side subtotal recomputation.
   const [quoteGrandTotal, setQuoteGrandTotal] = useState<number | null>(null);
   const [isLoadingFee, setIsLoadingFee] = useState(false);
-  const quoteAbortRef = useRef<AbortController | null>(null);
-
-  // Orders only support WALLET or CARD server-side — CARD (Paystack checkout
-  // link) is the only one this UI offers right now.
-  const selectedPaymentMethod = "CARD" as const;
 
   const {
     items: cartItems,
@@ -87,6 +104,16 @@ export default function CheckoutForm() {
       (i) => `${i.id}:${i.quantity}:${(i.modifierIds ?? []).join(",")}`,
     ),
   );
+
+  useEffect(() => {
+    idempotencyKeyRef.current = null;
+  }, [
+    cartFingerprint,
+    selectedAddress?.id,
+    paymentMethod,
+    deliveryNote,
+    phone,
+  ]);
 
   // Fetch live quote from backend whenever address or cart changes
   const fetchQuote = useCallback(
@@ -137,7 +164,6 @@ export default function CheckoutForm() {
         setIsLoadingFee(false);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [session?.accessToken, cartItems],
   );
 
@@ -152,6 +178,29 @@ export default function CheckoutForm() {
     return "";
   };
 
+  const normalizePhone = (value: string) => {
+    const cleaned = value.replace(/[\s-]/g, "");
+    if (cleaned.startsWith("+234")) return cleaned;
+    if (cleaned.startsWith("234")) return `+${cleaned}`;
+    if (cleaned.startsWith("0")) return `+234${cleaned.slice(1)}`;
+    return cleaned;
+  };
+
+  const fetchWalletBalance = useCallback(async () => {
+    const token = session?.accessToken;
+    if (!token) return;
+
+    setWalletLoading(true);
+    try {
+      const wallet = await WalletService.getMyWallet(token);
+      setWalletBalance(wallet.balance);
+    } catch {
+      setWalletBalance(null);
+    } finally {
+      setWalletLoading(false);
+    }
+  }, [session?.accessToken]);
+
   useEffect(() => {
     useCartStore.persist.rehydrate();
     setMounted(true);
@@ -165,7 +214,6 @@ export default function CheckoutForm() {
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
-      abortControllerRef.current?.abort();
       setIsProcessing(false);
     };
   }, []);
@@ -184,7 +232,6 @@ export default function CheckoutForm() {
     try {
       const data = await ApiService.get<{ phone?: string }>("/users/me", token);
       const saved = data.phone || "";
-      profilePhoneRef.current = saved;
       setPhone(saved);
     } catch {
       // Non-fatal — user can still enter phone manually
@@ -208,14 +255,14 @@ export default function CheckoutForm() {
     try {
       setIsLoadingAddresses(true);
 
-      const data = await ApiService.get<any[]>("/addresses", token);
+      const data = await AddressService.list(token);
       // Backend uses latitude/longitude; this form's Address type uses lat/lng.
       const mapped: Address[] = data.map((a) => ({
         id: a.id,
         label: a.label,
-        street: a.street,
-        city: a.city,
-        state: a.state,
+        street: a.street || "",
+        city: a.city || undefined,
+        state: a.state || undefined,
         isDefault: a.isDefault,
         lat: a.latitude,
         lng: a.longitude,
@@ -234,11 +281,12 @@ export default function CheckoutForm() {
     if (status === "authenticated") {
       fetchAddresses();
       fetchProfile();
+      fetchWalletBalance();
     }
     if (status === "unauthenticated") {
       setIsLoadingProfile(false);
     }
-  }, [status, fetchAddresses, fetchProfile]);
+  }, [status, fetchAddresses, fetchProfile, fetchWalletBalance]);
 
   // Fetch quote whenever address is selected, cart changes, or token becomes available.
   // `fetchQuote` MUST be in the dep array — it closes over `session?.accessToken`
@@ -248,7 +296,7 @@ export default function CheckoutForm() {
     if (status === "authenticated") {
       fetchQuote(selectedAddress);
     }
-  }, [selectedAddress?.id, cartFingerprint, status, fetchQuote]);
+  }, [selectedAddress, cartFingerprint, status, fetchQuote]);
 
   // ✅ FIXED: Detect and handle cancelled/failed order payments on return
   // This runs when user returns from payment cancellation and allows them to retry
@@ -311,15 +359,18 @@ export default function CheckoutForm() {
     if (!token) return;
 
     try {
-      const created = await ApiService.post<any>(
-        "/addresses",
+      if (addressData.lat == null || addressData.lng == null) {
+        throw new Error("Please pin the address location before saving.");
+      }
+
+      const created = await AddressService.create(
         {
-          label: addressData.label,
-          street: addressData.street,
-          city: addressData.city,
-          state: addressData.state,
+          label: (addressData.label || "HOME").toUpperCase() as AddressLabel,
           latitude: addressData.lat,
           longitude: addressData.lng,
+          ...(addressData.street ? { street: addressData.street } : {}),
+          ...(addressData.city ? { city: addressData.city } : {}),
+          ...(addressData.state ? { state: addressData.state } : {}),
         },
         token,
       );
@@ -328,9 +379,9 @@ export default function CheckoutForm() {
       setSelectedAddress({
         id: created.id,
         label: created.label,
-        street: created.street,
-        city: created.city,
-        state: created.state,
+        street: created.street || "",
+        city: created.city || undefined,
+        state: created.state || undefined,
         isDefault: created.isDefault,
         lat: created.latitude,
         lng: created.longitude,
@@ -342,12 +393,93 @@ export default function CheckoutForm() {
     }
   };
 
+  const handleRemoveCartItem = async (lineId: string) => {
+    const item = cartItems.find((entry) => (entry.lineId ?? entry.id) === lineId);
+    removeItem(lineId);
+
+    const token = session?.accessToken;
+    if (!token || !item) return;
+
+    try {
+      // Re-read the server cart because quote calculation can rebuild it and
+      // therefore change backend cart-item IDs.
+      const serverCart = await CartService.get(token);
+      const serverItem = serverCart.items.find((entry) =>
+        item.kind === "DISH"
+          ? entry.menuItemId === item.id
+          : entry.productId === item.id,
+      );
+      if (serverItem) await CartService.removeItem(serverItem.id, token);
+    } catch (error: any) {
+      toast.error(error?.message || "The item could not be removed from your cart.");
+      try {
+        const currentCart = await CartService.get(token);
+        useCartStore
+          .getState()
+          .replaceItems(mapServerCartItems(currentCart));
+      } catch {
+        // The optimistic local removal remains when refresh is unavailable.
+      }
+    }
+  };
+
+  const handleClearCart = async () => {
+    if (!window.confirm("Remove every item from your cart?")) return;
+
+    const previousItems = cartItems;
+    clearCart();
+    const token = session?.accessToken;
+    if (!token) return;
+
+    try {
+      await CartService.clear(token);
+      toast.success("Cart cleared");
+    } catch (error: any) {
+      useCartStore.getState().replaceItems(previousItems);
+      toast.error(error?.message || "The cart could not be cleared.");
+    }
+  };
+
+  const handleWalletTopup = async () => {
+    const amount = Number(topupAmount);
+    if (!Number.isInteger(amount) || amount <= 0) {
+      toast.error("Enter a valid top-up amount.");
+      return;
+    }
+
+    const token = session?.accessToken;
+    if (!token) {
+      toast.error("Please log in to top up your wallet.");
+      return;
+    }
+
+    setTopupLoading(true);
+    try {
+      const result = await WalletService.initializeTopup(amount, token);
+      if (!result.authorizationUrl?.startsWith("https://checkout.paystack.com/")) {
+        throw new Error("The payment link returned by the server is invalid.");
+      }
+
+      localStorage.setItem(
+        "pending_wallet_topup",
+        JSON.stringify({
+          reference: result.reference,
+          returnTo: "/main/checkout",
+        }),
+      );
+      window.location.href = result.authorizationUrl;
+    } catch (error: any) {
+      toast.error(error?.message || "Could not initialize wallet top-up.");
+      setTopupLoading(false);
+    }
+  };
+
   const handlePlaceOrder = async () => {
     if (!isOnline) {
       toast.error("No internet connection.");
       return;
     }
-    if (!selectedAddress || !selectedPaymentMethod) {
+    if (!selectedAddress) {
       toast.error("Please select a delivery address");
       return;
     }
@@ -376,6 +508,15 @@ export default function CheckoutForm() {
       return;
     }
 
+    if (
+      paymentMethod === "WALLET" &&
+      (walletBalance === null || walletBalance < (quoteGrandTotal ?? 0))
+    ) {
+      toast.error("Your wallet balance is not enough for this order.");
+      setShowTopup(true);
+      return;
+    }
+
     const token = session?.accessToken;
 
     if (!token) {
@@ -386,24 +527,15 @@ export default function CheckoutForm() {
     setIsProcessing(true);
 
     try {
-      // Persist phone to user profile if it was added or changed
-      const normalizedPhone = phone.trim();
-      if (normalizedPhone !== profilePhoneRef.current) {
-        try {
-          await ApiService.patch("/users/me/profile", { phone: normalizedPhone }, token);
-          profilePhoneRef.current = normalizedPhone;
-        } catch (err: any) {
-          throw new Error(err?.message || "Failed to save phone number");
-        }
-      }
-
       // Re-sync cart (in case it changed since the last quote) then check out
       // in one call — the backend creates the order from its own cart and,
       // for CARD, returns a Paystack authorizationUrl directly. There's no
       // separate payment-initialize step.
       await syncCartToServer(cartItems, token);
 
-      const idempotencyKey = crypto.randomUUID();
+      if (!idempotencyKeyRef.current) {
+        idempotencyKeyRef.current = `chk-${session?.user.id ?? "customer"}-${Date.now()}`;
+      }
       const data = await ApiService.post<{
         orderId: string;
         total?: number;
@@ -413,8 +545,10 @@ export default function CheckoutForm() {
         "/orders/checkout",
         {
           deliveryAddressId: selectedAddress.id,
-          paymentMethod: selectedPaymentMethod,
-          idempotencyKey,
+          paymentMethod,
+          deliveryNote: deliveryNote.trim() || undefined,
+          alternatePhone: normalizePhone(phone),
+          idempotencyKey: idempotencyKeyRef.current,
         },
         token,
       );
@@ -426,6 +560,9 @@ export default function CheckoutForm() {
       const orderTotal = data.pricing?.total ?? data.total ?? 0;
 
       if (data.authorizationUrl) {
+        if (!data.authorizationUrl.startsWith("https://checkout.paystack.com/")) {
+          throw new Error("The payment link returned by the server is invalid.");
+        }
         localStorage.setItem("pending_checkout", "true");
         localStorage.setItem("last_order_id", data.orderId);
         savePurchaseContext({
@@ -435,10 +572,12 @@ export default function CheckoutForm() {
           contentId: data.orderId,
         });
         window.location.href = data.authorizationUrl;
-      } else {
+      } else if (paymentMethod === "WALLET") {
         // WALLET — already paid, nothing further to redirect to a gateway for.
         clearCart();
         router.push(`/main/orders/confirmed?id=${data.orderId}`);
+      } else {
+        throw new Error("The online payment link was not returned.");
       }
     } catch (error: any) {
       console.error("Order placement error:", error);
@@ -493,10 +632,10 @@ export default function CheckoutForm() {
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          {/* Phone Number */}
+          {/* Alternate contact number */}
           <section className="bg-white dark:bg-[#151515] p-5 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm">
             <h2 className="font-bold text-lg flex items-center gap-2 mb-4">
-              <Phone className="w-5 h-5 text-yellow-500" /> Contact Number
+              <Phone className="w-5 h-5 text-yellow-500" /> Alternate Phone
             </h2>
             {isLoadingProfile ? (
               <div className="p-4 flex items-center justify-center">
@@ -530,7 +669,7 @@ export default function CheckoutForm() {
                 )}
                 {!phone && !phoneError && (
                   <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
-                    Required — we use this to contact you about your delivery.
+                    Required — used if we cannot reach your primary number.
                   </p>
                 )}
               </div>
@@ -602,9 +741,10 @@ export default function CheckoutForm() {
                           )}
                         </p>
                         <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                          {selectedAddress.city
-                            ? `${selectedAddress.street}, ${selectedAddress.city}`
-                            : selectedAddress.street}
+                          {[selectedAddress.street, selectedAddress.city]
+                            .filter(Boolean)
+                            .join(", ") ||
+                            `${selectedAddress.lat.toFixed(5)}, ${selectedAddress.lng.toFixed(5)}`}
                         </p>
                       </>
                     ) : (
@@ -632,12 +772,153 @@ export default function CheckoutForm() {
             )}
           </section>
 
+          <section className="space-y-5 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/5 dark:bg-[#151515]">
+            <div>
+              <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
+                <CreditCard className="h-5 w-5 text-yellow-500" /> Payment
+              </h2>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  aria-pressed={paymentMethod === "CARD"}
+                  onClick={() => setPaymentMethod("CARD")}
+                  disabled={isProcessing}
+                  className={`flex items-center gap-3 rounded-2xl border-2 p-4 text-left transition ${paymentMethod === "CARD" ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-500/10" : "border-gray-200 dark:border-white/10"}`}
+                >
+                  <span className="rounded-xl bg-yellow-100 p-2 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400">
+                    <CreditCard className="h-5 w-5" />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-black">Pay online</span>
+                    <span className="mt-0.5 block text-xs text-gray-500">
+                      Secure Paystack checkout
+                    </span>
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  aria-pressed={paymentMethod === "WALLET"}
+                  onClick={() => {
+                    setPaymentMethod("WALLET");
+                    if (
+                      walletBalance !== null &&
+                      walletBalance < (quoteGrandTotal ?? 0)
+                    ) {
+                      setShowTopup(true);
+                    }
+                  }}
+                  disabled={isProcessing}
+                  className={`flex items-center gap-3 rounded-2xl border-2 p-4 text-left transition ${paymentMethod === "WALLET" ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-500/10" : "border-gray-200 dark:border-white/10"}`}
+                >
+                  <span className="rounded-xl bg-yellow-100 p-2 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400">
+                    <Wallet className="h-5 w-5" />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-black">Wallet</span>
+                    <span
+                      className={`mt-0.5 block text-xs ${walletBalance !== null && walletBalance < (quoteGrandTotal ?? 0) ? "text-red-500" : "text-gray-500"}`}
+                    >
+                      {walletLoading
+                        ? "Checking balance…"
+                        : walletBalance === null
+                          ? "Balance unavailable"
+                          : `Balance: ₦${walletBalance.toLocaleString()}`}
+                    </span>
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {paymentMethod === "WALLET" && (
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-black">Top up your wallet</p>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      Add funds with Paystack and return to this checkout.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowTopup((current) => !current)}
+                    className="shrink-0 rounded-xl bg-yellow-100 px-3 py-2 text-xs font-black text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400"
+                  >
+                    {showTopup ? "Close" : "Top up"}
+                  </button>
+                </div>
+
+                {showTopup && (
+                  <div className="mt-4 space-y-3 border-t border-gray-200 pt-4 dark:border-white/10">
+                    <div className="flex items-center rounded-xl border border-gray-200 bg-white px-3 focus-within:border-yellow-500 dark:border-white/10 dark:bg-[#151515]">
+                      <span className="font-bold text-gray-500">₦</span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="1"
+                        step="1"
+                        value={topupAmount}
+                        onChange={(event) => setTopupAmount(event.target.value)}
+                        aria-label="Wallet top-up amount"
+                        className="min-w-0 flex-1 bg-transparent px-2 py-3 font-black outline-none"
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[5000, 10000, 20000].map((amount) => (
+                        <button
+                          key={amount}
+                          type="button"
+                          onClick={() => setTopupAmount(String(amount))}
+                          className={`rounded-xl border px-2 py-2 text-xs font-bold ${topupAmount === String(amount) ? "border-yellow-500 bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400" : "border-gray-200 text-gray-500 dark:border-white/10"}`}
+                        >
+                          ₦{amount.toLocaleString()}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleWalletTopup}
+                      disabled={topupLoading || !topupAmount}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-gray-950 py-3 text-sm font-black text-white disabled:opacity-50 dark:bg-white dark:text-black"
+                    >
+                      {topupLoading && (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      )}
+                      {topupLoading
+                        ? "Opening Paystack…"
+                        : "Continue to Paystack"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <label className="block border-t border-gray-100 pt-5 dark:border-white/5">
+              <span className="mb-2 flex items-center gap-2 text-sm font-black">
+                <NotebookPen className="h-4 w-4 text-yellow-500" /> Delivery note
+                <span className="font-medium text-gray-400">(optional)</span>
+              </span>
+              <textarea
+                value={deliveryNote}
+                onChange={(event) => setDeliveryNote(event.target.value)}
+                maxLength={500}
+                disabled={isProcessing}
+                placeholder="e.g. Leave at the gate"
+                className="h-24 w-full resize-none rounded-2xl border border-gray-200 bg-transparent p-4 text-sm outline-none transition focus:border-yellow-500 dark:border-white/10"
+              />
+              <span className="mt-1 block text-right text-[10px] text-gray-400">
+                {deliveryNote.length}/500
+              </span>
+            </label>
+          </section>
+
           <CartItemsList
             items={cartItems}
             isProcessing={isProcessing}
             onAdd={addItem}
             onDecrease={decreaseItem}
-            onRemove={removeItem}
+            onRemove={handleRemoveCartItem}
+            onClear={handleClearCart}
           />
         </div>
 
@@ -656,10 +937,15 @@ export default function CheckoutForm() {
                 isProcessing ||
                 !selectedAddress ||
                 !isOnline ||
-                !!validatePhone(phone)
+                !!validatePhone(phone) ||
+                (paymentMethod === "WALLET" &&
+                  (walletLoading ||
+                    walletBalance === null ||
+                    walletBalance < (quoteGrandTotal ?? 0)))
               }
               onPlaceOrder={handlePlaceOrder}
               retryCount={0}
+              paymentMethod={paymentMethod}
             />
           </div>
         </div>

@@ -6,7 +6,6 @@ import { Search, PenLine, X } from "lucide-react";
 import { MenuTabs } from "@/app/main/components/restaurant/MenuTabs";
 import { SidebarCart } from "@/app/main/components/restaurant/sidebarcart";
 import { FloatingCart } from "@/app/main/components/home/FloatingCart";
-import BottomNav from "@/app/main/components/layout/BottomNav";
 import { StoreHero } from "@/store/StoreHero";
 import { ProductCard } from "@/store/ProductCard";
 import { StoreReviews } from "@/store/StoreReviews";
@@ -99,7 +98,7 @@ export default function StoreClient() {
     try {
       const saved = localStorage.getItem("asoose_recent_store_searches");
       if (saved) setRecentSearches(JSON.parse(saved));
-    } catch (e) { /* ignore */ }
+    } catch { /* ignore */ }
   }, []);
 
   const fetchStoreData = useCallback(async () => {
@@ -208,11 +207,7 @@ export default function StoreClient() {
     }
   };
 
-  const handleReviewSubmit = async (
-    _rating: number,
-    _comment: string,
-    _orderId?: string, // reserved for future backend support
-  ) => {
+  const handleReviewSubmit = async () => {
     // TODO: wire up once the /reviews module's request/response contract is
     // confirmed — this UI already renders an empty review list gracefully.
     throw new Error("Reviews aren't available yet — check back soon.");
@@ -287,10 +282,10 @@ export default function StoreClient() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 pb-24">
-      <main className="max-w-7xl mx-auto md:px-6 md:py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-8">
+    <div className="min-h-screen bg-[#f7f7f5] pb-28 text-gray-900 dark:bg-[#0a0a0a] dark:text-gray-100">
+      <main className="mx-auto max-w-7xl md:px-6 md:py-6 lg:py-8">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
+          <div className="space-y-7 lg:col-span-2 lg:space-y-8">
             <StoreHero
               name={store.name}
               image={store.image}
@@ -301,11 +296,11 @@ export default function StoreClient() {
               isAvailable={store.isAvailableInLocation}
             />
 
-            <div className="space-y-6">
+            <div className="space-y-5 sm:space-y-6">
               {/* Search Input */}
               <div className="px-4 md:px-0">
                 <div className="relative group">
-                  <Search className="absolute left-4 top-3.5 w-5 h-5 text-gray-400 group-focus-within:text-yellow-500 transition-colors" />
+                  <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-yellow-500" />
                   <input
                     type="text"
                     placeholder={`Search in ${store.name}...`}
@@ -319,13 +314,14 @@ export default function StoreClient() {
                         (e.target as HTMLInputElement).blur();
                       }
                     }}
-                    className="w-full bg-white dark:bg-[#151515] h-12 rounded-xl pl-12 pr-12 border border-gray-100 dark:border-white/5 focus:outline-none focus:border-yellow-500 transition-colors"
+                    className="h-12 w-full rounded-2xl border border-black/[0.06] bg-white pl-12 pr-12 text-sm font-medium shadow-sm transition-colors placeholder:text-gray-400 focus:border-yellow-500 focus:outline-none focus:ring-4 focus:ring-yellow-500/10 dark:border-white/[0.07] dark:bg-[#151515]"
                     autoComplete="off"
                   />
                   {searchQuery && (
                     <button
                       onClick={() => setSearchQuery("")}
-                      className="absolute right-4 top-3.5 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/10"
+                      aria-label="Clear store search"
                     >
                       <X className="w-5 h-5" />
                     </button>
@@ -379,7 +375,7 @@ export default function StoreClient() {
                 </div>
               </div>
 
-              <div className="px-4 md:px-0 sticky top-0 z-20 bg-gray-50 dark:bg-[#0a0a0a] pt-2 pb-2">
+              <div className="sticky top-[64px] z-20 border-y border-black/[0.04] bg-[#f7f7f5]/95 px-4 py-2 backdrop-blur-xl md:px-0 dark:border-white/5 dark:bg-[#0a0a0a]/95">
                 <MenuTabs
                   categories={categories}
                   activeTab={activeTab}
@@ -387,15 +383,15 @@ export default function StoreClient() {
                 />
               </div>
 
-              <div className="px-4 md:px-0 min-h-[300px]">
-                <h3 className="text-xl font-black tracking-tight mb-4 flex items-center gap-2">
+              <div className="min-h-[300px] px-4 md:px-0">
+                <h3 className="mb-4 flex items-center gap-2 text-xl font-black tracking-tight sm:text-2xl">
                   {searchQuery ? "Search Results" : activeTab}{" "}
                   <span className="text-gray-400 text-base font-normal">
                     ({displayedItems.length})
                   </span>
                 </h3>
                 {displayedItems.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                     {displayedItems.map((item) => (
                       <ProductCard
                         key={item.id}
@@ -414,8 +410,10 @@ export default function StoreClient() {
                     ))}
                   </div>
                 ) : (
-                  <div className="py-16 text-center text-gray-400 border-2 border-dashed border-gray-100 dark:border-white/5 rounded-2xl">
-                    <p>No items found.</p>
+                  <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white/50 px-4 py-14 text-center text-gray-400 dark:border-white/10 dark:bg-white/[0.02]">
+                    <Search className="mx-auto mb-3 h-7 w-7 opacity-50" />
+                    <p className="font-semibold">No items found</p>
+                    <p className="mt-1 text-xs">Try a different search or category.</p>
                   </div>
                 )}
               </div>
@@ -423,9 +421,9 @@ export default function StoreClient() {
 
             <hr className="border-gray-200 dark:border-white/5 mx-4 md:mx-0" />
 
-            <div id="reviews" className="px-4 md:px-0">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-black">
+            <div id="reviews" className="px-4 pb-4 md:px-0 md:pb-0">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3 sm:mb-6">
+                <h2 className="text-xl font-black sm:text-2xl">
                   Ratings & Reviews{" "}
                   <span className="text-gray-400 text-lg ml-2">
                     ({reviews.length})
@@ -456,8 +454,6 @@ export default function StoreClient() {
       </main>
 
       <FloatingCart />
-      <BottomNav />
-
       {selectedProduct && (
         <ProductModal
           product={selectedProduct}

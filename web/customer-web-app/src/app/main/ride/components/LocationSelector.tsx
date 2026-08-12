@@ -19,25 +19,30 @@ export function LocationSelector() {
     setIsConfiguring(null);
   };
 
+  const selectedLocation =
+    isConfiguring === "pickup" ? pickupLocation : dropoffLocation;
+  const activeLabel = isConfiguring === "pickup" ? "pickup" : "drop-off";
+
   return (
-    <div className="flex flex-col justify-between h-full p-6 animate-in slide-in-from-left-5">
-      <div>
+    <div className="flex h-full min-h-0 flex-col animate-in slide-in-from-bottom-5 md:slide-in-from-left-5">
+      <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-zinc-200 dark:bg-zinc-700 md:hidden" />
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-3 pt-3 sm:px-6 md:pt-6">
         <button
           onClick={() => setIsConfiguring(null)}
-          className="mb-4 flex items-center gap-2 text-sm font-bold text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
+          className="mb-3 flex items-center gap-2 text-xs font-bold text-zinc-500 transition-colors hover:text-zinc-900 dark:hover:text-white sm:text-sm md:mb-4"
         >
           <ArrowLeft size={16} /> Back to options
         </button>
 
-        <h1 className="text-2xl font-black tracking-tight mb-2 text-zinc-900 dark:text-white">
+        <h1 className="mb-1 text-xl font-black tracking-tight text-zinc-900 dark:text-white sm:text-2xl md:mb-2">
           Pin Location
         </h1>
-        <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-3">
-          Tap the map to place a pin, or drag an existing pin to adjust it
-          precisely.
+        <p className="mb-3 text-xs leading-5 text-zinc-500 dark:text-zinc-400 sm:text-sm">
+          Tap the visible map above to place a pin, or drag an existing pin to
+          adjust it precisely.
         </p>
         {isConfiguring && (
-          <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
+          <div className="mb-3 flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 dark:border-blue-800 dark:bg-blue-900/20 md:mb-4">
             <GripHorizontal size={14} className="text-blue-500 flex-shrink-0" />
             <p className="text-xs text-blue-700 dark:text-blue-300">
               Setting <strong>{isConfiguring}</strong> — tap the map or drag the
@@ -46,10 +51,10 @@ export function LocationSelector() {
           </div>
         )}
 
-        <div className="flex flex-col space-y-4">
+        <div className="flex flex-col space-y-2.5 md:space-y-4">
           {/* Pickup Selection Button */}
           <button
-            className={`p-4 rounded-xl text-left border-2 transition-all group w-full ${
+            className={`w-full rounded-xl border-2 p-3 text-left transition-all group sm:p-4 ${
               isConfiguring === "pickup"
                 ? "border-black dark:border-white bg-zinc-50 dark:bg-zinc-800"
                 : "border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800"
@@ -79,7 +84,7 @@ export function LocationSelector() {
 
           {/* Dropoff Selection Button */}
           <button
-            className={`p-4 rounded-xl text-left border-2 transition-all group w-full ${
+            className={`w-full rounded-xl border-2 p-3 text-left transition-all group sm:p-4 ${
               isConfiguring === "dropoff"
                 ? "border-black dark:border-white bg-zinc-50 dark:bg-zinc-800"
                 : "border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800"
@@ -109,13 +114,17 @@ export function LocationSelector() {
         </div>
       </div>
 
-      <button
-        className="w-full bg-black dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold text-lg hover:opacity-90 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-        disabled={!pickupLocation && !dropoffLocation}
-        onClick={handleConfirm}
-      >
-        Confirm Locations
-      </button>
+      <div className="shrink-0 border-t border-zinc-100 bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 dark:border-zinc-800 dark:bg-zinc-900 sm:px-6">
+        <button
+          className="w-full rounded-xl bg-black py-3.5 text-sm font-black text-white shadow-lg transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-black sm:py-4 sm:text-base"
+          disabled={!selectedLocation}
+          onClick={handleConfirm}
+        >
+          {selectedLocation
+            ? `Use ${activeLabel} location`
+            : `Tap the map to set ${activeLabel}`}
+        </button>
+      </div>
     </div>
   );
 }

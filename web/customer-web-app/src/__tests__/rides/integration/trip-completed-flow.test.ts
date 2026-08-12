@@ -9,18 +9,18 @@
  *  M5 — REST sync updates tripSummary from actual backend data
  */
 
-import type { DriverAcceptedEvent } from '@/services/socket.service';
+import type { DriverAcceptedEvent } from "@/services/socket.service";
 
 // ─── H6: onTripCompleted calls getCurrentRide immediately ────────────────────
-describe('H6 — immediate REST fetch on TRIP_COMPLETED', () => {
+describe("H6 — immediate REST fetch on TRIP_COMPLETED", () => {
   /**
    * Simulate the onTripCompleted handler logic from RideSocketListener.tsx.
    * We verify it calls RideService.getCurrentRide correctly.
    */
-  it('calls RideService.getCurrentRide when TRIP_COMPLETED fires', async () => {
+  it("calls RideService.getCurrentRide when TRIP_COMPLETED fires", async () => {
     const mockGetCurrentRide = jest.fn().mockResolvedValue({
-      id: 'ride-001',
-      status: 'COMPLETED',
+      id: "ride-001",
+      status: "COMPLETED",
       totalFare: 4500,
       distanceKm: 15.2,
       durationMin: 30,
@@ -30,14 +30,14 @@ describe('H6 — immediate REST fetch on TRIP_COMPLETED', () => {
     const mockSetRideStatus = jest.fn();
 
     // Simulate the handler exactly as written in RideSocketListener
-    const rideId = 'ride-001';
-    const token = 'test-token';
+    const rideId = "ride-001";
+    const token = "test-token";
 
     // Simulate onTripCompleted
-    const data = { rideId: 'ride-001' };
+    const data = { rideId: "ride-001" };
     if (data.rideId !== rideId) return;
 
-    mockSetRideStatus('payment-required');
+    mockSetRideStatus("payment-required");
 
     if (token && rideId) {
       const ride = await mockGetCurrentRide(token);
@@ -51,8 +51,8 @@ describe('H6 — immediate REST fetch on TRIP_COMPLETED', () => {
     }
 
     // Verify
-    expect(mockGetCurrentRide).toHaveBeenCalledWith('test-token');
-    expect(mockSetRideStatus).toHaveBeenCalledWith('payment-required');
+    expect(mockGetCurrentRide).toHaveBeenCalledWith("test-token");
+    expect(mockSetRideStatus).toHaveBeenCalledWith("payment-required");
     expect(mockSetTripSummary).toHaveBeenCalledWith({
       fare: 4500,
       distance: 15.2,
@@ -60,12 +60,14 @@ describe('H6 — immediate REST fetch on TRIP_COMPLETED', () => {
     });
   });
 
-  it('handles getCurrentRide failure gracefully (non-fatal)', async () => {
-    const mockGetCurrentRide = jest.fn().mockRejectedValue(new Error('Network error'));
+  it("handles getCurrentRide failure gracefully (non-fatal)", async () => {
+    const mockGetCurrentRide = jest
+      .fn()
+      .mockRejectedValue(new Error("Network error"));
     const mockSetTripSummary = jest.fn();
 
-    const rideId = 'ride-002';
-    const token = 'test-token';
+    const rideId = "ride-002";
+    const token = "test-token";
 
     if (token && rideId) {
       try {
@@ -82,119 +84,125 @@ describe('H6 — immediate REST fetch on TRIP_COMPLETED', () => {
       }
     }
 
-    expect(mockGetCurrentRide).toHaveBeenCalledWith('test-token');
+    expect(mockGetCurrentRide).toHaveBeenCalledWith("test-token");
     // tripSummary should NOT have been set since the call failed
     expect(mockSetTripSummary).not.toHaveBeenCalled();
   });
 
-  it('source code calls RideService.getCurrentRide inside onTripCompleted', () => {
-    const fs = require('fs');
-    const path = require('path');
+  it("source code calls RideService.getCurrentRide inside onTripCompleted", () => {
+    const fs = require("fs");
+    const path = require("path");
     const socketListenerPath = path.resolve(
       __dirname,
-      '../../../app/main/ride/components/RideSocketListener.tsx',
+      "../../../app/main/ride/components/RideSocketListener.tsx",
     );
-    const source = fs.readFileSync(socketListenerPath, 'utf-8');
+    const source = fs.readFileSync(socketListenerPath, "utf-8");
 
     // Find the onTripCompleted handler
-    expect(source).toContain('onTripCompleted');
+    expect(source).toContain("onTripCompleted");
 
     // Inside onTripCompleted, getCurrentRide must be called
-    const tripCompletedSection = source.split('onTripCompleted')[1];
-    expect(tripCompletedSection).toContain('RideService.getCurrentRide');
+    const tripCompletedSection = source.split("onTripCompleted")[1];
+    expect(tripCompletedSection).toContain("RideService.getCurrentRide");
   });
 });
 
 // ─── M2: REST sync backfills driver info ─────────────────────────────────────
-describe('M2/M5 — REST sync provides full driver and trip data', () => {
-  it('source verifies REST polling fetches full ride including rider data', () => {
-    const fs = require('fs');
-    const path = require('path');
+describe("M2/M5 — REST sync provides full driver and trip data", () => {
+  it("source verifies REST polling fetches full ride including rider data", () => {
+    const fs = require("fs");
+    const path = require("path");
 
     // The RideSocketListener uses getCurrentRide which returns the full backend ride
     // including rider.image and rider.rating — this data is NOT on the socket payload
     // but IS available via REST, allowing the store to be updated with full driver info.
     const socketListenerPath = path.resolve(
       __dirname,
-      '../../../app/main/ride/components/RideSocketListener.tsx',
+      "../../../app/main/ride/components/RideSocketListener.tsx",
     );
-    const source = fs.readFileSync(socketListenerPath, 'utf-8');
+    const source = fs.readFileSync(socketListenerPath, "utf-8");
 
     // Verify it imports RideService
     expect(source).toContain("import { RideService }");
     // Verify it calls getCurrentRide (which returns full ride with rider info)
-    expect(source).toContain('RideService.getCurrentRide');
+    expect(source).toContain("RideService.getCurrentRide");
   });
 
-  it('onDriverAccepted sets default values, not socket payload fields', () => {
+  it("onDriverAccepted sets default values, not socket payload fields", () => {
     // Simulate the exact handler logic
     const socketData: DriverAcceptedEvent = {
-      type: 'DRIVER_ACCEPTED',
-      rideId: 'r1',
+      type: "DRIVER_ACCEPTED",
+      rideId: "r1",
       driver: {
-        id: 'd1',
-        name: 'Alex',
-        phone: '080',
-        vehicle: { brand: 'Toyota', model: 'Camry', plateNumber: 'XYZ', color: 'White', year: 2022 },
+        id: "d1",
+        name: "Alex",
+        phone: "080",
+        vehicle: {
+          brand: "Toyota",
+          model: "Camry",
+          plateNumber: "XYZ",
+          color: "White",
+          year: 2022,
+        },
       },
     };
 
     const driverState = {
       name: socketData.driver.name,
-      photoUrl: '/profile.jpg', // Hard-coded default, NOT from socket
+      photoUrl: "/profile.webp", // Hard-coded default, NOT from socket
       vehicle: {
-        make: socketData.driver.vehicle?.brand || 'Vehicle',
-        model: socketData.driver.vehicle?.model || 'Car',
-        licensePlate: socketData.driver.vehicle?.plateNumber || '---',
+        make: socketData.driver.vehicle?.brand || "Vehicle",
+        model: socketData.driver.vehicle?.model || "Car",
+        licensePlate: socketData.driver.vehicle?.plateNumber || "---",
       },
       rating: null, // Hard-coded null, NOT from socket
       phone: socketData.driver.phone,
     };
 
-    expect(driverState.photoUrl).toBe('/profile.jpg');
+    expect(driverState.photoUrl).toBe("/profile.webp");
     expect(driverState.rating).toBeNull();
     // These will be backfilled by REST sync (useRideSynchronization)
   });
 });
 
 // ─── H6: source-level verification ──────────────────────────────────────────
-describe('H6 — source-level verification', () => {
+describe("H6 — source-level verification", () => {
   it('onTripCompleted sets "payment-required" BEFORE calling getCurrentRide', () => {
-    const fs = require('fs');
-    const path = require('path');
+    const fs = require("fs");
+    const path = require("path");
     const socketListenerPath = path.resolve(
       __dirname,
-      '../../../app/main/ride/components/RideSocketListener.tsx',
+      "../../../app/main/ride/components/RideSocketListener.tsx",
     );
-    const source = fs.readFileSync(socketListenerPath, 'utf-8');
+    const source = fs.readFileSync(socketListenerPath, "utf-8");
 
     // Extract the onTripCompleted section
-    const startIdx = source.indexOf('onTripCompleted');
+    const startIdx = source.indexOf("onTripCompleted");
     const section = source.substring(startIdx, startIdx + 1000);
 
     // setRideStatus("payment-required") should appear before getCurrentRide
-    const statusIdx = section.indexOf('payment-required');
-    const fetchIdx = section.indexOf('getCurrentRide');
+    const statusIdx = section.indexOf("payment-required");
+    const fetchIdx = section.indexOf("getCurrentRide");
 
     expect(statusIdx).toBeGreaterThan(0);
     expect(fetchIdx).toBeGreaterThan(0);
     expect(statusIdx).toBeLessThan(fetchIdx);
   });
 
-  it('onTripCompleted populates tripSummary with fare/distance/duration', () => {
-    const fs = require('fs');
-    const path = require('path');
+  it("onTripCompleted populates tripSummary with fare/distance/duration", () => {
+    const fs = require("fs");
+    const path = require("path");
     const socketListenerPath = path.resolve(
       __dirname,
-      '../../../app/main/ride/components/RideSocketListener.tsx',
+      "../../../app/main/ride/components/RideSocketListener.tsx",
     );
-    const source = fs.readFileSync(socketListenerPath, 'utf-8');
+    const source = fs.readFileSync(socketListenerPath, "utf-8");
 
     // After getCurrentRide, the handler should set tripSummary
-    const tripCompletedSection = source.split('onTripCompleted')[1];
-    expect(tripCompletedSection).toContain('setTripSummary');
-    expect(tripCompletedSection).toContain('ride.totalFare');
-    expect(tripCompletedSection).toContain('ride.distanceKm');
-    expect(tripCompletedSection).toContain('ride.durationMin');
+    const tripCompletedSection = source.split("onTripCompleted")[1];
+    expect(tripCompletedSection).toContain("setTripSummary");
+    expect(tripCompletedSection).toContain("ride.totalFare");
+    expect(tripCompletedSection).toContain("ride.distanceKm");
+    expect(tripCompletedSection).toContain("ride.durationMin");
   });
 });

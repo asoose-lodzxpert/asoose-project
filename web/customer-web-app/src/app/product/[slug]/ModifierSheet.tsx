@@ -78,7 +78,7 @@ export function ModifierSheet({
       />
 
       {/* Sheet — full-width bottom sheet on mobile, floating panel on desktop */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 flex flex-col bg-white dark:bg-[#1a1a1a] rounded-t-3xl shadow-2xl max-h-[88vh] lg:left-auto lg:right-8 lg:bottom-8 lg:w-[420px] lg:rounded-2xl">
+      <div className="fixed bottom-0 left-0 right-0 z-50 flex max-h-[92dvh] flex-col rounded-t-3xl bg-white shadow-2xl sm:left-1/2 sm:right-auto sm:w-[min(440px,calc(100%-2rem))] sm:-translate-x-1/2 sm:rounded-3xl lg:bottom-8 lg:left-auto lg:right-8 lg:w-[420px] lg:translate-x-0 dark:bg-[#1a1a1a]">
         {/* Drag handle — mobile only */}
         <div className="flex justify-center pt-3 pb-1 flex-shrink-0 lg:hidden">
           <div className="w-10 h-1 rounded-full bg-gray-200 dark:bg-white/15" />
@@ -97,6 +97,7 @@ export function ModifierSheet({
           <button
             onClick={onClose}
             className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+            aria-label="Close product options"
           >
             <X className="w-5 h-5" />
           </button>
@@ -135,7 +136,7 @@ export function ModifierSheet({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {group.modifiers.map((mod) => {
                     const selected = (selections[group.id] || []).includes(
                       mod.id,
@@ -184,7 +185,7 @@ export function ModifierSheet({
         </div>
 
         {/* Footer CTA */}
-        <div className="px-5 py-4 border-t border-gray-100 dark:border-white/5 flex-shrink-0">
+        <div className="shrink-0 border-t border-gray-100 px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 dark:border-white/5 sm:pb-4">
           <button
             onClick={() => isValid && !isSubmitting && onConfirm(selections)}
             disabled={!isValid || isSubmitting}

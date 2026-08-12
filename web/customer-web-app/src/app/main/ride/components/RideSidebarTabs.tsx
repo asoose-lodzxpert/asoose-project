@@ -30,7 +30,7 @@ export function RideSidebarTabs() {
   ];
 
   return (
-    <div className="flex border-b border-zinc-100 dark:border-zinc-800">
+    <div className="m-3 flex rounded-2xl bg-zinc-100 p-1 dark:bg-white/5">
       {tabs.map((tab) => {
         const Icon = tab.icon;
         const isActive = activeTab === tab.id;
@@ -38,14 +38,14 @@ export function RideSidebarTabs() {
           <button
             key={tab.id}
             onClick={() => handleTabChange(tab.id)}
-            className={`flex-1 flex flex-col items-center py-3 gap-1 transition-all ${
+            className={`flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs font-black transition-all ${
               isActive 
-                ? 'text-yellow-600 dark:text-yellow-500 border-b-2 border-yellow-500' 
+                ? 'bg-white text-zinc-950 shadow-sm dark:bg-zinc-800 dark:text-white'
                 : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200'
             }`}
           >
-            <Icon size={18} />
-            <span className="text-[10px] font-bold uppercase tracking-wider">{tab.label}</span>
+            <Icon size={15} />
+            <span>{tab.label}</span>
           </button>
         );
       })}

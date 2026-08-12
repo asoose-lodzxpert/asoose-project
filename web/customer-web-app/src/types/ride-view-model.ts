@@ -71,6 +71,7 @@ export interface DriverView {
 export interface RideViewModel {
   /** Ride ID */
   id: string;
+  trackingId?: string;
   
   /** Current ride status enum */
   status: RideStatus;
@@ -148,6 +149,9 @@ export interface BackendRide {
     lng?: number;
     label?: string;
     phone?: string;
+    latitude?: number;
+    longitude?: number;
+    address?: string;
   };
   dropoffAddress?: {
     id?: string;
@@ -158,10 +162,14 @@ export interface BackendRide {
     lng?: number;
     label?: string;
     phone?: string;
+    latitude?: number;
+    longitude?: number;
+    address?: string;
   };
   
   // Pricing
   totalFare?: number;
+  fare?: number;
   /** @deprecated estimatedFare is not a real backend column — kept on BackendRide
    *  only because the API may still include it in responses for old rides. */
   estimatedFare?: number;
@@ -175,6 +183,8 @@ export interface BackendRide {
   // Trip data
   distanceKm?: number;
   durationMin?: number;
+  distance?: number;
+  duration?: number;
 
   /** Vehicle type requested (ECONOMY | BUSINESS) */
   vehicleType?: string;
@@ -201,6 +211,7 @@ export interface BackendRide {
       year?: number;
     };
   };
+  driver?: BackendRide["rider"];
   
   // Payment & Metadata
   payment?: {
@@ -214,5 +225,9 @@ export interface BackendRide {
 
   // Security
   startOtp?: string;
+  pickupCode?: string;
+  trackingId?: string;
+  paymentMethod?: string;
   cancellationReason?: string;
+  cancelReason?: string;
 }

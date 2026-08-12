@@ -3,11 +3,12 @@
 import React, { useState } from "react";
 import { X, MapPin, Loader2 } from "lucide-react";
 import { LocationInput } from "@/components/shared/LocationInput";
+import type { AddressLabel, CreateAddressInput } from "@/services/address.service";
 
 interface AddAddressModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (address: any) => Promise<void>;
+  onSave: (address: CreateAddressInput) => Promise<void>;
 }
 
 export const AddAddressModal = ({
@@ -17,6 +18,7 @@ export const AddAddressModal = ({
 }: AddAddressModalProps) => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
+    label: "HOME" as AddressLabel,
     street: "",
     isDefault: false,
   });
@@ -37,16 +39,17 @@ export const AddAddressModal = ({
     setLoading(true);
     try {
       const payload = {
-        street: formData.street,
+        label: formData.label,
+        latitude: coords.lat,
+        longitude: coords.lng,
+        ...(formData.street.trim() ? { street: formData.street.trim() } : {}),
         isDefault: formData.isDefault,
-        lat: coords.lat,
-        lng: coords.lng,
       };
 
       await onSave(payload);
 
       onClose();
-      setFormData({ street: "", isDefault: false });
+      setFormData({ label: "HOME", street: "", isDefault: false });
       setCoords(null);
     } catch (error) {
       console.error("Form submission error:", error);
@@ -74,6 +77,16 @@ export const AddAddressModal = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="text-xs font-bold text-gray-500 uppercase">Address label</label>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {(["HOME", "WORK", "OTHER"] as AddressLabel[]).map((label) => (
+                <button key={label} type="button" onClick={() => setFormData((current) => ({ ...current, label }))} className={`rounded-xl border px-3 py-2.5 text-xs font-black transition ${formData.label === label ? "border-yellow-400 bg-yellow-50 text-yellow-800 dark:bg-yellow-500/10 dark:text-yellow-400" : "border-gray-200 dark:border-white/10"}`}>
+                  {label[0] + label.slice(1).toLowerCase()}
+                </button>
+              ))}
+            </div>
+          </div>
           {/* Street — debounced place search via backend */}
           <div>
             <label className="text-xs font-bold text-gray-500 uppercase">
@@ -100,6 +113,7 @@ export const AddAddressModal = ({
                 <MapPin className="w-3 h-3" /> Location pinned
               </p>
             )}
+            <p className="mt-2 text-[11px] leading-5 text-gray-400">Only the label and pinned location are required. Address details are filled when available.</p>
           </div>
 
           <div className="flex items-center gap-3 pt-2">

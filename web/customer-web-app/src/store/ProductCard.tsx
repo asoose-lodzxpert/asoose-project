@@ -144,7 +144,7 @@ export const ProductCard = ({
 
   const cardBody = (
     <>
-      <div className="w-24 h-24 sm:w-32 sm:h-32 bg-gray-100 dark:bg-white/5 rounded-xl flex-shrink-0 overflow-hidden relative">
+      <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-gray-100 sm:h-28 sm:w-28 xl:h-32 xl:w-32 dark:bg-white/5">
         {image?.startsWith("http") ? (
           <Image
             src={image}
@@ -156,6 +156,13 @@ export const ProductCard = ({
         ) : (
           <div className="w-full h-full flex items-center justify-center text-3xl">
             📦
+          </div>
+        )}
+        {isSoldOut && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/55">
+            <span className="rounded-md bg-red-600 px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider text-white">
+              Sold out
+            </span>
           </div>
         )}
       </div>
@@ -176,12 +183,13 @@ export const ProductCard = ({
         </div>
 
         <div className="flex justify-between items-end mt-2">
-          <span className="font-black text-lg">₦{price.toLocaleString()}</span>
+          <span className="text-base font-black sm:text-lg">₦{price.toLocaleString()}</span>
           <button
             type="button"
             onClick={handleQuickAdd}
             disabled={loading || !isAvailable || isSoldOut}
-            className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center text-gray-900 dark:text-white hover:bg-yellow-500 hover:text-black transition-colors z-10 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-900 transition-colors hover:bg-yellow-400 hover:text-black disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white/10 dark:text-white"
+            aria-label={`Add ${name} to basket`}
           >
             {loading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -198,7 +206,7 @@ export const ProductCard = ({
     return (
       <Link
         href={href}
-        className="bg-white dark:bg-[#151515] p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm flex gap-4 hover:border-yellow-500/30 transition-colors group cursor-pointer"
+        className="group flex h-full cursor-pointer gap-3 rounded-2xl border border-black/[0.06] bg-white p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-yellow-400/60 hover:shadow-md sm:gap-4 dark:border-white/[0.07] dark:bg-[#151515]"
       >
         {cardBody}
       </Link>
@@ -208,7 +216,7 @@ export const ProductCard = ({
   return (
     <div
       onClick={onClick}
-      className="bg-white dark:bg-[#151515] p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm flex gap-4 hover:border-yellow-500/30 transition-colors group cursor-pointer"
+      className="group flex h-full cursor-pointer gap-3 rounded-2xl border border-black/[0.06] bg-white p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-yellow-400/60 hover:shadow-md sm:gap-4 dark:border-white/[0.07] dark:bg-[#151515]"
     >
       {cardBody}
     </div>

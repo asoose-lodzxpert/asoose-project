@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import { RideService } from '@/services/ride.service';
 import { mapRidesToViewModels } from '@/services/mappers/ride.mapper';
 import type { RideViewModel } from '@/types/ride-view-model';
-import { Loader2, Calendar, MapPin, Clock, AlertCircle } from 'lucide-react';
+import { Loader2, Calendar, Clock } from 'lucide-react';
 import { toast } from 'react-toastify';
 import Link from 'next/link';
 import {

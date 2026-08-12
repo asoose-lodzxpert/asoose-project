@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useState, useRef, useMemo } from "react";
 import useSWR from "swr";
@@ -14,29 +15,29 @@ import { GoogleMap, Marker, Polyline } from "@react-google-maps/api";
 import { useGoogleMaps } from "@/providers/GoogleMapsProvider";
 import { ErrorState } from "@/components/ErrorState";
 import {
-  formatRideStatus,
   formatRideDateTime,
   formatRideTime,
   formatCurrency,
 } from "@/services/formatters/ride-status.formatter";
 import {
   ArrowLeft,
-  Clock,
-  MapPin,
   CreditCard,
   User,
   Star,
-  ShieldCheck,
   Receipt,
-  Navigation,
   Loader2,
   AlertCircle,
   ShieldAlert,
   Flag,
   ExternalLink,
+  Copy,
+  Check,
+  RefreshCw,
+  XCircle,
 } from "lucide-react";
 import Link from "next/link";
 import ReportDisputeModal from "@/app/main/orders/component/reportDisputeModal";
+import { toast } from "react-toastify";
 
 const API_URL = (
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1"
@@ -60,6 +61,9 @@ export default function RideDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [routePolyline, setRoutePolyline] = useState<string | null>(null);
+  const [pickupCode, setPickupCode] = useState<string | null>(null);
+  const [codeCopied, setCodeCopied] = useState(false);
+  const [actionLoading, setActionLoading] = useState<"payment" | "cancel" | null>(null);
 
   // Keep ref to abort controller for cleanup
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -103,6 +107,10 @@ export default function RideDetailsPage() {
         // Transform backend → ViewModel (handles all mapping and null safety)
         const viewModel = mapRideToViewModel(backendRide);
         setRide(viewModel);
+
+        RideService.getPickupCode(rideId, token)
+          .then((result) => setPickupCode(result.pickupCode))
+          .catch(() => setPickupCode(null));
 
         // ========== MAP ROUTE CALCULATION ==========
         // Only calculate if we have valid coordinates and Google Maps is loaded
@@ -167,6 +175,53 @@ export default function RideDetailsPage() {
   // ========== DISPUTE ==========
   const [isDisputeModalOpen, setIsDisputeModalOpen] = useState(false);
   const rideId = params.id as string;
+
+  const copyPickupCode = async () => {
+    if (!pickupCode) return;
+    await navigator.clipboard.writeText(pickupCode);
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 1800);
+  };
+
+  const regeneratePayment = async () => {
+    if (!session?.accessToken) return;
+    setActionLoading("payment");
+    try {
+      const result = await RideService.regenerateCheckout(
+        rideId,
+        session.accessToken,
+      );
+      if (!result.authorizationUrl.startsWith("https://checkout.paystack.com/")) {
+        throw new Error("The payment link returned by the server is invalid.");
+      }
+      localStorage.setItem("pending_ride", "true");
+      localStorage.setItem("pending_ride_id", rideId);
+      window.location.href = result.authorizationUrl;
+    } catch (paymentError: any) {
+      toast.error(paymentError?.message || "Could not generate payment link.");
+      setActionLoading(null);
+    }
+  };
+
+  const cancelRide = async () => {
+    if (!session?.accessToken) return;
+    const reason = window.prompt("Why are you cancelling this ride?", "Changed my mind");
+    if (reason === null) return;
+    setActionLoading("cancel");
+    try {
+      const cancelled = await RideService.cancelRide(
+        rideId,
+        reason.trim() || "Changed my mind",
+        session.accessToken,
+      );
+      setRide(mapRideToViewModel(cancelled));
+      toast.success("Ride cancelled successfully.");
+    } catch (cancelError: any) {
+      toast.error(cancelError?.message || "Could not cancel this ride.");
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   // C6 fix: use the customer-facing dispute check endpoint (not super-admin)
   const disputeCheckKey =
@@ -280,7 +335,7 @@ export default function RideDetailsPage() {
               {formatRideDateTime(ride.createdAt?.toISOString())}
             </h2>
             <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">
-              Order ID: #{ride.id.slice(0, 8).toUpperCase()}
+              {ride.trackingId || `Ride #${ride.id.slice(0, 8).toUpperCase()}`}
             </p>
           </div>
           <span
@@ -295,6 +350,39 @@ export default function RideDetailsPage() {
             {ride.statusLabel}
           </span>
         </div>
+
+        {pickupCode &&
+          !["COMPLETED", "CANCELLED"].includes(ride.status) &&
+          !isCancelledStatus(ride.status) && (
+            <div className="rounded-2xl border border-yellow-200 bg-yellow-50 p-5 dark:border-yellow-500/20 dark:bg-yellow-500/10">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-yellow-700 dark:text-yellow-400">
+                    Ride pickup code
+                  </p>
+                  <p className="mt-2 font-mono text-3xl font-black tracking-[0.2em] text-zinc-900 dark:text-white">
+                    {pickupCode}
+                  </p>
+                  <p className="mt-2 text-xs leading-5 text-zinc-600 dark:text-zinc-400">
+                    Share this code with your driver only when you are inside
+                    the correct vehicle and ready to begin the ride.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={copyPickupCode}
+                  aria-label="Copy pickup code"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm dark:bg-white/10"
+                >
+                  {codeCopied ? (
+                    <Check className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <Copy className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
 
         {/* ========== MAP SNAPSHOT ========== */}
         {isLoaded &&
@@ -475,14 +563,11 @@ export default function RideDetailsPage() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold">
-                Paid via{" "}
-                {ride.paymentMethod
-                  ? ride.paymentMethod.charAt(0).toUpperCase() +
-                    ride.paymentMethod.slice(1).toLowerCase()
-                  : "Card"}
+                {ride.paymentStatus === "COMPLETED" ? "Paid via " : "Payment via "}
+                {ride.paymentMethod === "WALLET" ? "Wallet" : "Pay online"}
               </p>
               <p className="text-xs text-zinc-400 truncate">
-                Transaction ID: {ride.paymentReference?.toUpperCase() || ride.id.slice(0, 12).toUpperCase()}
+                Status: {ride.paymentStatus || "PENDING"}
               </p>
             </div>
           </div>
@@ -497,6 +582,39 @@ export default function RideDetailsPage() {
             <p className="text-sm text-red-700 dark:text-red-300">
               {ride.cancellationReason}
             </p>
+          </div>
+        )}
+
+        {!isCancelledStatus(ride.status) && ride.status !== "COMPLETED" && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {ride.paymentStatus !== "COMPLETED" && (
+              <button
+                type="button"
+                onClick={regeneratePayment}
+                disabled={actionLoading !== null}
+                className="flex items-center justify-center gap-2 rounded-xl bg-yellow-500 py-4 text-sm font-black text-black disabled:opacity-50"
+              >
+                {actionLoading === "payment" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Regenerate payment link
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={cancelRide}
+              disabled={actionLoading !== null}
+              className="flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-white py-4 text-sm font-black text-red-600 disabled:opacity-50 dark:border-red-500/20 dark:bg-zinc-900"
+            >
+              {actionLoading === "cancel" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <XCircle className="h-4 w-4" />
+              )}
+              Cancel ride
+            </button>
           </div>
         )}
 

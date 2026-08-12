@@ -12,6 +12,8 @@ export interface CartItem {
   image?: string | null;
   modifierIds?: string[];
   modifierNames?: string[];
+  serverItemId?: string;
+  instructions?: string;
   /** Which backend cart-item field this maps to: menuItemId (DISH) vs productId (PRODUCT).
    *  Missing on old persisted carts — treated as "PRODUCT" wherever read. */
   kind?: "PRODUCT" | "DISH";
@@ -34,6 +36,7 @@ interface CartState {
   decreaseItem: (itemId: string) => void;
   removeItem: (itemId: string) => void;
   clearCart: () => void;
+  replaceItems: (items: CartItem[]) => void;
   getTotalPrice: () => number;
   getTotalItems: () => number;
   getItemsByStore: () => Record<string, CartItem[]>;
@@ -89,6 +92,8 @@ export const useCartStore = create<CartState>()(
       }, // ← was followed by a rogue `});` and `},` here
 
       clearCart: () => set({ items: [] }),
+
+      replaceItems: (items) => set({ items }),
 
       getTotalPrice: () =>
         get().items.reduce(

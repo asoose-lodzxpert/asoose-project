@@ -10,7 +10,7 @@ interface AddAddressModalProps {
   onSave: (data: any) => Promise<void>;
 }
 
-const INITIAL_FORM = { street: "", phone: "", label: "Home" };
+const INITIAL_FORM = { street: "", label: "Home" };
 
 export const AddAddressModal = ({
   isOpen,
@@ -24,7 +24,6 @@ export const AddAddressModal = ({
   const [isLocating, setIsLocating] = useState(false);
   const [errors, setErrors] = useState<{
     street?: string;
-    phone?: string;
     general?: string;
   }>({});
 
@@ -41,12 +40,9 @@ export const AddAddressModal = ({
 
   const validate = (): boolean => {
     const newErrors: typeof errors = {};
-    if (!formData.street.trim())
-      newErrors.street = "Please search and select an address.";
-    else if (!coords)
+    if (!coords)
       newErrors.street =
-        "Please select an address from the suggestions to pin your location.";
-    if (!formData.phone.trim()) newErrors.phone = "Contact phone is required.";
+        "Please search for an address or use your current location to place the pin.";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -60,7 +56,6 @@ export const AddAddressModal = ({
     try {
       await onSave({
         street: formData.street,
-        phone: formData.phone,
         // Backend AddressLabel enum is uppercase ("HOME"|"WORK"|"OTHER");
         // the picker below displays Title Case.
         label: formData.label.toUpperCase(),
@@ -154,32 +149,7 @@ export const AddAddressModal = ({
             )}
           </div>
 
-          {/* Contact Phone */}
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Contact Phone <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="tel"
-              className={`w-full p-3 rounded-xl bg-gray-50 dark:bg-white/5 border outline-none transition-colors ${
-                errors.phone
-                  ? "border-red-400 dark:border-red-500 focus:border-red-500"
-                  : "border-gray-200 dark:border-white/10 focus:border-yellow-500"
-              }`}
-              placeholder="e.g. 08012345678"
-              value={formData.phone}
-              onChange={(e) => {
-                setFormData({ ...formData, phone: e.target.value });
-                if (errors.phone)
-                  setErrors((er) => ({ ...er, phone: undefined }));
-              }}
-            />
-            {errors.phone && (
-              <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" /> {errors.phone}
-              </p>
-            )}
-          </div>
+          <p className="rounded-xl bg-gray-50 px-3 py-2 text-[11px] leading-5 text-gray-500 dark:bg-white/5">Only the label and pinned location are required. Other address information is optional.</p>
 
           <div className="pt-4">
             <button

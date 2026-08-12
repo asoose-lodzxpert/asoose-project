@@ -6,12 +6,11 @@ import {
   Clock, 
   Trash2, 
   Loader2,
-  Car,
-  MapPin
+  Route
 } from 'lucide-react';
 import { ScheduledRideService } from '@/services/scheduled-ride.service';
 import { toast } from 'react-toastify';
-import { SidebarSection, SidebarDivider } from './Sidebar';
+import { SidebarSection } from './Sidebar';
 import { useRideStore } from '../store/ride';
 
 export function ScheduledRidesList() {
@@ -25,7 +24,7 @@ export function ScheduledRidesList() {
     try {
       const data = await ScheduledRideService.getUpcomingRides();
       setRides(data);
-    } catch (err: any) {
+    } catch {
       toast.error('Failed to load upcoming rides');
     } finally {
       setIsLoading(false);
@@ -97,9 +96,12 @@ export function ScheduledRidesList() {
                       {new Date(ride.scheduledAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-700 text-[9px] font-bold dark:text-gray-300">
-                    Standard Ride
-                  </span>
+                  {(ride.distance != null || ride.duration != null) && (
+                    <span className="flex items-center gap-2 rounded-full bg-zinc-100 px-2 py-0.5 text-[9px] font-bold dark:bg-zinc-700 dark:text-gray-300">
+                      {ride.distance != null && <span className="flex items-center gap-1"><Route size={10} />{Number(ride.distance).toFixed(1)} km</span>}
+                      {ride.duration != null && <span>{Math.ceil(Number(ride.duration))} min</span>}
+                    </span>
+                  )}
                 </div>
 
                 <div className="space-y-2 relative pl-4">
@@ -116,8 +118,7 @@ export function ScheduledRidesList() {
 
                 <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Car size={14} className="text-zinc-400" />
-                    <p className="text-sm font-black dark:text-white">₦{(ride.scheduledFare ?? 0).toLocaleString()}</p>
+                    <p className="text-sm font-black dark:text-white">₦{Number(ride.fare ?? 0).toLocaleString()}</p>
                   </div>
                   <button 
                     onClick={() => handleCancel(ride.id)}

@@ -1,6 +1,5 @@
 "use client";
 
-import { useSession } from "next-auth/react";
 import { RideController } from "./components/RideController";
 import { GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 import { MapView } from "./components/MapView";
@@ -15,7 +14,6 @@ import { Sidebar } from "./components/Sidebar";
 import { Suspense } from "react";
 
 export default function Home() {
-  const { data: session } = useSession();
   const rideStatus = useRideStore((state) => state.rideStatus);
   const isConfiguring = useRideStore((state) => state.isConfiguring);
   const rideId = useRideStore((state) => state.rideId);
@@ -27,14 +25,6 @@ export default function Home() {
   // Activate State Recovery
   useRideSynchronization();
 
-  const isRideActive = [
-    "searching",
-    "confirmed",
-    "arrived",
-    "in-progress",
-    "payment-required",
-  ].includes(rideStatus);
-
   // Sidebar-hosted states: idle (RideSelection) and configuring (LocationSelector)
   const showSidebar = rideStatus === "idle" || isConfiguring;
 
@@ -44,7 +34,7 @@ export default function Home() {
            BottomNav is `fixed` so it doesn't participate in document flow — no need to
            subtract its height here. On mobile the BottomNav overlaps the page; floating
            panels use bottom-20 to clear it. */}
-      <div className="relative flex flex-row h-[calc(100dvh-64px)] w-full overflow-hidden">
+      <div className="relative flex h-[calc(100dvh-64px-68px)] w-full flex-row overflow-hidden md:h-[calc(100dvh-64px)]">
         {/* --- Invisible logic-only components --- */}
         <UserLocationTracker />
         <MapCameraManager />
@@ -55,7 +45,13 @@ export default function Home() {
 
         {/* --- Sidebar (left column, only for idle/configuring) --- */}
         {showSidebar && (
-          <div className="z-20 w-full max-w-md md:w-[450px] md:min-w-[450px] h-full flex-shrink-0">
+          <div
+            className={`z-30 flex-shrink-0 overflow-hidden bg-white dark:bg-zinc-900 md:static md:h-full md:w-[450px] md:min-w-[450px] md:max-w-md md:rounded-none ${
+              isConfiguring
+                ? "absolute inset-x-0 bottom-0 h-[62%] rounded-t-[2rem] border-t border-black/5 shadow-[0_-20px_60px_-24px_rgba(0,0,0,0.35)] dark:border-white/10"
+                : "h-full w-full max-w-md"
+            }`}
+          >
             <Sidebar>
               <Suspense fallback={<div className="p-8 text-center text-zinc-500">Loading ride details...</div>}>
                 <RideController />
@@ -65,7 +61,7 @@ export default function Home() {
         )}
 
         {/* --- Map (fills remaining space) --- */}
-        <div className="flex-1 h-full w-full relative">
+        <div className="relative h-full w-full flex-1">
           <MapView />
 
           {/* --- Floating overlays (positioned over the map) --- */}

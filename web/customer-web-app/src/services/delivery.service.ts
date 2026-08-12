@@ -3,6 +3,7 @@ import { ApiService } from "./api.service";
 // ✅ FIX: Expanded interface to match Backend Prisma Model & UsersService response
 export interface Delivery {
   id: string;
+  trackingId?: string;
   status:
     | "PENDING"
     | "REQUESTED"
@@ -14,6 +15,11 @@ export interface Delivery {
     | "CANCELLED";
   deliveryFee: number;
   distanceKm?: number;
+  durationMinutes?: number;
+  size?: "SMALL" | "MEDIUM" | "LARGE";
+  paymentMethod?: "WALLET" | "CARD";
+  paymentStatus?: string;
+  confirmationCode?: string;
 
   // Package Info
   packageDetails?: string;
@@ -58,7 +64,7 @@ export interface Delivery {
 /** Maps the real backend's ParcelStatus enum to the DeliveryStatus-shaped
  *  strings the rest of the app (page.tsx, socket handlers, polling) already
  *  compares against — keeps the UI layer unchanged. */
-function mapParcelStatus(status: string): Delivery["status"] {
+export function mapParcelStatus(status: string): Delivery["status"] {
   switch (status) {
     case "SEARCHING_RIDER":
       return "REQUESTED";
@@ -94,9 +100,14 @@ export function weightToParcelSize(
 function mapParcelToDelivery(p: any): Delivery {
   return {
     id: p.id,
+    trackingId: p.trackingId,
     status: mapParcelStatus(p.status),
     deliveryFee: p.fare ?? 0,
     distanceKm: p.distanceKm ?? p.distance,
+    durationMinutes: p.estimatedDurationMinutes ?? p.duration,
+    size: p.size,
+    paymentMethod: p.paymentMethod,
+    paymentStatus: p.paymentStatus,
     packageDetails: p.description ?? undefined,
     recipientName: p.recipientName,
     recipientPhone: p.recipientPhone,
@@ -173,11 +184,12 @@ export class DeliveryService {
       recipientName: string;
       recipientPhone: string;
       description?: string;
-      paymentMethod?: "WALLET" | "CARD" | "CASH";
+      paymentMethod: "WALLET" | "CARD";
+      idempotencyKey?: string;
     },
     token?: string,
   ): Promise<CreateParcelResult> {
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = data.idempotencyKey ?? `parcel-${crypto.randomUUID()}`;
     const res = await ApiService.post<{
       parcel: any;
       authorizationUrl?: string;
@@ -191,7 +203,7 @@ export class DeliveryService {
         recipientName: data.recipientName,
         recipientPhone: data.recipientPhone,
         description: data.description,
-        paymentMethod: data.paymentMethod ?? "CARD",
+        paymentMethod: data.paymentMethod,
         idempotencyKey,
       },
       token,
@@ -213,12 +225,23 @@ export class DeliveryService {
     return mapParcelToDelivery(parcel);
   }
 
+  static async getConfirmationCode(
+    id: string,
+    token?: string,
+  ): Promise<{ parcelId: string; trackingId: string; confirmationCode: string }> {
+    return ApiService.get(`/parcels/${id}/confirmation-code`, token);
+  }
+
   static async rateDelivery(
     _deliveryId: string,
     _rating: number,
     _comment?: string,
     _token?: string,
   ): Promise<never> {
+    void _deliveryId;
+    void _rating;
+    void _comment;
+    void _token;
     // Backend does not have a delivery rating endpoint yet.
     throw new Error(
       "Delivery rating is not yet available. This feature is coming soon.",
@@ -233,6 +256,7 @@ export class DeliveryService {
     interval: number = 3000,
     token?: string,
   ): Promise<boolean> {
+    void _targetStatus;
     let attempts = 0;
     const paidStatuses = [
       "REQUESTED",
@@ -266,6 +290,7 @@ export class DeliveryService {
     _gateway: string = "PAYSTACK",
     token?: string,
   ): Promise<boolean | null> {
+    void _gateway;
     try {
       const res: any = await ApiService.get(
         `/payments/verify/${encodeURIComponent(reference)}`,
@@ -285,6 +310,7 @@ export class DeliveryService {
     _gateway: string = "PAYSTACK",
     token?: string,
   ): Promise<{ status: string; [key: string]: any }> {
+    void _gateway;
     const res: any = await ApiService.get(
       `/payments/verify/${encodeURIComponent(reference)}`,
       token,

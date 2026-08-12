@@ -58,15 +58,20 @@ function mapAddress(backendAddress?: {
   state?: string;
   lat?: number;
   lng?: number;
+  latitude?: number;
+  longitude?: number;
+  address?: string;
 }): AddressView {
   return {
-    addressText: constructAddressText(
-      backendAddress?.street,
-      backendAddress?.city,
-      backendAddress?.state
-    ),
-    lat: backendAddress?.lat ?? null,
-    lng: backendAddress?.lng ?? null,
+    addressText:
+      backendAddress?.address ||
+      constructAddressText(
+        backendAddress?.street,
+        backendAddress?.city,
+        backendAddress?.state,
+      ),
+    lat: backendAddress?.latitude ?? backendAddress?.lat ?? null,
+    lng: backendAddress?.longitude ?? backendAddress?.lng ?? null,
     street: backendAddress?.street,
     city: backendAddress?.city,
     state: backendAddress?.state,
@@ -141,12 +146,12 @@ export function mapRideToViewModel(backendRide: BackendRide): RideViewModel {
 
     // ========== DRIVER ==========
     // CRITICAL: Map backend rider → driver (rename + flatten)
-    const driver = mapDriver(backendRide.rider);
+    const driver = mapDriver(backendRide.driver ?? backendRide.rider);
 
     // ========== PRICING ==========
     // Map totalFare (backend) → actualFare (frontend)
     // estimatedFare is not a real backend column — use totalFare only
-    const actualFare = backendRide.totalFare ?? 0;
+    const actualFare = backendRide.fare ?? backendRide.totalFare ?? 0;
 
     // ========== STATUS ==========
     // Format status enum to human-readable
@@ -168,6 +173,7 @@ export function mapRideToViewModel(backendRide: BackendRide): RideViewModel {
     const viewModel: RideViewModel = {
       // Core
       id: backendRide.id,
+      ...(backendRide.trackingId && { trackingId: backendRide.trackingId }),
       status: backendRide.status as RideStatus,
       statusLabel,
 
@@ -182,11 +188,11 @@ export function mapRideToViewModel(backendRide: BackendRide): RideViewModel {
       actualFare,
 
       // Distance & Duration
-      ...(backendRide.distanceKm !== undefined && {
-        distanceKm: backendRide.distanceKm,
+      ...((backendRide.distance ?? backendRide.distanceKm) !== undefined && {
+        distanceKm: backendRide.distance ?? backendRide.distanceKm,
       }),
-      ...(backendRide.durationMin !== undefined && {
-        durationMin: backendRide.durationMin,
+      ...((backendRide.duration ?? backendRide.durationMin) !== undefined && {
+        durationMin: backendRide.duration ?? backendRide.durationMin,
       }),
 
       // Timestamps
@@ -205,11 +211,18 @@ export function mapRideToViewModel(backendRide: BackendRide): RideViewModel {
 
       // Metadata
       ...(backendRide.payment?.status && { paymentStatus: backendRide.payment.status }),
+      ...(!backendRide.payment?.status && backendRide.paymentStatus && {
+        paymentStatus: backendRide.paymentStatus,
+      }),
       ...(backendRide.payment?.method && { paymentMethod: backendRide.payment.method }),
+      ...(!backendRide.payment?.method && backendRide.paymentMethod && {
+        paymentMethod: backendRide.paymentMethod,
+      }),
       ...(backendRide.payment?.reference && { paymentReference: backendRide.payment.reference }),
       ...(backendRide.vehicleType && { vehicleType: backendRide.vehicleType }),
-      ...(backendRide.cancellationReason && {
-        cancellationReason: backendRide.cancellationReason,
+      ...((backendRide.cancelReason || backendRide.cancellationReason) && {
+        cancellationReason:
+          backendRide.cancelReason || backendRide.cancellationReason,
       }),
     };
 

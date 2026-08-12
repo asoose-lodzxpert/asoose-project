@@ -1,32 +1,30 @@
 // as/customer-web-app/src/app/store/skeleton.tsx
 export const StoreSkeleton = () => {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] pb-24 animate-pulse">
-      {/* 1. Header Area */}
-      <div className="h-[70px] bg-white dark:bg-[#151515] border-b border-gray-100 dark:border-white/5" />
-
-      <main className="max-w-7xl mx-auto space-y-8">
-        {/* 2. Dynamic Banner Placeholder */}
-        <div className="px-4 pt-6">
-          <div className="w-full h-44 sm:h-56 rounded-[2rem] bg-gray-200 dark:bg-white/5" />
+    <div className="min-h-screen animate-pulse bg-[#f7f7f5] pb-24 dark:bg-[#0a0a0a]">
+      <main className="mx-auto max-w-7xl space-y-10 sm:space-y-12">
+        <div className="px-4 pt-4 sm:pt-6">
+          <div className="h-[260px] w-full rounded-[1.75rem] bg-gray-200 sm:h-[330px] dark:bg-white/5" />
         </div>
 
-        {/* 3. Category Grid Placeholder */}
         <div className="px-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className="mb-5 space-y-2">
+            <div className="h-3 w-16 rounded bg-gray-200 dark:bg-white/5" />
+            <div className="h-7 w-64 max-w-full rounded-lg bg-gray-200 dark:bg-white/5" />
+          </div>
+          <div className="flex gap-3 overflow-hidden sm:grid sm:grid-cols-3 lg:grid-cols-6">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div
                 key={i}
-                className="flex flex-col items-center p-5 rounded-3xl bg-white dark:bg-[#151515] border border-gray-100 dark:border-white/5"
+                className="flex min-w-[148px] items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3 dark:border-white/5 dark:bg-[#151515]"
               >
-                <div className="w-14 h-14 rounded-2xl bg-gray-200 dark:bg-white/5" />
-                <div className="mt-4 w-16 h-3 rounded bg-gray-200 dark:bg-white/5" />
+                <div className="h-11 w-11 shrink-0 rounded-xl bg-gray-200 dark:bg-white/5" />
+                <div className="h-3 w-16 rounded bg-gray-200 dark:bg-white/5" />
               </div>
             ))}
           </div>
         </div>
 
-        {/* 4. Vertical Sections (simulating multiple categories) */}
         {[1, 2].map((section) => (
           <div key={section} className="space-y-6">
             <div className="px-4 flex justify-between items-end">
@@ -37,15 +35,17 @@ export const StoreSkeleton = () => {
               <div className="w-20 h-8 rounded-full bg-gray-200 dark:bg-white/5" />
             </div>
 
-            <div className="px-4 flex gap-5 overflow-hidden">
+            <div className="flex gap-4 overflow-hidden px-4 sm:grid sm:grid-cols-2 lg:grid-cols-3">
               {[1, 2, 3].map((card) => (
                 <div
                   key={card}
-                  className="min-w-[300px] h-64 rounded-[2rem] bg-white dark:bg-[#151515] p-4 border border-gray-100 dark:border-white/5"
+                  className="h-64 min-w-[82vw] overflow-hidden rounded-[1.35rem] border border-gray-100 bg-white sm:min-w-0 dark:border-white/5 dark:bg-[#151515]"
                 >
-                  <div className="w-full h-40 rounded-2xl bg-gray-200 dark:bg-white/5 mb-4" />
-                  <div className="w-3/4 h-5 rounded bg-gray-200 dark:bg-white/5 mb-2" />
-                  <div className="w-1/2 h-3 rounded bg-gray-200 dark:bg-white/5" />
+                  <div className="h-40 w-full bg-gray-200 dark:bg-white/5" />
+                  <div className="space-y-3 p-4">
+                    <div className="h-5 w-3/4 rounded bg-gray-200 dark:bg-white/5" />
+                    <div className="h-3 w-1/2 rounded bg-gray-200 dark:bg-white/5" />
+                  </div>
                 </div>
               ))}
             </div>

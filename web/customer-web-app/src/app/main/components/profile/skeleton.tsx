@@ -1,19 +1,19 @@
 import React from "react";
 
 export const ProfileSkeleton = () => (
-  <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] pb-24 animate-pulse">
+  <div className="min-h-screen animate-pulse bg-[#f7f7f5] pb-24 dark:bg-[#0a0a0a]">
     {/* Header Skeleton */}
-    <div className="bg-white dark:bg-[#151515] border-b border-gray-100 dark:border-white/5 pt-10 pb-8 px-4 sm:px-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-          <div className="w-24 h-24 rounded-full bg-gray-200 dark:bg-white/10" />
-          <div className="flex-1 space-y-3 w-full sm:w-auto">
-            <div className="h-4 w-24 bg-gray-200 dark:bg-white/10 rounded mx-auto sm:mx-0" />
-            <div className="h-8 w-48 bg-gray-300 dark:bg-white/20 rounded mx-auto sm:mx-0" />
-            <div className="h-4 w-64 bg-gray-200 dark:bg-white/10 rounded mx-auto sm:mx-0" />
-            <div className="flex gap-4 justify-center sm:justify-start mt-4">
-              <div className="h-10 w-16 bg-gray-200 dark:bg-white/10 rounded-lg" />
-              <div className="h-10 w-24 bg-gray-200 dark:bg-white/10 rounded-lg" />
+    <div className="px-4 pb-4 pt-4 sm:pb-6 sm:pt-6">
+      <div className="mx-auto max-w-5xl rounded-[1.75rem] bg-[#181816] p-5 sm:p-8">
+        <div className="flex items-start gap-4 sm:gap-6">
+          <div className="h-16 w-16 shrink-0 rounded-2xl bg-white/10 sm:h-24 sm:w-24 sm:rounded-3xl" />
+          <div className="min-w-0 flex-1 space-y-3 pt-1">
+            <div className="h-3 w-24 rounded bg-white/10" />
+            <div className="h-7 w-48 max-w-full rounded bg-white/15" />
+            <div className="h-3 w-56 max-w-full rounded bg-white/10" />
+            <div className="mt-5 grid max-w-lg grid-cols-2 gap-2 border-t border-white/10 pt-5">
+              <div className="h-16 rounded-2xl bg-white/[0.07]" />
+              <div className="h-16 rounded-2xl bg-white/[0.07]" />
             </div>
           </div>
         </div>
@@ -21,19 +21,19 @@ export const ProfileSkeleton = () => (
     </div>
 
     {/* Tabs Skeleton */}
-    <div className="sticky top-0 bg-gray-50/95 dark:bg-[#0a0a0a]/95 border-b border-gray-200 dark:border-white/5 px-4 py-4">
-      <div className="max-w-4xl mx-auto flex gap-3 overflow-hidden">
+    <div className="sticky top-[64px] border-y border-black/[0.05] bg-[#f7f7f5]/95 px-4 py-3 dark:border-white/5 dark:bg-[#0a0a0a]/95">
+      <div className="mx-auto flex max-w-5xl gap-2 overflow-hidden">
         {[1, 2, 3, 4, 5].map((i) => (
           <div
             key={i}
-            className="h-10 w-28 bg-gray-200 dark:bg-white/10 rounded-full shrink-0"
+            className="h-10 w-28 shrink-0 rounded-xl bg-gray-200 dark:bg-white/10"
           />
         ))}
       </div>
     </div>
 
     {/* Content Skeleton */}
-    <main className="max-w-4xl mx-auto px-4 py-8">
+    <main className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
       <ContentSkeleton />
     </main>
   </div>
@@ -44,7 +44,7 @@ export const ContentSkeleton = () => (
     {[1, 2, 3].map((i) => (
       <div
         key={i}
-        className="h-32 bg-white dark:bg-[#151515] rounded-3xl border border-gray-100 dark:border-white/5"
+        className="h-32 rounded-2xl border border-gray-100 bg-white sm:rounded-3xl dark:border-white/5 dark:bg-[#151515]"
       />
     ))}
   </div>

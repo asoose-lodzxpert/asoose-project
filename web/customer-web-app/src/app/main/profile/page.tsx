@@ -4,7 +4,6 @@ import React, {
   useState,
   useEffect,
   useCallback,
-  useMemo,
   useRef,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -21,6 +20,8 @@ import {
   Trash2,
   ShieldCheck,
   ShieldAlert,
+  BedDouble,
+  CalendarDays,
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 
@@ -36,17 +37,15 @@ import { OrderCard } from "@/app/main/components/profile/OrderCard";
 import { RideCard } from "@/app/main/components/profile/ridecard";
 import { DeliveryCard } from "@/app/main/components/profile/deliverycard";
 import { DisputeCard } from "@/app/main/components/profile/DisputeCard";
-import BottomNav from "@/app/main/components/layout/BottomNav";
 import { EmptyState } from "@/app/main/components/profile/EmptyState";
-import { LinkedAccountsSection } from "@/app/main/components/profile/LinkedAccountsSection";
+import { WalletTab } from "@/app/main/components/profile/WalletTab";
 import {
   ProfileSkeleton,
   ContentSkeleton,
 } from "@/app/main/components/profile/skeleton";
 import { ApiService } from "@/services/api.service";
-
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+import type { Booking } from "@/services/property.service";
+import { AddressService, type CreateAddressInput, type SavedAddress } from "@/services/address.service";
 
 export default function ProfilePage() {
   return (
@@ -63,8 +62,10 @@ function ProfilePageContent() {
 
   const VALID_TABS: ProfileTab[] = [
     "orders",
+    "bookings",
     "rides",
     "deliveries",
+    "wallet",
     "disputes",
     "addresses",
     "settings",
@@ -93,21 +94,17 @@ function ProfilePageContent() {
 
   const [profile, setProfile] = useState<any>(null); // Changed from {} to null
   const [orders, setOrders] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [rides, setRides] = useState<any[]>([]);
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [disputes, setDisputes] = useState<any[]>([]);
-  const [addresses, setAddresses] = useState<any[]>([]);
+  const [addresses, setAddresses] = useState<SavedAddress[]>([]);
 
   // Use ref to track current tab for race condition prevention
   const activeTabRef = useRef(activeTab);
   useEffect(() => {
     activeTabRef.current = activeTab;
   }, [activeTab]);
-
-  const defaultAddr = useMemo(
-    () => addresses.find((a: any) => a.isDefault) || addresses[0] || null,
-    [addresses],
-  );
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -160,20 +157,27 @@ function ProfilePageContent() {
         let data;
         switch (tab) {
           case "orders":
-            data = await fetchWithAuth("/orders", accessToken);
+            data = await fetchWithAuth(
+              "/orders?page=1&limit=20",
+              accessToken,
+            );
             if (activeTabRef.current === "orders") {
               setOrders(data?.orders || []);
             }
             break;
+          case "bookings":
+            data = await fetchWithAuth("/bookings?page=1&limit=20", accessToken);
+            if (activeTabRef.current === "bookings") setBookings(data?.bookings || []);
+            break;
           case "rides":
-            data = await fetchWithAuth("/rides", accessToken);
+            data = await fetchWithAuth("/rides?page=1&limit=20", accessToken);
             if (activeTabRef.current === "rides") setRides(data?.rides || []);
             break;
           case "deliveries":
             // "Deliveries" here means parcels the customer has sent — the
             // backend's separate /deliveries module is for order-delivery
-            // tracking, not for listing a customer's own send-a-package history.
-            data = await fetchWithAuth("/parcels", accessToken);
+            // tracking, not for listing a customer's own delivery history.
+            data = await fetchWithAuth("/parcels?page=1&limit=20", accessToken);
             if (activeTabRef.current === "deliveries")
               setDeliveries(data?.parcels || []);
             break;
@@ -230,7 +234,7 @@ function ProfilePageContent() {
 
         const [prof, addr] = await Promise.all([
           fetchWithAuth("/users/me", accessToken),
-          fetchWithAuth("/addresses", accessToken),
+          AddressService.list(accessToken),
         ]);
 
         // Handle profile data properly
@@ -247,7 +251,6 @@ function ProfilePageContent() {
           setAddresses(addr);
         }
 
-        await fetchTabData("orders", accessToken);
       } catch (err) {
         console.error("Profile init failed", err);
         // Don't show error if it's session expiry (already handled)
@@ -266,26 +269,36 @@ function ProfilePageContent() {
   }, [session, status, router]);
 
   useEffect(() => {
-    if (token && activeTab !== "addresses" && activeTab !== "settings") {
+    if (
+      token &&
+      activeTab !== "addresses" &&
+      activeTab !== "settings" &&
+      activeTab !== "wallet"
+    ) {
       fetchTabData(activeTab, token);
     }
   }, [activeTab, token, fetchTabData]);
 
-  const handleUpdateProfile = async (data: { name: string; phone: string }) => {
+  const handleUpdateProfile = async (data: {
+    firstName: string;
+    lastName: string;
+    phone: string;
+  }) => {
     if (!token) {
       toast.error("Session expired. Please log in again.");
       return;
     }
 
     try {
-      const parts = data.name.trim().split(/\s+/);
       const updatedProfile = await fetchWithAuth("/users/me/profile", token, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          firstName: parts[0] ?? "",
-          lastName: parts.slice(1).join(" ") || parts[0] || "",
-          phone: data.phone,
+          firstName: data.firstName.trim(),
+          lastName: data.lastName.trim(),
+          phone: data.phone.trim(),
+          avatar: profile?.avatar || undefined,
+          cityId: profile?.cityId || undefined,
         }),
       });
 
@@ -298,31 +311,22 @@ function ProfilePageContent() {
     }
   };
 
-  const handleAddAddress = async (addressData: any) => {
+  const handleAddAddress = async (addressData: CreateAddressInput) => {
     if (!token) {
       toast.error("Session expired. Please log in again.");
-      return;
+      throw new Error("Session expired");
     }
 
-    // AddAddressModal collects { street, isDefault, lat, lng } — backend
-    // requires latitude/longitude.
-    const { lat, lng, ...rest } = addressData;
-    addressData = { ...rest, latitude: lat, longitude: lng };
-
     try {
-      await fetchWithAuth("/addresses", token, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(addressData),
-      });
-
-      const updatedAddresses = await fetchWithAuth("/addresses", token);
+      await AddressService.create(addressData, token);
+      const updatedAddresses = await AddressService.list(token);
       setAddresses(updatedAddresses || []);
       setIsAddressModalOpen(false);
       toast.success("Address added successfully");
     } catch (error: any) {
       console.error("Add address error:", error);
       toast.error(error.message || "Failed to add address");
+      throw error;
     }
   };
 
@@ -390,9 +394,7 @@ function ProfilePageContent() {
 
     if (result.isConfirmed) {
       try {
-        await fetchWithAuth(`/addresses/${id}`, token, {
-          method: "DELETE",
-        });
+        await AddressService.delete(id, token);
 
         setAddresses((prev) => prev.filter((a) => a.id !== id));
         toast.success("Address deleted successfully");
@@ -402,12 +404,26 @@ function ProfilePageContent() {
 
         // Refresh addresses on error
         try {
-          const refreshed = await fetchWithAuth("/addresses", token);
+          const refreshed = await AddressService.list(token);
           setAddresses(refreshed || []);
         } catch (refreshErr) {
           console.error("Failed to refresh addresses:", refreshErr);
         }
       }
+    }
+  };
+
+  const handleSetDefaultAddress = async (id: string) => {
+    if (!token) return;
+    try {
+      const updated = await AddressService.setDefault(id, token);
+      setAddresses((current) => current.map((address) => ({
+        ...address,
+        isDefault: address.id === updated.id,
+      })));
+      toast.success("Default address updated");
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to update default address");
     }
   };
 
@@ -431,19 +447,17 @@ function ProfilePageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 pb-24">
+    <div className="min-h-screen bg-[#f7f7f5] pb-28 text-gray-900 dark:bg-[#0a0a0a] dark:text-gray-100 sm:pb-24">
       <ProfileHeader
         profile={profile}
         greeting={getGreeting()}
-        defaultAddr={defaultAddr}
-        orderCount={orders.length}
         onEditProfile={() => setIsEditProfileOpen(true)}
         onLogout={() => signOut({ callbackUrl: "/sign-in" })}
       />
 
       <ProfileTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
-      <main className="max-w-4xl mx-auto px-4 py-8 min-h-[400px]">
+      <main className="mx-auto min-h-[400px] max-w-5xl px-4 py-6 sm:py-8">
         {isTabLoading ? (
           <ContentSkeleton />
         ) : (
@@ -466,16 +480,13 @@ function ProfilePageContent() {
                       className="block hover:scale-[1.01] transition-transform"
                     >
                       <OrderCard
-                        id={order.id.slice(0, 8).toUpperCase()}
-                        type={order.type ?? "ORDER"}
+                        id={order.orderNumber || order.id.slice(0, 8).toUpperCase()}
                         status={order.status}
                         date={new Date(order.createdAt).toLocaleDateString()}
                         total={`₦${Number(order.total).toLocaleString()}`}
                         items={order.items?.map(
                           (i: any) => `${i.quantity}x ${i.name}`,
                         )}
-                        stores={order.stores}
-                        orderCount={order.orderCount}
                       />
                     </Link>
                   ))
@@ -494,8 +505,39 @@ function ProfilePageContent() {
                     actionLink="/main/ride"
                   />
                 ) : (
-                  rides.map((ride) => <RideCard key={ride.id} {...ride} />)
+                  rides.map((ride) => (
+                    <Link
+                      key={ride.id}
+                      href={`/main/ride/history/${ride.id}`}
+                      className="block"
+                    >
+                      <RideCard
+                        id={ride.id}
+                        trackingId={ride.trackingId}
+                        status={ride.status}
+                        date={new Date(ride.createdAt).toLocaleDateString()}
+                        total={ride.fare ?? 0}
+                        description={`${ride.pickupAddress?.address || ride.pickupAddress?.street || "Pickup"} → ${ride.dropoffAddress?.address || ride.dropoffAddress?.street || "Dropoff"}`}
+                        isScheduled={ride.isScheduled}
+                        scheduledAt={ride.scheduledAt}
+                      />
+                    </Link>
+                  ))
                 )}
+              </div>
+            )}
+
+            {activeTab === "bookings" && (
+              <div className="space-y-4">
+                {bookings.length === 0 ? (
+                  <EmptyState icon={BedDouble} title="No accommodation booked" desc="Find hotels, apartments and shortlets in your city." actionLabel="Explore Accommodation" actionLink="/main/stays" />
+                ) : bookings.map((booking) => (
+                  <Link href={`/main/bookings/${booking.id}`} key={booking.id} className="flex items-center gap-4 rounded-3xl border border-black/[0.06] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 dark:border-white/[0.07] dark:bg-[#151515] sm:p-5">
+                    <div className="rounded-2xl bg-yellow-100 p-3 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400"><BedDouble className="h-5 w-5" /></div>
+                    <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="truncate font-black">{booking.propertyName}</h3><span className="rounded-full bg-gray-100 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-gray-500 dark:bg-white/5">{booking.status.replaceAll("_", " ")}</span></div><p className="mt-1 text-xs text-gray-500">{booking.roomTypeName}</p><p className="mt-2 flex items-center gap-1.5 text-xs font-bold text-gray-400"><CalendarDays className="h-3.5 w-3.5" />{new Date(booking.checkIn).toLocaleDateString()} – {new Date(booking.checkOut).toLocaleDateString()}</p></div>
+                    <div className="text-right"><p className="text-sm font-black">₦{Number(booking.total).toLocaleString()}</p><ChevronRight className="ml-auto mt-2 h-4 w-4 text-gray-300" /></div>
+                  </Link>
+                ))}
               </div>
             )}
 
@@ -505,8 +547,8 @@ function ProfilePageContent() {
                   <EmptyState
                     icon={Package}
                     title="No deliveries yet"
-                    desc="Send packages securely across the city."
-                    actionLabel="Send Package"
+                    desc="Send items securely across the city."
+                    actionLabel="Send a Delivery"
                     actionLink="/main/delivery"
                   />
                 ) : (
@@ -517,13 +559,15 @@ function ProfilePageContent() {
                       status={delivery.status}
                       date={new Date(delivery.createdAt).toLocaleDateString()}
                       total={delivery.total ?? 0}
-                      description={delivery.description}
-                      recipient={delivery.recipient}
+                      description={delivery.description || `${delivery.size?.toLowerCase() || "Standard"} delivery`}
+                      recipient={delivery.recipientName}
                     />
                   ))
                 )}
               </div>
             )}
+
+            {activeTab === "wallet" && token && <WalletTab token={token} />}
 
             {activeTab === "disputes" && (
               <div className="space-y-4">
@@ -556,12 +600,12 @@ function ProfilePageContent() {
             )}
 
             {activeTab === "addresses" && (
-              <div className="space-y-6">
+              <div className="space-y-5 sm:space-y-6">
                 <button
                   onClick={() => setIsAddressModalOpen(true)}
-                  className="w-full py-6 border-2 border-dashed border-gray-200 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-2 text-gray-400 font-bold hover:border-yellow-500 hover:text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-500/10 transition-all"
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-gray-200 bg-white/60 px-4 py-5 text-sm font-bold text-gray-500 transition-all hover:border-yellow-500 hover:bg-yellow-50 hover:text-yellow-600 sm:rounded-3xl sm:py-6 dark:border-white/10 dark:bg-white/[0.02] dark:text-gray-400 dark:hover:bg-yellow-500/10 dark:hover:text-yellow-500"
                 >
-                  <MapPin className="w-6 h-6" />
+                  <MapPin className="h-5 w-5" />
                   <span>Add New Address</span>
                 </button>
                 {addresses.length === 0 ? (
@@ -569,12 +613,13 @@ function ProfilePageContent() {
                     No addresses saved yet
                   </div>
                 ) : (
-                  <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
                     {addresses.map((addr) => (
                       <AddressCard
                         key={addr.id}
                         {...addr}
                         onDelete={handleDeleteAddress}
+                        onSetDefault={handleSetDefaultAddress}
                       />
                     ))}
                   </div>
@@ -583,9 +628,9 @@ function ProfilePageContent() {
             )}
 
             {activeTab === "settings" && (
-              <div className="max-w-xl mx-auto space-y-6">
-                <div className="bg-white dark:bg-[#151515] rounded-3xl border border-gray-100 dark:border-white/5 overflow-hidden">
-                  <div className="p-4 border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/5 font-bold flex items-center gap-2">
+              <div className="mx-auto max-w-2xl space-y-4 sm:space-y-6">
+                <div className="overflow-hidden rounded-2xl border border-black/[0.06] bg-white shadow-sm sm:rounded-3xl dark:border-white/[0.07] dark:bg-[#151515]">
+                  <div className="flex items-center gap-2 border-b border-gray-100 bg-gray-50/70 p-4 font-bold dark:border-white/5 dark:bg-white/5">
                     <User className="w-4 h-4" /> Personal Info
                   </div>
                   <div className="p-2">
@@ -599,22 +644,13 @@ function ProfilePageContent() {
                   </div>
                 </div>
 
-                <div className="bg-white dark:bg-[#151515] rounded-3xl border border-gray-100 dark:border-white/5 overflow-hidden">
-                  <div className="p-4 border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/5 font-bold flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4" /> Linked Accounts
-                  </div>
-                  <div className="p-4">
-                    <LinkedAccountsSection />
-                  </div>
-                </div>
-
-                <div className="bg-white dark:bg-[#151515] rounded-3xl border border-gray-100 dark:border-white/5 overflow-hidden">
-                  <div className="p-4 border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/5 font-bold flex items-center gap-2">
+                <div className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-sm sm:rounded-3xl dark:border-red-900/20 dark:bg-[#151515]">
+                  <div className="flex items-center gap-2 border-b border-gray-100 bg-gray-50/70 p-4 font-bold dark:border-white/5 dark:bg-white/5">
                     <ShieldCheck className="w-4 h-4" /> Security
                   </div>
-                  <div className="p-6 flex items-start gap-4">
-                    <div className="p-3 bg-red-100 dark:bg-red-900/20 text-red-600 rounded-full">
-                      <Trash2 className="w-6 h-6" />
+                  <div className="flex items-start gap-3 p-4 sm:gap-4 sm:p-6">
+                    <div className="shrink-0 rounded-xl bg-red-100 p-2.5 text-red-600 sm:rounded-full sm:p-3 dark:bg-red-900/20">
+                      <Trash2 className="h-5 w-5 sm:h-6 sm:w-6" />
                     </div>
                     <div>
                       <h4 className="font-bold text-red-600">Delete Account</h4>
@@ -624,7 +660,7 @@ function ProfilePageContent() {
                       </p>
                       <button
                         onClick={handleDeleteAccount}
-                        className="px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 font-bold text-sm rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                        className="rounded-xl bg-red-50 px-4 py-2 text-sm font-bold text-red-600 transition-colors hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30"
                       >
                         Request Deletion
                       </button>
@@ -637,8 +673,6 @@ function ProfilePageContent() {
         )}
       </main>
 
-      <BottomNav />
-
       <AddAddressModal
         isOpen={isAddressModalOpen}
         onClose={() => setIsAddressModalOpen(false)}
@@ -647,7 +681,11 @@ function ProfilePageContent() {
 
       <EditProfileModal
         isOpen={isEditProfileOpen}
-        initialData={{ name: profile?.name || "", phone: profile?.phone || "" }}
+        initialData={{
+          firstName: profile?.firstName || "",
+          lastName: profile?.lastName || "",
+          phone: profile?.phone || "",
+        }}
         onClose={() => setIsEditProfileOpen(false)}
         onSave={handleUpdateProfile}
       />

@@ -491,17 +491,25 @@ export default function RideDetailPage() {
                 <div className="flex flex-col md:flex-row justify-between gap-8 md:gap-4">
                   {ride.timeline.map((step, i) => {
                     const iconMap: Record<string, React.ReactNode> = {
-                      'REQUESTED': <Box className="w-4 h-4" />,
-                      'SEARCHING': <Loader2 className="w-4 h-4 animate-spin" />,
-                      'ACCEPTED': <CheckCircle className="w-4 h-4" />,
-                      'ARRIVED': <MapPin className="w-4 h-4" />,
-                      'IN_PROGRESS': <Truck className="w-4 h-4" />,
-                      'COMPLETED': <CheckCircle className="w-4 h-4" />,
-                      'CANCELLED': <Ban className="w-4 h-4" />,
+                      REQUESTED: <Box className="w-4 h-4" />,
+                      SEARCHING: <Loader2 className="w-4 h-4 animate-spin" />,
+                      ACCEPTED: <CheckCircle className="w-4 h-4" />,
+                      ARRIVED: <MapPin className="w-4 h-4" />,
+                      IN_PROGRESS: <Truck className="w-4 h-4" />,
+                      COMPLETED: <CheckCircle className="w-4 h-4" />,
+                      CANCELLED: <Ban className="w-4 h-4" />,
                     };
 
-                    const statusKey = step.status.toUpperCase().replace(/\s/g, '_');
-                    const icon = iconMap[statusKey] || (step.done ? <CheckCircle className="w-4 h-4" /> : <div className="w-2 h-2 bg-gray-600 rounded-full" />);
+                    const statusKey = step.status
+                      .toUpperCase()
+                      .replace(/\s/g, "_");
+                    const icon =
+                      iconMap[statusKey] ||
+                      (step.done ? (
+                        <CheckCircle className="w-4 h-4" />
+                      ) : (
+                        <div className="w-2 h-2 bg-gray-600 rounded-full" />
+                      ));
 
                     return (
                       <div
@@ -514,8 +522,8 @@ export default function RideDetailPage() {
                             step.active
                               ? "bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/20"
                               : step.done
-                              ? "bg-green-500 border-green-500 text-white"
-                              : "bg-[#0F172A] border-gray-600 text-gray-600"
+                                ? "bg-green-500 border-green-500 text-white"
+                                : "bg-[#0F172A] border-gray-600 text-gray-600"
                           }`}
                         >
                           {icon}
@@ -528,8 +536,8 @@ export default function RideDetailPage() {
                               step.active
                                 ? "text-blue-400"
                                 : step.done
-                                ? "text-white"
-                                : "text-gray-500"
+                                  ? "text-white"
+                                  : "text-gray-500"
                             }`}
                           >
                             {step.status}
@@ -542,7 +550,11 @@ export default function RideDetailPage() {
                             <div className="inline-flex items-center gap-1.5 bg-[#0F172A] py-1 px-2 rounded border border-gray-700">
                               <User className="w-3 h-3 text-gray-500" />
                               <span className="text-[10px] text-gray-300 whitespace-nowrap">
-                                {i === 0 ? "System" : i === 1 ? (ride.driver?.name || "Rider") : "Trip Update"}
+                                {i === 0
+                                  ? "System"
+                                  : i === 1
+                                    ? ride.driver?.name || "Rider"
+                                    : "Trip Update"}
                               </span>
                             </div>
                           )}
@@ -658,12 +670,12 @@ export default function RideDetailPage() {
                     No Driver Assigned
                   </p>
                   {canAssign && (
-                  <button
-                    onClick={() => setIsAssignModalOpen(true)}
-                    className="w-full py-2 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-lg text-xs font-bold uppercase hover:bg-purple-500 hover:text-white transition-all"
-                  >
-                    Assign Driver
-                  </button>
+                    <button
+                      onClick={() => setIsAssignModalOpen(true)}
+                      className="w-full py-2 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-lg text-xs font-bold uppercase hover:bg-purple-500 hover:text-white transition-all"
+                    >
+                      Assign Driver
+                    </button>
                   )}
                 </div>
               )}
@@ -678,7 +690,7 @@ export default function RideDetailPage() {
               </div>
               <div className="flex items-center gap-4 mb-4">
                 <img
-                  src={ride.passenger.image || "/profile.jpg"}
+                  src={ride.passenger.image || "/profile.webp"}
                   alt="Passenger"
                   className="w-12 h-12 rounded-full border-2 border-gray-600 object-cover"
                 />
@@ -721,7 +733,9 @@ export default function RideDetailPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-orange-400">Platform Fee</span>
-                  <span className="text-orange-400">{ride.fare.platformFee}</span>
+                  <span className="text-orange-400">
+                    {ride.fare.platformFee}
+                  </span>
                 </div>
                 <div className="flex justify-between text-green-500">
                   <span>Discount</span>

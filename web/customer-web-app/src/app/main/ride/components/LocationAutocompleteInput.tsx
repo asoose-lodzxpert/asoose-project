@@ -3,13 +3,9 @@
 import React, { useEffect, useRef, useCallback } from "react";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useRideStore } from "../store/ride";
-import { MapPin, Navigation, Loader2, AlertCircle, X } from "lucide-react";
+import { MapPin, Navigation, Loader2, X } from "lucide-react";
 import { requestGeolocation } from "@/services/geolocation.service";
 import { validateGeolocationCoordinates } from "@/services/validate-geolocation-coordinates";
-import type {
-  GeolocationError,
-  GeolocationCoordinates,
-} from "@/services/geolocation.types";
 import { reverseGeocode } from "@/services/reverse-geocode.service";
 import {
   searchPlaces,
@@ -32,7 +28,6 @@ interface LocationAutocompleteInputProps {
 export function LocationAutocompleteInput({
   onLocationSelect,
   type,
-  initialValue = "",
   onFocus,
 }: LocationAutocompleteInputProps) {
   const [suggestions, setSuggestions] = React.useState<PlaceSuggestion[]>([]);
@@ -55,12 +50,8 @@ export function LocationAutocompleteInput({
     [type],
   );
 
-  const geoError = useRideStore((state) => state.geolocationError);
   // Use user's live location (or fall back to Maiduguri) to bias search results
   const userLocation = useRideStore((state) => state.userLocation);
-  const setGeoError = (err: string | null) => {
-    useRideStore.getState().setGeolocationError(err);
-  };
 
   const isUserTypingRef = useRef(false);
 
@@ -89,14 +80,13 @@ export function LocationAutocompleteInput({
       setSuggestions(results);
       setShowDropdown(results.length > 0);
     });
-  }, [debouncedInputValue]);
+  }, [debouncedInputValue, userLocation?.lat, userLocation?.lng]);
 
   const handleSelect = (placeId: string, description: string) => {
     justSelectedRef.current = true;
     setShowDropdown(false);
     setSuggestions([]);
     setInputValue(description);
-    setGeoError(null);
     trackMetaEvent("Search", {
       content_category: "ride",
       search_type: type,
@@ -125,18 +115,12 @@ export function LocationAutocompleteInput({
   const handleUseCurrentLocation = async () => {
     if (type !== "pickup") return;
     setIsGeolocating(true);
-    setGeoError(null);
     justSelectedRef.current = true; // Block dropdown during geolocation
     try {
       const coords = await requestGeolocation();
       try {
         validateGeolocationCoordinates(coords);
       } catch (validationError) {
-        setGeoError(
-          validationError instanceof Error
-            ? validationError.message
-            : "Invalid geolocation result",
-        );
         toast.error(
           validationError instanceof Error
             ? validationError.message
@@ -155,7 +139,6 @@ export function LocationAutocompleteInput({
       toast.success("Location detected successfully");
     } catch (error: any) {
       const errorMessage = formatGeolocationError(error);
-      setGeoError(errorMessage);
       toast.error(errorMessage);
       console.warn(
         "Geolocation error (handled):",
@@ -234,7 +217,6 @@ export function LocationAutocompleteInput({
             isUserTypingRef.current = true;
             justSelectedRef.current = false; // User is typing again — release guard
             setInputValue(e.target.value);
-            setGeoError(null);
             if (e.target.value.length >= 3) {
               setShowDropdown(true);
             } else {
@@ -259,7 +241,6 @@ export function LocationAutocompleteInput({
                   setInputValue("");
                   setSuggestions([]);
                   setShowDropdown(false);
-                  setGeoError(null);
                 }}
                 className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors text-zinc-600 dark:text-zinc-400"
                 aria-label="Clear location"
@@ -274,17 +255,13 @@ export function LocationAutocompleteInput({
               disabled={isGeolocating}
               className={`
                 flex items-center gap-1.5 rounded-lg transition-all
-                ${!inputValue && !isGeolocating && !geoError ? "animate-pulse" : ""}
+                ${!inputValue && !isGeolocating ? "animate-pulse" : ""}
                 ${
                   inputValue
                     ? "p-1.5"
                     : "px-2.5 py-1.5 bg-blue-50 dark:bg-blue-900/20"
                 }
-                ${
-                  geoError
-                    ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                    : "text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30"
-                }
+                text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30
                 disabled:opacity-50 disabled:cursor-not-allowed
               `}
               title="Detect my location automatically"
@@ -306,7 +283,7 @@ export function LocationAutocompleteInput({
       </div>
 
       {/* Geolocation hint — shown when pickup input is empty and no error */}
-      {type === "pickup" && !inputValue && !geoError && !isGeolocating && (
+      {type === "pickup" && !inputValue && !isGeolocating && (
         <p className="mt-1.5 ml-1 text-xs text-zinc-400 dark:text-zinc-500">
           Type an address or tap{" "}
           <span className="font-semibold text-blue-500 dark:text-blue-400">
@@ -314,26 +291,6 @@ export function LocationAutocompleteInput({
           </span>{" "}
           to auto-detect your location.
         </p>
-      )}
-
-      {/* Error Message */}
-      {geoError && (
-        <div className="mt-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 flex items-start gap-2">
-          <AlertCircle
-            size={16}
-            className="text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5"
-          />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-red-800 dark:text-red-200">{geoError}</p>
-            <button
-              onClick={handleUseCurrentLocation}
-              disabled={isGeolocating}
-              className="text-xs font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 mt-2 disabled:opacity-50"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
       )}
 
       {/* Suggestions Dropdown */}

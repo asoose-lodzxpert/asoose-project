@@ -22,6 +22,7 @@ type Position = { lat: number; lng: number };
 
 interface PackageInfo {
   type: string;
+  size: 'SMALL' | 'MEDIUM' | 'LARGE';
   weight: string; // Legacy label (e.g., "< 5kg")
   instructions: string;
   recipientName: string;
@@ -61,15 +62,16 @@ interface DeliveryState {
   // Actions
   setStage: (stage: DeliveryStage) => void;
   setLocations: (pickup?: Position, dropoff?: Position) => void;
-  setAddressIds: (pickupId?: string, dropoffId?: string) => void; 
+  setAddressIds: (pickupId?: string | null, dropoffId?: string | null) => void;
   setPackageInfo: (info: Partial<PackageInfo>) => void;
-  setCalculatedFee: (fee: number) => void; 
+  setCalculatedFee: (fee: number | null) => void;
   resetDelivery: () => void;
 }
 
 const initialPackageInfo: PackageInfo = {
-  type: 'Document',
-  weight: '< 5kg',
+  type: 'Small delivery',
+  size: 'SMALL',
+  weight: 'Small items',
   instructions: '',
   recipientName: '',
   recipientPhone: '',
@@ -109,8 +111,8 @@ export const useDeliveryStore = create<DeliveryState>()(
       })),
 
       setAddressIds: (pickupId, dropoffId) => set((state) => ({
-        pickupAddressId: pickupId ?? state.pickupAddressId,
-        dropoffAddressId: dropoffId ?? state.dropoffAddressId
+        pickupAddressId: pickupId === undefined ? state.pickupAddressId : pickupId,
+        dropoffAddressId: dropoffId === undefined ? state.dropoffAddressId : dropoffId,
       })),
 
       setPackageInfo: (info) => set((state) => ({ 
@@ -135,6 +137,19 @@ export const useDeliveryStore = create<DeliveryState>()(
     {
       name: 'asoose-delivery-storage',
       storage: createJSONStorage(() => localStorage),
+      // Merge nested delivery fields so users with an older persisted form
+      // automatically receive new defaults such as the explicit size enum.
+      merge: (persisted, current) => {
+        const saved = persisted as Partial<DeliveryState> | undefined;
+        return {
+          ...current,
+          ...saved,
+          packageInfo: {
+            ...initialPackageInfo,
+            ...(saved?.packageInfo ?? {}),
+          },
+        };
+      },
       partialize: (state) => ({ 
         stage: state.stage, 
         packageInfo: state.packageInfo,

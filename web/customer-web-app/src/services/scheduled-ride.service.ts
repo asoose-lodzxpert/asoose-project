@@ -25,20 +25,38 @@ export interface BookScheduledRideDto {
 
 export class ScheduledRideService {
   static async bookRide(data: BookScheduledRideDto, token?: string, idempotencyKey?: string) {
-    return ApiService.post("/scheduled-rides", data, token, {
-      headers: idempotencyKey ? { "idempotency-key": idempotencyKey } : undefined
-    });
+    return ApiService.post<any>("/rides", {
+      pickup: {
+        latitude: data.pickupLocation.lat,
+        longitude: data.pickupLocation.lng,
+        address: data.pickupLocation.addressText,
+      },
+      dropoff: {
+        latitude: data.dropoffLocation.lat,
+        longitude: data.dropoffLocation.lng,
+        address: data.dropoffLocation.addressText,
+      },
+      paymentMethod: "CARD",
+      vehicleType: "SEDAN",
+      isScheduled: true,
+      scheduledAt: data.scheduledAt,
+      idempotencyKey: idempotencyKey ?? `ride-${crypto.randomUUID()}`,
+      bookedForOther: Boolean(data.passengerName || data.passengerPhone),
+      passengerName: data.passengerName ?? null,
+      passengerPhone: data.passengerPhone ?? null,
+      passengerEmail: null,
+    }, token);
   }
 
   static async getUpcomingRides(token?: string) {
-    return ApiService.get<any[]>("/scheduled-rides/upcoming", token);
+    const result = await ApiService.get<{ rides: any[] }>(
+      "/rides?page=1&limit=20",
+      token,
+    );
+    return result.rides.filter((ride) => ride.isScheduled);
   }
 
   static async cancelRide(rideId: string, token?: string) {
-    return ApiService.patch(`/scheduled-rides/${rideId}/cancel`, {}, token);
-  }
-
-  static async rescheduleRide(rideId: string, data: { scheduledAt: string }, token?: string) {
-    return ApiService.patch(`/scheduled-rides/${rideId}/reschedule`, data, token);
+    return ApiService.post(`/rides/${rideId}/cancel`, { reason: "Cancelled scheduled ride" }, token);
   }
 }

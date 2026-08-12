@@ -1,20 +1,19 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   Phone,
   MessageSquare,
   CheckCircle2,
   Truck,
-  MapPin,
   Package,
   Clock,
   CreditCard,
   User,
-  Circle,
-  ChevronRight,
+  Copy,
+  Check,
+  Wallet,
 } from "lucide-react";
-import { format } from "date-fns";
 
 // Extended Interface to match the full backend response including Prisma relations
 interface FullDeliveryDetails {
@@ -29,6 +28,13 @@ interface FullDeliveryDetails {
     | "DELIVERED"
     | "CANCELLED";
   deliveryFee: number;
+  trackingId?: string;
+  size?: "SMALL" | "MEDIUM" | "LARGE";
+  distanceKm?: number;
+  durationMinutes?: number;
+  paymentMethod?: "WALLET" | "CARD";
+  paymentStatus?: string;
+  confirmationCode?: string;
   packageDetails?: string;
   recipientName?: string;
   recipientPhone?: string;
@@ -76,6 +82,7 @@ export default function DeliveryProgressUI({
 }: DeliveryProgressUIProps) {
   const status = delivery?.status || propStage || "REQUESTED";
   const rider = delivery?.rider;
+  const [codeCopied, setCodeCopied] = useState(false);
 
   // ==========================
   // TIMELINE LOGIC
@@ -99,7 +106,7 @@ export default function DeliveryProgressUI({
     {
       id: "PICKED_UP",
       match: ["PICKED_UP", "IN_TRANSIT"],
-      label: "Package Picked Up",
+      label: "Delivery Picked Up",
       desc: "En route to destination",
       icon: Package,
       date: delivery?.pickedUpAt,
@@ -107,7 +114,7 @@ export default function DeliveryProgressUI({
     {
       id: "DELIVERED",
       label: "Delivered",
-      desc: "Package has arrived",
+      desc: "Delivery has arrived",
       icon: CheckCircle2,
       date: delivery?.deliveredAt,
     },
@@ -138,21 +145,29 @@ export default function DeliveryProgressUI({
   const getPickupDisplay = () =>
     delivery?.pickupAddress?.address ||
     delivery?.pickupAddress?.street ||
-    "Processing Location...";
+    "Processing location...";
   const getDropoffDisplay = () =>
     delivery?.dropoffAddress?.address ||
     delivery?.dropoffAddress?.street ||
-    "Processing Location...";
-  const getCityDisplay = (addr: any) => addr?.city || "Maiduguri";
+    "Processing location...";
+  const getCityDisplay = (addr: any) =>
+    [addr?.city, addr?.state].filter(Boolean).join(", ") || "Location resolving";
+
+  const copyConfirmationCode = async () => {
+    if (!delivery?.confirmationCode) return;
+    await navigator.clipboard.writeText(delivery.confirmationCode);
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 1800);
+  };
 
   // ==========================
   // RENDER
   // ==========================
   return (
-    <div className="max-w-5xl mx-auto p-4 md:p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 pb-32">
+    <div className="mx-auto max-w-5xl space-y-5 pb-16 animate-in fade-in slide-in-from-bottom-4 sm:space-y-6">
       {/* 1. STATUS HEADER */}
-      <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 shadow-sm border border-zinc-100 dark:border-zinc-800">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+      <div className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm sm:rounded-3xl sm:p-6 dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <div className="flex items-center gap-3 mb-1">
               <h2 className="text-2xl font-black dark:text-white">
@@ -161,7 +176,9 @@ export default function DeliveryProgressUI({
                   : "Tracking Delivery"}
               </h2>
             </div>
-            <p className="text-zinc-500 text-sm">ID: {delivery?.id || "---"}</p>
+            <p className="break-all text-sm text-zinc-500">
+              Tracking ID: {delivery?.trackingId || delivery?.id || "---"}
+            </p>
           </div>
           <div
             className={`px-4 py-2 rounded-full font-bold text-sm flex items-center gap-2
@@ -229,8 +246,23 @@ export default function DeliveryProgressUI({
         </div>
       </div>
 
+      {delivery?.confirmationCode && status !== "DELIVERED" && status !== "CANCELLED" && (
+        <div className="rounded-2xl border border-yellow-200 bg-yellow-50 p-4 sm:p-5 dark:border-yellow-500/20 dark:bg-yellow-500/10">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-yellow-700 dark:text-yellow-400">Delivery confirmation code</p>
+              <p className="mt-2 font-mono text-3xl font-black tracking-[0.2em] text-zinc-900 dark:text-white">{delivery.confirmationCode}</p>
+              <p className="mt-2 max-w-xl text-xs leading-5 text-zinc-600 dark:text-zinc-400">Give this code to the rider only after the recipient has received the delivery. The rider uses it to complete the delivery.</p>
+            </div>
+            <button onClick={copyConfirmationCode} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-zinc-700 shadow-sm transition hover:bg-yellow-100 dark:bg-white/10 dark:text-white" aria-label="Copy confirmation code">
+              {codeCopied ? <Check className="h-5 w-5 text-green-600" /> : <Copy className="h-5 w-5" />}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* 2. LEFT COL: COURIER & PACKAGE */}
+        {/* 2. LEFT COL: COURIER & DELIVERY */}
         <div className="md:col-span-2 space-y-6">
           {/* COURIER CARD */}
           {rider ? (
@@ -282,7 +314,7 @@ export default function DeliveryProgressUI({
             </div>
           )}
 
-          {/* ADDRESS & PACKAGE INFO */}
+          {/* ADDRESS & DELIVERY INFO */}
           <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 shadow-sm border border-zinc-100 dark:border-zinc-800">
             <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-6">
               Delivery Particulars
@@ -326,15 +358,15 @@ export default function DeliveryProgressUI({
               </div>
             </div>
 
-            <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800 grid grid-cols-2 gap-4">
+            <div className="mt-8 grid grid-cols-1 gap-4 border-t border-zinc-100 pt-6 sm:grid-cols-2 dark:border-zinc-800">
               <div>
                 <p className="text-xs text-zinc-400 font-bold uppercase mb-1">
-                  Package Details
+                  Delivery Details
                 </p>
                 <div className="flex items-center gap-2">
                   <Package size={16} className="text-yellow-500" />
                   <span className="font-medium dark:text-white">
-                    {delivery?.packageDetails || "Standard Package"}
+                    {delivery?.packageDetails || "Standard delivery"}
                   </span>
                 </div>
                 {delivery?.weightKg && (
@@ -342,6 +374,9 @@ export default function DeliveryProgressUI({
                     {delivery.weightKg} kg{" "}
                     {delivery.isFragile ? "• Fragile" : ""}
                   </p>
+                )}
+                {delivery?.size && (
+                  <p className="mt-1 text-xs capitalize text-zinc-500">{delivery.size.toLowerCase()} size</p>
                 )}
               </div>
               <div>
@@ -382,15 +417,15 @@ export default function DeliveryProgressUI({
               </div>
               <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-2" />
               <div className="flex justify-between text-lg font-bold">
-                <span>Total Paid</span>
+                <span>{delivery?.paymentStatus === "COMPLETED" ? "Total Paid" : "Total"}</span>
                 <span>₦{delivery?.deliveryFee?.toLocaleString() || "0"}</span>
               </div>
             </div>
 
             <div className="flex items-center gap-3 bg-zinc-50 dark:bg-zinc-800 p-3 rounded-xl border border-zinc-100 dark:border-zinc-700">
-              <CreditCard size={18} className="text-zinc-500" />
-              <span className="text-sm font-medium">Paid via Card</span>
-              <CheckCircle2 size={16} className="ml-auto text-green-500" />
+              {delivery?.paymentMethod === "WALLET" ? <Wallet size={18} className="text-zinc-500" /> : <CreditCard size={18} className="text-zinc-500" />}
+              <span className="text-sm font-medium">{delivery?.paymentMethod === "WALLET" ? "Wallet" : "Pay online"}</span>
+              <span className={`ml-auto rounded-full px-2 py-1 text-[10px] font-bold ${delivery?.paymentStatus === "COMPLETED" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{delivery?.paymentStatus || "PENDING"}</span>
             </div>
           </div>
 
