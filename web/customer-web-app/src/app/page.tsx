@@ -239,8 +239,6 @@ export default function AsooseLanding() {
 
   if (!mounted) return null;
 
-  const activeIndex = SERVICE_KEYS.indexOf(activeService);
-
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
@@ -251,125 +249,125 @@ export default function AsooseLanding() {
         }`}
       >
         {/* ── HERO ──────────────────────────────────────────────────────── */}
-        <header className="mx-auto max-w-7xl px-4 pb-14 pt-24 sm:px-6 sm:pb-20 sm:pt-28 lg:pt-32">
+        <header
+          className="relative min-h-[760px] overflow-hidden bg-zinc-950 pt-16 text-white sm:min-h-[820px]"
+          onMouseEnter={() => setIsPaused(true)}
+          onMouseLeave={() => setIsPaused(false)}
+        >
+          <Image
+            key={activeService}
+            src={SERVICE_DATA[activeService].image}
+            alt=""
+            fill
+            className="animate-in fade-in zoom-in-105 object-cover duration-1000"
+            priority
+            sizes="100vw"
+            quality={92}
+            placeholder="blur"
+            blurDataURL={BLUR_MAP[SERVICE_DATA[activeService].image]}
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/75 to-black/10" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/20" />
           <div
-            className={`relative overflow-hidden rounded-[2rem] border transition-all duration-500 sm:rounded-[2.5rem] ${
-              darkMode
-                ? "border-white/10 bg-[#11110f]"
-                : "border-black/[0.06] bg-[#f8f7f2]"
-            }`}
-            onMouseEnter={() => setIsPaused(true)}
-            onMouseLeave={() => setIsPaused(false)}
-          >
-            <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-yellow-400/20 blur-3xl" />
+            className="absolute inset-0 opacity-[0.12]"
+            style={{
+              backgroundImage: "radial-gradient(circle at center, white 1px, transparent 1px)",
+              backgroundSize: "26px 26px",
+            }}
+          />
 
-            <div className="relative z-20 flex gap-2 overflow-x-auto px-5 pt-5 scrollbar-hide sm:px-8 sm:pt-8 lg:px-12">
-              {SERVICE_KEYS.map((key) => {
-                const Icon = SERVICE_DATA[key].icon;
-                const active = activeService === key;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setActiveService(key)}
-                    aria-pressed={active}
-                    className={`inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-xs font-extrabold transition sm:text-sm ${
-                      active
-                        ? "bg-[#171714] text-white shadow-lg dark:bg-yellow-400 dark:text-black"
-                        : "border border-black/[0.06] bg-white/70 text-gray-600 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10"
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {key === "food" ? "Marketplace" : key === "ride" ? "Rides" : "Delivery"}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div
-              className="flex w-full transition-transform duration-700 ease-in-out"
-              style={{ transform: `translateX(-${activeIndex * 100}%)` }}
-            >
-              {SERVICE_KEYS.map((key, index) => (
-                <div
-                  key={key}
-                  className="grid w-full flex-shrink-0 items-center gap-8 px-5 pb-10 pt-8 sm:px-8 sm:pb-12 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] md:gap-12 lg:px-12 lg:pb-14 lg:pt-10"
-                >
-                  <div className="relative z-10 order-2 flex flex-col items-start text-left md:order-1">
-                    <p className="mb-4 text-[11px] font-black uppercase tracking-[0.18em] text-yellow-700 dark:text-yellow-400 sm:text-xs">
-                      {SERVICE_DATA[key].eyebrow}
-                    </p>
-                    <h1 className="mb-5 max-w-xl text-[2.65rem] font-black leading-[0.98] tracking-[-0.055em] sm:text-6xl lg:text-7xl">
-                      {SERVICE_DATA[key].title}
-                    </h1>
-                    <p className="mb-7 max-w-lg text-base font-medium leading-7 text-gray-600 dark:text-gray-300 sm:text-lg">
-                      {SERVICE_DATA[key].desc}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <Link
-                        href={SERVICE_DATA[key].link}
-                        className="inline-flex items-center gap-2 rounded-xl bg-yellow-400 px-6 py-3.5 text-sm font-black text-black shadow-lg shadow-yellow-400/15 transition hover:bg-yellow-300 active:scale-[0.98] sm:px-7 sm:py-4"
-                      >
-                        {SERVICE_DATA[key].cta}
-                        <ArrowRight className="h-4 w-4" />
-                      </Link>
-                      <Link
-                        href="/about"
-                        className="rounded-xl px-5 py-3.5 text-sm font-extrabold text-gray-600 transition hover:bg-black/5 hover:text-black dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
-                      >
-                        Learn about Asoose
-                      </Link>
-                    </div>
-                    <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-xs font-bold text-gray-500 dark:text-gray-400">
-                      <span className="flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-yellow-600" /> Verified partners</span>
-                      <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-yellow-600" /> Live tracking</span>
-                      <span className="flex items-center gap-1.5"><Wallet className="h-4 w-4 text-yellow-600" /> Secure payments</span>
-                    </div>
-                  </div>
-
-                  <div className="relative order-1 h-[260px] w-full overflow-hidden rounded-[1.5rem] bg-zinc-100 shadow-2xl shadow-black/10 sm:h-[360px] md:order-2 md:h-[470px] md:rounded-[2rem] dark:bg-zinc-900">
-                    <Image
-                      src={SERVICE_DATA[key].image}
-                      alt={SERVICE_DATA[key].title}
-                      fill
-                      className="object-cover transition-transform duration-700 hover:scale-[1.02]"
-                      priority={index === 0}
-                      loading={index === 0 ? "eager" : "lazy"}
-                      sizes="(max-width: 768px) 100vw, 50vw"
-                      quality={index === 0 ? 90 : 85}
-                      placeholder="blur"
-                      blurDataURL={BLUR_MAP[SERVICE_DATA[key].image]}
-                    />
-                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
-                    <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between rounded-2xl border border-white/20 bg-black/45 px-4 py-3 text-white backdrop-blur-md sm:bottom-5 sm:left-5 sm:right-5">
-                      <div><p className="text-[10px] font-bold uppercase tracking-widest text-white/60">Available in your city</p><p className="mt-0.5 text-sm font-black">Fast. Local. Dependable.</p></div>
-                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-yellow-400 text-black"><ArrowRight className="h-4 w-4" /></span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {!isPaused && (
-              <div className="absolute bottom-0 left-0 z-20 h-0.5 w-full bg-yellow-400/15">
-                <div
-                  key={activeService}
-                  className="h-full w-full origin-left animate-[progress_5s_linear_forwards] bg-yellow-400"
-                />
+          <div className="relative z-10 mx-auto flex min-h-[650px] max-w-7xl items-center px-4 pb-40 pt-20 sm:px-6 sm:pb-44 sm:pt-24">
+            <div className="max-w-4xl">
+              <div className="mb-6 flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.22em] text-yellow-400 sm:text-xs">
+                <span className="h-0.5 w-10 bg-yellow-400" />
+                Shopping · Rides · Delivery
               </div>
-            )}
+              <h1 className="max-w-4xl text-5xl font-black leading-[0.9] tracking-[-0.06em] sm:text-7xl lg:text-[6.6rem]">
+                Asoose is your all-in-one app
+                <span className="block text-yellow-400">for everyday city life.</span>
+              </h1>
+              <p className="mt-7 max-w-xl text-base font-medium leading-7 text-white/70 sm:text-xl sm:leading-8">
+                Asoose connects you to trusted local stores, reliable drivers and couriers. Order food and essentials, request a ride, or send a package—all from one app.
+              </p>
+              <div className="mt-9 flex flex-wrap gap-3">
+                <Link
+                  href={SERVICE_DATA[activeService].link}
+                  className="inline-flex items-center gap-2 rounded-xl bg-yellow-400 px-6 py-4 text-sm font-black text-black shadow-2xl shadow-yellow-400/20 transition hover:bg-yellow-300 active:scale-[0.98]"
+                >
+                  {SERVICE_DATA[activeService].cta}
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  href="#download"
+                  className="rounded-xl border border-white/25 bg-white/10 px-6 py-4 text-sm font-black text-white backdrop-blur-md transition hover:bg-white/20"
+                >
+                  Download the app
+                </Link>
+              </div>
+            </div>
           </div>
+
+          {!isPaused && (
+            <div className="absolute bottom-0 left-0 z-20 h-1 w-full bg-white/10">
+              <div key={activeService} className="h-full w-full origin-left animate-[progress_5s_linear_forwards] bg-yellow-400" />
+            </div>
+          )}
         </header>
 
-        {/* ── HOW IT WORKS ──────────────────────────────────────────────── */}
-        <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
-          <div className="mb-10 text-center sm:mb-14">
-            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-yellow-600">Simple from start to finish</p>
-            <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">How Asoose works</h2>
-            <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-gray-500 sm:text-base">Whatever you need around the city, the experience stays clear and predictable.</p>
+        {/* ── PRIMARY ACTIONS ───────────────────────────────────────────── */}
+        <section className="relative z-20 mx-auto -mt-28 max-w-7xl px-4 sm:px-6">
+          <div className="grid overflow-hidden rounded-[2rem] border border-black/5 bg-white shadow-2xl shadow-black/15 dark:border-white/10 dark:bg-[#151513] md:grid-cols-3">
+            {SERVICE_KEYS.map((key) => {
+              const Icon = SERVICE_DATA[key].icon;
+              const active = activeService === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setActiveService(key)}
+                  aria-pressed={active}
+                  className={`group relative flex min-h-40 items-start gap-4 border-b p-6 text-left transition md:border-b-0 md:border-r md:last:border-r-0 sm:p-8 ${
+                    darkMode ? "border-white/10" : "border-black/[0.06]"
+                  } ${active ? "bg-yellow-400 text-black" : "hover:bg-yellow-400/10"}`}
+                >
+                  <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${active ? "bg-black text-yellow-400" : "bg-yellow-400/15 text-yellow-600"}`}>
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <span>
+                    <span className="block text-[10px] font-black uppercase tracking-[0.18em] opacity-55">
+                      {key === "food" ? "Marketplace" : key === "ride" ? "Rides" : "Delivery"}
+                    </span>
+                    <span className="mt-2 block text-xl font-black tracking-tight">{SERVICE_DATA[key].title}</span>
+                    <span className="mt-2 line-clamp-2 block text-xs font-medium leading-5 opacity-65">{SERVICE_DATA[key].desc}</span>
+                  </span>
+                  <ArrowRight className="absolute bottom-6 right-6 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </button>
+              );
+            })}
           </div>
+        </section>
 
-          <div className="relative grid gap-3 sm:grid-cols-3">
+        <section className="mx-auto max-w-7xl px-4 pb-8 pt-20 sm:px-6 sm:pb-14 sm:pt-28">
+          <div className="grid gap-8 border-b border-black/[0.06] pb-14 dark:border-white/10 sm:grid-cols-[1.2fr_1fr] sm:items-end">
+            <h2 className="max-w-3xl text-4xl font-black leading-[0.98] tracking-[-0.045em] sm:text-6xl">
+              One platform for shopping, rides and delivery.
+            </h2>
+            <p className="max-w-lg text-base leading-7 text-gray-500 sm:justify-self-end sm:text-lg">
+              Whether you are buying dinner, heading across town or sending an item, Asoose helps you get it done from one simple experience.
+            </p>
+          </div>
+        </section>
+
+        {/* ── HOW IT WORKS ──────────────────────────────────────────────── */}
+        <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16">
+          <div className="overflow-hidden rounded-[2.5rem] bg-[#151513] px-6 py-10 text-white sm:px-10 sm:py-14 lg:grid lg:grid-cols-[0.8fr_1.2fr] lg:gap-16 lg:px-14 lg:py-16">
+            <div className="mb-10 lg:mb-0">
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-yellow-400">Simple from start to finish</p>
+              <h2 className="mt-4 text-4xl font-black leading-none tracking-[-0.04em] sm:text-5xl">How Asoose works</h2>
+              <p className="mt-5 max-w-sm text-sm leading-6 text-white/55 sm:text-base">Whatever you need around the city, the experience stays clear and predictable.</p>
+            </div>
+
+            <div className="divide-y divide-white/10">
 
             {[
               {
@@ -390,181 +388,164 @@ export default function AsooseLanding() {
             ].map((step, i) => (
               <div
                 key={i}
-                className={`group flex items-start gap-4 rounded-3xl border p-5 sm:flex-col sm:p-6 ${darkMode ? "border-white/[0.07] bg-white/[0.03]" : "border-black/[0.05] bg-[#fafaf8]"}`}
+                className="group grid grid-cols-[auto_1fr] items-center gap-5 py-6 first:pt-0 last:pb-0 sm:grid-cols-[auto_1fr_auto]"
               >
-                <div className="relative flex-shrink-0">
-                  <div
-                    className={`relative z-10 flex h-12 w-12 items-center justify-center rounded-2xl transition-transform group-hover:-translate-y-0.5 ${
-                      darkMode
-                        ? "bg-yellow-400/10"
-                        : "bg-yellow-100"
-                    }`}
-                  >
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-yellow-400/10 transition-transform group-hover:-translate-y-0.5">
                     {step.icon}
-                  </div>
                 </div>
                 <div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Step {i + 1}</span>
-                  <h3 className="mt-1 text-base font-black sm:text-lg">{step.title}</h3>
-                  <p className="mt-1 max-w-[240px] text-sm leading-relaxed text-gray-500">
-                    {step.desc}
-                  </p>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-white/35">Step {i + 1}</span>
+                  <h3 className="mt-1 text-lg font-black">{step.title}</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-white/50">{step.desc}</p>
                 </div>
+                <span className="hidden text-5xl font-black text-white/[0.06] sm:block">0{i + 1}</span>
               </div>
+            ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── PARTNER PATHS ─────────────────────────────────────────────── */}
+        <section className="mx-auto max-w-7xl border-t border-black/5 px-4 py-16 dark:border-white/5 sm:px-6 sm:py-20">
+          <div className="mb-10 max-w-2xl sm:mb-12">
+            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-yellow-600">
+              Build with Asoose
+            </p>
+            <h2 className="mt-3 text-3xl font-black tracking-[-0.035em] sm:text-5xl">
+              Your next opportunity is here.
+            </h2>
+            <p className="mt-4 text-base leading-7 text-gray-500 sm:text-lg">
+              Reach more customers as a merchant or earn on your own schedule as a rider.
+            </p>
+          </div>
+
+          <div className="grid gap-5 lg:grid-cols-2">
+            {[
+              {
+                label: "For merchants",
+                title: "Grow beyond your storefront.",
+                desc: "Sell food, groceries and everyday goods while Asoose helps with orders, payments and delivery.",
+                image: "/vendor.webp",
+                alt: "Merchant preparing an Asoose order",
+                points: ["Reach nearby customers", "Manage orders live"],
+                androidUrl: MERCHANT_ANDROID_URL,
+                iosUrl: MERCHANT_IOS_URL,
+                appName: "merchant" as const,
+              },
+              {
+                label: "For riders",
+                title: "Earn on your schedule.",
+                desc: "Provide rides or complete deliveries with transparent earnings, navigation and support in one app.",
+                image: "/driver.webp",
+                alt: "Asoose rider ready for a trip",
+                points: ["Choose when you work", "Track earnings clearly"],
+                androidUrl: RIDER_ANDROID_URL,
+                iosUrl: RIDER_IOS_URL,
+                appName: "rider" as const,
+              },
+            ].map((path) => (
+              <article
+                key={path.appName}
+                className={`overflow-hidden rounded-[2rem] border ${
+                  darkMode
+                    ? "border-white/[0.08] bg-white/[0.035]"
+                    : "border-black/[0.06] bg-[#fafaf8]"
+                }`}
+              >
+                <div className="relative h-64 overflow-hidden bg-zinc-100 sm:h-72 dark:bg-zinc-900">
+                  <Image
+                    src={path.image}
+                    alt={path.alt}
+                    fill
+                    className="object-cover transition-transform duration-700 hover:scale-[1.02]"
+                    loading="lazy"
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                    quality={85}
+                    placeholder="blur"
+                    blurDataURL={BLUR_MAP[path.image]}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
+                  <span className="absolute left-5 top-5 rounded-full border border-white/20 bg-black/40 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-white backdrop-blur-md">
+                    {path.label}
+                  </span>
+                </div>
+                <div className="p-6 sm:p-8">
+                  <h3 className="text-2xl font-black tracking-[-0.025em] sm:text-3xl">{path.title}</h3>
+                  <p className="mt-3 max-w-xl text-sm leading-6 text-gray-500 sm:text-base">{path.desc}</p>
+                  <div className="my-6 flex flex-wrap gap-2">
+                    {path.points.map((point) => (
+                      <span
+                        key={point}
+                        className="rounded-full bg-yellow-400/15 px-3 py-1.5 text-xs font-extrabold text-yellow-800 dark:text-yellow-300"
+                      >
+                        {point}
+                      </span>
+                    ))}
+                  </div>
+                  <StoreButtons
+                    androidUrl={path.androidUrl}
+                    iosUrl={path.iosUrl}
+                    darkMode={darkMode}
+                    appName={path.appName}
+                    size="sm"
+                  />
+                </div>
+              </article>
             ))}
           </div>
         </section>
 
-        {/* ── MERCHANT SECTION ──────────────────────────────────────────── */}
-        <section className="py-16 sm:py-20 md:py-24 px-4 sm:px-6 max-w-7xl mx-auto grid md:grid-cols-2 gap-10 sm:gap-12 md:gap-16 items-center border-t border-black/5 dark:border-white/5">
-          <div className="order-2 md:order-1 space-y-6 sm:space-y-8">
-            <span className="inline-block text-[10px] uppercase tracking-widest font-bold opacity-40 border border-current rounded-full px-3 py-1">
-              For Merchants
-            </span>
-            <h3 className="text-3xl sm:text-4xl font-black tracking-tight">
-              Grow your business.
-              <br />
-              Become a partner.
-            </h3>
-            <p className="opacity-70 text-base sm:text-lg leading-relaxed">
-              Sell food, groceries, or goods. We handle payments and delivery so
-              you can focus on quality.
-            </p>
-            <ul className="space-y-3 sm:space-y-4 text-xs sm:text-sm font-bold uppercase tracking-wider">
-              {["Reach more customers", "Manage orders in real time", "Reliable delivery network"].map((item) => (
-                <li key={item} className="flex items-center gap-3">
-                  <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full flex-shrink-0" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-            <StoreButtons
-              androidUrl={MERCHANT_ANDROID_URL}
-              iosUrl={MERCHANT_IOS_URL}
-              darkMode={darkMode}
-              appName="merchant"
-              size="sm"
-            />
-          </div>
-          <div className="order-1 md:order-2 relative h-[300px] sm:h-[400px] md:h-[450px] rounded-3xl overflow-hidden bg-zinc-100 dark:bg-zinc-900">
-            <Image
-              src="/vendor.webp"
-              alt="Become a merchant"
-              fill
-              className="object-cover"
-              loading="lazy"
-              sizes="(max-width: 768px) 100vw, 50vw"
-              quality={85}
-              placeholder="blur"
-              blurDataURL={BLUR_MAP["/vendor.webp"]}
-            />
-          </div>
-        </section>
-
-        {/* ── RIDER SECTION ─────────────────────────────────────────────── */}
-        <section
-          className={`py-16 sm:py-20 md:py-24 px-4 sm:px-6 border-t ${
-            darkMode ? "bg-[#0a0a0a] border-white/5" : "bg-white border-black/5"
-          }`}
-        >
-          <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-10 sm:gap-12 md:gap-16 items-center">
-            <div className="relative h-[300px] sm:h-[400px] md:h-[450px] rounded-3xl overflow-hidden bg-zinc-100 dark:bg-zinc-900">
-              <Image
-                src="/driver.webp"
-                alt="Become a rider"
-                fill
-                className="object-cover"
-                loading="lazy"
-                sizes="(max-width: 768px) 100vw, 50vw"
-                quality={85}
-                placeholder="blur"
-                blurDataURL={BLUR_MAP["/driver.webp"]}
-              />
-            </div>
-            <div className="space-y-6 sm:space-y-8">
-              <span className="inline-block text-[10px] uppercase tracking-widest font-bold opacity-40 border border-current rounded-full px-3 py-1">
-                For Riders
-              </span>
-              <h3 className="text-3xl sm:text-4xl font-black tracking-tight">
-                Be the boss.
-                <br />
-                Drive with Asoose.
-              </h3>
-              <p className="opacity-70 text-base sm:text-lg leading-relaxed">
-                Earn on your schedule by helping people move and deliver across
-                the city. Deliver meals, groceries, or provide rides.
-              </p>
-              <ul className="space-y-3 sm:space-y-4 text-xs sm:text-sm font-bold uppercase tracking-wider">
-                {["Flexible working hours", "Transparent earnings", "In-app navigation & support"].map((item) => (
-                  <li key={item} className="flex items-center gap-3">
-                    <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full flex-shrink-0" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <StoreButtons
-                androidUrl={RIDER_ANDROID_URL}
-                iosUrl={RIDER_IOS_URL}
-                darkMode={darkMode}
-                appName="rider"
-                size="sm"
-              />
-            </div>
-          </div>
-        </section>
-
         {/* ── SAFETY & TRUST ────────────────────────────────────────────── */}
-        <section className="py-16 sm:py-20 md:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-black/5 dark:border-white/5">
-          <h3 className="text-2xl sm:text-3xl font-black mb-12 sm:mb-16 text-center tracking-tight">
-            Your safety drives us
-          </h3>
+        <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
+          <div className="relative overflow-hidden rounded-[2.5rem] bg-yellow-400 px-6 py-12 text-black sm:px-10 sm:py-16 lg:px-14">
+            <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full border-[48px] border-black/[0.04]" />
+            <div className="relative z-10 grid gap-12 lg:grid-cols-[0.75fr_1.25fr] lg:items-start">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-black/50">Safety by design</p>
+                <h3 className="mt-4 max-w-sm text-4xl font-black leading-[0.95] tracking-[-0.045em] sm:text-5xl">
+                  Confidence at every step.
+                </h3>
+                <p className="mt-5 max-w-sm text-sm font-medium leading-6 text-black/60 sm:text-base">
+                  From the partner you choose to the payment you make, protection is part of the experience.
+                </p>
+              </div>
 
-          <div className="flex flex-col sm:flex-row gap-4">
+              <div className="divide-y divide-black/10 border-y border-black/10">
             {[
               {
-                icon: <UserCheck size={22} className="text-yellow-500" />,
+                icon: <UserCheck size={22} />,
                 title: "Verified riders and vendors",
                 desc: "Every partner goes through identity and background checks before they're approved.",
               },
               {
-                icon: <ShieldCheck size={22} className="text-yellow-500" />,
+                icon: <ShieldCheck size={22} />,
                 title: "Live GPS tracking & SOS",
                 desc: "Share your trip live with loved ones and reach emergency assistance with one tap.",
               },
               {
-                icon: <Lock size={22} className="text-yellow-500" />,
+                icon: <Lock size={22} />,
                 title: "Secure encrypted payments",
                 desc: "All transactions are end-to-end encrypted. Your financial data stays safe.",
               },
             ].map((item, i) => (
               <div
                 key={i}
-                className={`group flex flex-row sm:flex-col gap-4 sm:gap-3 flex-1 p-5 sm:p-6 rounded-2xl border transition-colors ${
-                  darkMode
-                    ? "bg-white/[0.03] border-white/8 hover:bg-white/[0.06]"
-                    : "bg-black/[0.02] border-black/5 hover:bg-black/[0.04]"
-                }`}
+                className="group grid gap-4 py-6 sm:grid-cols-[auto_0.65fr_1fr] sm:items-center"
               >
-                <div
-                  className={`w-10 h-10 flex-shrink-0 rounded-xl flex items-center justify-center ${
-                    darkMode ? "bg-yellow-500/10" : "bg-yellow-50"
-                  }`}
-                >
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-black text-yellow-400">
                   {item.icon}
                 </div>
-                <div>
-                  <div className="font-bold text-sm sm:text-base mb-1 group-hover:text-yellow-500 transition-colors">
-                    {item.title}
-                  </div>
-                  <p className="text-xs opacity-55 leading-relaxed">{item.desc}</p>
-                </div>
+                <div className="text-sm font-black sm:text-base">{item.title}</div>
+                <p className="text-xs font-medium leading-relaxed text-black/55 sm:text-sm">{item.desc}</p>
               </div>
             ))}
+              </div>
+            </div>
           </div>
         </section>
 
         {/* ── DOWNLOAD CTA ──────────────────────────────────────────────── */}
-        <section className="px-4 py-16 sm:px-6 sm:py-20">
+        <section id="download" className="scroll-mt-20 px-4 py-16 sm:px-6 sm:py-20">
           <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[2rem] bg-[#171714] px-5 py-12 text-center text-white shadow-2xl shadow-black/15 sm:px-10 sm:py-16">
             <div className="absolute -left-16 -top-20 h-64 w-64 rounded-full bg-yellow-400/15 blur-3xl" />
             <div className="absolute -bottom-24 -right-12 h-64 w-64 rounded-full bg-yellow-400/10 blur-3xl" />

@@ -59,6 +59,7 @@ function HomeHeaderInner() {
 
   // Logic for Branding visibility
   const showBranding = [
+    "/main/store",
     "/main/ride",
     "/main/delivery",
     "/main/orders",
@@ -260,12 +261,17 @@ function HomeHeaderInner() {
     <>
       <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#0a0a0a]/90 backdrop-blur-xl border-b border-gray-100 dark:border-white/5 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-6">
-        {/* LEFT: Branding OR Address */}
-        <div className="flex items-center gap-6">
+        {/* LEFT: Branding and location */}
+        <div className="flex min-w-0 items-center gap-2 sm:gap-4">
           {/* 1. Branding */}
           {showBranding && (
-            <Link href="/" className="flex items-center gap-3 group">
-              <div className="w-9 h-9 relative transition-transform group-hover:scale-105">
+            <Link
+              href="/"
+              aria-label="Back to Asoose home"
+              title="Back to Asoose home"
+              className="group flex shrink-0 items-center gap-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500"
+            >
+              <div className="relative h-9 w-9 transition-transform group-hover:scale-105">
                 <Image
                   src="/logo.png"
                   alt="Asoose Logo"
@@ -275,7 +281,7 @@ function HomeHeaderInner() {
                   priority
                 />
               </div>
-              <span className="text-lg font-black tracking-tight hidden sm:block text-zinc-900 dark:text-white">
+              <span className="hidden text-lg font-black tracking-tight text-zinc-900 dark:text-white xl:block">
                 Asoose
               </span>
             </Link>
