@@ -1,20 +1,17 @@
 "use client";
 
 import React, { useTransition, useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-  ArrowLeft,
   SearchX,
   SlidersHorizontal,
   ChevronDown,
   Loader2,
 } from "lucide-react";
-import { HomeHeader } from "@/app/main/components/home/HomeHeader";
 import { RestaurantCard } from "@/app/main/components/home/RestaurantCard";
-import AppFooter from "@/app/main/components/layout/AppFooter";
-import BottomNav from "@/app/main/components/layout/BottomNav";
 import { FloatingCart } from "@/app/main/components/home/FloatingCart";
+import { useRideStore } from "@/app/main/ride/store/ride";
 
 // --- TYPES ---
 export interface Vendor {
@@ -50,6 +47,9 @@ export default function CategoryClient({
   filters,
 }: CategoryClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const userLocation = useRideStore((state) => state.userLocation);
+  const cityId = useRideStore((state) => state.cityId);
   const [isPending, startTransition] = useTransition();
   const [scrolled, setScrolled] = useState(false);
 
@@ -59,14 +59,41 @@ export default function CategoryClient({
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  useEffect(() => {
+    if (!userLocation && !cityId) return;
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    let changed = false;
+    const setIfChanged = (key: string, value: string) => {
+      if (nextParams.get(key) !== value) {
+        nextParams.set(key, value);
+        changed = true;
+      }
+    };
+
+    if (cityId) setIfChanged("cityId", cityId);
+    if (userLocation) {
+      setIfChanged("lat", String(userLocation.lat));
+      setIfChanged("lng", String(userLocation.lng));
+    }
+
+    if (changed) {
+      router.replace(
+        `/main/store/category/${categoryId}?${nextParams.toString()}`,
+        { scroll: false },
+      );
+    }
+  }, [categoryId, cityId, router, searchParams, userLocation]);
+
   const formatTitle = (slug: string) =>
     slug.charAt(0).toUpperCase() + slug.slice(1);
 
   const handleFilterClick = (filterSlug: string) => {
     if (filterSlug === activeFilter) return;
     startTransition(() => {
-      // ✅ Correct Link with /main prefix
-      router.push(`/main/store/category/${categoryId}?filter=${filterSlug}`, {
+      const nextParams = new URLSearchParams(searchParams.toString());
+      nextParams.set("filter", filterSlug);
+      router.push(`/main/store/category/${categoryId}?${nextParams.toString()}`, {
         scroll: false,
       });
     });

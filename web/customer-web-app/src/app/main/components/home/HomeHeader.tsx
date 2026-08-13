@@ -44,8 +44,8 @@ function HomeHeaderInner() {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   
   const userLocation = useRideStore((state) => state.userLocation);
-  const cityId = useRideStore((state) => state.cityId);
   const selectedCity = useCityStore((state) => state.selectedCity);
+  const locationLabel = useCityStore((state) => state.locationLabel);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -119,10 +119,11 @@ function HomeHeaderInner() {
   // NOT the session object, to avoid infinite re-fetch loops.
   useEffect(() => {
     if (!accessToken) {
-      setDeliveryAddress({
-        label: "Guest",
-        details: "Login to set address",
-      });
+      setDeliveryAddress(
+        locationLabel
+          ? { label: "Current location", details: locationLabel }
+          : null,
+      );
       return;
     }
 
@@ -137,7 +138,12 @@ function HomeHeaderInner() {
 
         if (cancelled) return;
 
-        if (addressResult.status === "fulfilled") {
+        if (userLocation && locationLabel) {
+          setDeliveryAddress({
+            label: "Current location",
+            details: locationLabel,
+          });
+        } else if (addressResult.status === "fulfilled") {
           const addresses = addressResult.value;
           if (addresses && addresses.length > 0) {
             const active = addresses.find((a) => a.isDefault) || addresses[0];
@@ -147,20 +153,6 @@ function HomeHeaderInner() {
                 [active.street, active.city].filter(Boolean).join(", ") ||
                 `${active.latitude.toFixed(4)}, ${active.longitude.toFixed(4)}`,
             });
-
-            // Resolve cityId from the coordinates of the selected address
-            ApiService.post<any>("/locations/resolve-city", {
-              latitude: active.latitude,
-              longitude: active.longitude,
-            })
-              .then((resolved) => {
-                if (resolved?.city?.id) {
-                  import("@/app/main/ride/store/ride").then((module) => {
-                    module.useRideStore.getState().setCityId(resolved.city.id);
-                  });
-                }
-              })
-              .catch((err) => console.error("City resolve failed:", err));
           } else {
             setDeliveryAddress(null);
           }
@@ -179,7 +171,7 @@ function HomeHeaderInner() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, userLocation, cityId]); // Re-fetch address info if location changes
+  }, [accessToken, locationLabel, userLocation]);
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
@@ -321,10 +313,10 @@ function HomeHeaderInner() {
                   <span className="max-w-[100px] sm:max-w-[200px] truncate block">
                     {deliveryAddress ? (
                       <>
-                        {deliveryAddress.label === "Guest"
-                          ? selectedCity ? `${selectedCity.name}, ${selectedCity.state}` : "Set Location"
-                          : deliveryAddress.details}
+                        {deliveryAddress.details}
                       </>
+                    ) : locationLabel ? (
+                      <span>{locationLabel}</span>
                     ) : selectedCity ? (
                       <span>{selectedCity.name}, {selectedCity.state}</span>
                     ) : (

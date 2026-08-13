@@ -299,6 +299,16 @@ function StorePage() {
   if (initialLoading) return <StoreSkeleton />;
 
   const activeBanner = banners[activeBannerIndex];
+  const categoryLocationParams = new URLSearchParams();
+  if (cityId) categoryLocationParams.set("cityId", cityId);
+  if (userLocation) {
+    categoryLocationParams.set("lat", String(userLocation.lat));
+    categoryLocationParams.set("lng", String(userLocation.lng));
+  }
+  const serializedCategoryLocation = categoryLocationParams.toString();
+  const categoryLocationQuery = serializedCategoryLocation
+    ? `?${serializedCategoryLocation}`
+    : "";
 
   return (
     <div className="min-h-screen bg-[#f7f7f5] dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 pb-32 font-sans">
@@ -392,7 +402,7 @@ function StorePage() {
                     <div className="mt-6 flex flex-col items-start gap-4 sm:mt-7 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
                       {categories[0] ? (
                         <Link
-                          href={`/main/store/category/${categories[0].code}${userLocation ? `?lat=${userLocation.lat}&lng=${userLocation.lng}` : ""}`}
+                          href={`/main/store/category/${categories[0].code}${categoryLocationQuery}`}
                           className="inline-flex items-center gap-2 rounded-xl bg-yellow-400 px-5 py-3 text-sm font-extrabold text-black transition hover:bg-yellow-300 active:scale-[0.98]"
                         >
                           Start shopping
@@ -433,7 +443,7 @@ function StorePage() {
                 {categories.map((c) => (
                   <Link
                     key={c.id}
-                    href={`/main/store/category/${c.code}${userLocation ? `?lat=${userLocation.lat}&lng=${userLocation.lng}` : ""}`}
+                    href={`/main/store/category/${c.code}${categoryLocationQuery}`}
                     className="group flex min-w-[148px] snap-start items-center gap-3 rounded-2xl border border-black/[0.06] bg-white p-3 shadow-[0_8px_30px_-24px_rgba(0,0,0,0.45)] transition duration-300 hover:-translate-y-0.5 hover:border-yellow-400/70 hover:shadow-md dark:border-white/[0.07] dark:bg-[#151515]"
                   >
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-yellow-400/15 text-yellow-700 transition-colors group-hover:bg-yellow-400 group-hover:text-black dark:text-yellow-400">
@@ -466,7 +476,7 @@ function StorePage() {
                         </p>
                       </div>
                       <Link
-                        href={`/main/store/category/${section.id}${userLocation ? `?lat=${userLocation.lat}&lng=${userLocation.lng}` : ""}`}
+                        href={`/main/store/category/${section.id}${categoryLocationQuery}`}
                         className="flex items-center gap-1 rounded-full border border-black/[0.06] bg-white px-3 py-2 text-xs font-bold text-gray-600 shadow-sm transition hover:border-yellow-400 hover:text-black dark:border-white/10 dark:bg-white/5 dark:text-gray-300"
                       >
                         See all

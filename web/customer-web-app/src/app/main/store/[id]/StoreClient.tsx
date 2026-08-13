@@ -61,6 +61,8 @@ interface Store {
 export default function StoreClient() {
   const params = useParams();
   const slugOrId = params.id as string;
+  const userLocation = useRideStore((state) => state.userLocation);
+  const cityId = useRideStore((state) => state.cityId);
 
   // Guard against reserved path segments that would otherwise fall into this
   // dynamic route (e.g. /main/store/categories hitting the vendor API).
@@ -104,14 +106,22 @@ export default function StoreClient() {
   const fetchStoreData = useCallback(async () => {
     try {
       setError(null);
-      const userLocation = useRideStore.getState().userLocation;
-      const locQuery = userLocation
-        ? `?lat=${userLocation.lat}&lng=${userLocation.lng}`
-        : "";
+      const locationParams = new URLSearchParams();
+      if (cityId) locationParams.set("cityId", cityId);
+      if (userLocation) {
+        locationParams.set("lat", String(userLocation.lat));
+        locationParams.set("lng", String(userLocation.lng));
+      }
+      const serializedLocation = locationParams.toString();
+      const locQuery = serializedLocation ? `?${serializedLocation}` : "";
+      const itemParams = new URLSearchParams(locationParams);
+      itemParams.set("limit", "100");
 
       const [detail, items] = await Promise.all([
         ApiService.get<any>(`/catalog/storefronts/${slugOrId}${locQuery}`),
-        ApiService.get<any>(`/catalog/storefronts/${slugOrId}/items?limit=100`),
+        ApiService.get<any>(
+          `/catalog/storefronts/${slugOrId}/items?${itemParams.toString()}`,
+        ),
       ]);
 
       // Backend splits detail (name/rating/hours) from items (products, or a
@@ -172,7 +182,7 @@ export default function StoreClient() {
     } finally {
       setLoading(false);
     }
-  }, [slugOrId]);
+  }, [cityId, slugOrId, userLocation]);
 
   useEffect(() => {
     if (slugOrId) fetchStoreData();

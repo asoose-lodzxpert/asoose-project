@@ -3,9 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useRideStore } from "@/app/main/ride/store/ride";
-import { ApiService } from "@/services/api.service";
 import { CityFallbackDialog } from "@/components/CityFallbackDialog";
-import type { ActiveCity } from "@/services/location.service";
+import { requestGeolocation } from "@/services/geolocation.service";
+import {
+  LocationService,
+  type ActiveCity,
+} from "@/services/location.service";
+import { reverseGeocode } from "@/services/reverse-geocode.service";
 import { useCityStore } from "@/store/useCityStore";
 
 /**
@@ -23,6 +27,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const setCityId = useRideStore((state) => state.setCityId);
   const selectedCity = useCityStore((state) => state.selectedCity);
   const setSelectedCity = useCityStore((state) => state.setSelectedCity);
+  const setLocationLabel = useCityStore((state) => state.setLocationLabel);
   const [hasRequested, setHasRequested] = useState(false);
   const [needsCityChoice, setNeedsCityChoice] = useState(false);
 
@@ -62,12 +67,10 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const coords = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        };
+    const detectLocation = async () => {
+      try {
+        const position = await requestGeolocation();
+        const coords = { lat: position.lat, lng: position.lng };
 
         if (
           !Number.isFinite(coords.lat) ||
@@ -75,47 +78,68 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
           Math.abs(coords.lat) > 90 ||
           Math.abs(coords.lng) > 180
         ) {
-          setGeolocationError(null);
           requestCityChoice();
           return;
         }
 
+        // These exact browser coordinates are the source of truth for nearby
+        // catalog requests. City resolution only adds the operating-city ID.
         setUserLocation(coords);
 
-        // Resolve cityId from coordinates
-        try {
-          const result: any = await ApiService.post("/locations/resolve-city", {
+        const [cityResult, addressResult] = await Promise.allSettled([
+          LocationService.resolveCity(coords.lat, coords.lng),
+          reverseGeocode(coords.lat, coords.lng),
+        ]);
+
+        const address =
+          addressResult.status === "fulfilled"
+            ? addressResult.value.address
+            : null;
+        if (address) setLocationLabel(address);
+
+        if (
+          cityResult.status === "fulfilled" &&
+          cityResult.value.serviceAvailable &&
+          cityResult.value.city?.id
+        ) {
+          const city = cityResult.value.city;
+          setCityId(city.id);
+          setSelectedCity({
+            ...city,
             latitude: coords.lat,
             longitude: coords.lng,
           });
-          if (result?.city?.id) {
-            setCityId(result.city.id);
-            setNeedsCityChoice(false);
-            console.log("🏙️ City detected:", result.city.name);
-          } else {
-            requestCityChoice();
+          if (!address) {
+            setLocationLabel([city.name, city.state].filter(Boolean).join(", "));
           }
-        } catch (cityErr) {
-          console.error("Failed to resolve city from coordinates:", cityErr);
+          setNeedsCityChoice(false);
+        } else {
+          // Never combine fresh coordinates with a stale persisted city ID.
+          setCityId(null);
+          setSelectedCity(null);
           requestCityChoice();
         }
 
         setGeolocationError(null);
-        console.log("📍 Location detected:", coords);
-      },
-      (error) => {
-        console.warn("⚠️ Geolocation error:", error.message);
-        // Browser location is optional. Users can still search or choose both
-        // points on the map, so do not turn this into a form validation error.
+      } catch (error: unknown) {
+        console.warn(
+          "⚠️ Geolocation error:",
+          error instanceof Error ? error.message : "Position unavailable",
+        );
+        // Browser location is optional. Fall back to a supported city only
+        // when permission or device positioning is unavailable.
         setGeolocationError(null);
         requestCityChoice();
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-    );
+      }
+    };
+
+    void detectLocation();
   }, [
     setUserLocation,
     setGeolocationError,
     setCityId,
+    setSelectedCity,
+    setLocationLabel,
     hasRequested,
     requestCityChoice,
   ]);
@@ -141,6 +165,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
 
     const resolvedCity = { ...city, latitude, longitude };
     setSelectedCity(resolvedCity);
+    setLocationLabel([city.name, city.state].filter(Boolean).join(", "));
     setCityId(city.id);
     if (latitude != null && longitude != null) {
       setUserLocation({ lat: latitude, lng: longitude });

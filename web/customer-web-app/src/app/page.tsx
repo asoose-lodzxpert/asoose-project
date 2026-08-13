@@ -5,7 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   ArrowRight,
-  Zap,
   ShieldCheck,
   MapPin,
   Clock,
@@ -13,7 +12,9 @@ import {
   UserCheck,
   Lock,
   ChevronDown,
-  Star,
+  ShoppingBag,
+  CarFront,
+  PackageCheck,
 } from "lucide-react";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
@@ -32,6 +33,8 @@ const BLUR_MAP: Record<string, string> = {
   "/driver.webp":
     "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/wAARCAAIAAoDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABcQAAMBAAAAAAAAAAAAAAAAAAABEjL/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8AkkQD/9k=",
 };
+
+const SERVICE_KEYS = ["food", "ride", "package"] as const;
 
 // Apple SVG icon
 function AppleIcon({ className }: { className?: string }) {
@@ -158,31 +161,32 @@ export default function AsooseLanding() {
   const MERCHANT_IOS_URL =
     "https://apps.apple.com/ng/app/asoose/id6781271502";
 
-  const SERVICE_KEYS = ["food", "ride", "package"] as const;
-
   const SERVICE_DATA = {
     food: {
-      title: "Local Marketplace",
-      desc: "Explore thousands of items from nearby stores. Groceries, meals, pharmacy, and retail delivered fast",
-      cta: "Make order",
+      eyebrow: "Food, groceries and essentials",
+      title: "Your city, delivered.",
+      desc: "Order meals, groceries, pharmacy items and everyday essentials from trusted stores near you.",
+      cta: "Start shopping",
       link: "/main/store",
-      badge: "Track your order live",
+      icon: ShoppingBag,
       image: "/marketplace.webp",
     },
     ride: {
-      title: "Where to?",
-      desc: "Get to your destination quickly and safely. Reliable rides with verified drivers and upfront pricing.",
+      eyebrow: "Reliable rides, when you need them",
+      title: "Move with confidence.",
+      desc: "Request a safe, dependable ride with verified drivers, clear pricing and live trip tracking.",
       cta: "Book a ride",
       link: "/main/ride",
-      badge: "Quick driver matching",
+      icon: CarFront,
       image: "/ride.webp",
     },
     package: {
-      title: "Send a package",
-      desc: "Secure delivery for your parcels. From documents to bulk items, we ensure it gets there safely.",
+      eyebrow: "Simple, secure local delivery",
+      title: "Send it with ease.",
+      desc: "Move documents, parcels and larger items across the city with transparent pricing and live tracking.",
       cta: "Send a package",
       link: "/main/delivery",
-      badge: "Upfront pricing & secure",
+      icon: PackageCheck,
       image: "/delivery.webp",
     },
   };
@@ -246,71 +250,89 @@ export default function AsooseLanding() {
           darkMode ? "bg-[#0a0a0a] text-gray-100" : "bg-white text-gray-900"
         }`}
       >
-        {/* ── HERO CAROUSEL ─────────────────────────────────────────────── */}
-        <header className="pt-24 sm:pt-32 md:pt-40 pb-12 sm:pb-16 md:pb-24 px-4 sm:px-6 max-w-7xl mx-auto">
+        {/* ── HERO ──────────────────────────────────────────────────────── */}
+        <header className="mx-auto max-w-7xl px-4 pb-14 pt-24 sm:px-6 sm:pb-20 sm:pt-28 lg:pt-32">
           <div
-            className={`relative w-full rounded-[2.5rem] overflow-hidden border transition-all duration-500 min-h-[500px] flex ${
+            className={`relative overflow-hidden rounded-[2rem] border transition-all duration-500 sm:rounded-[2.5rem] ${
               darkMode
-                ? "bg-[#121212] border-white/10"
-                : "bg-white border-black/5"
+                ? "border-white/10 bg-[#11110f]"
+                : "border-black/[0.06] bg-[#f8f7f2]"
             }`}
             onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
           >
-            {/* Slides */}
+            <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-yellow-400/20 blur-3xl" />
+
+            <div className="relative z-20 flex gap-2 overflow-x-auto px-5 pt-5 scrollbar-hide sm:px-8 sm:pt-8 lg:px-12">
+              {SERVICE_KEYS.map((key) => {
+                const Icon = SERVICE_DATA[key].icon;
+                const active = activeService === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setActiveService(key)}
+                    aria-pressed={active}
+                    className={`inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-xs font-extrabold transition sm:text-sm ${
+                      active
+                        ? "bg-[#171714] text-white shadow-lg dark:bg-yellow-400 dark:text-black"
+                        : "border border-black/[0.06] bg-white/70 text-gray-600 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {key === "food" ? "Marketplace" : key === "ride" ? "Rides" : "Delivery"}
+                  </button>
+                );
+              })}
+            </div>
+
             <div
-              className="flex transition-transform duration-700 ease-in-out w-full"
+              className="flex w-full transition-transform duration-700 ease-in-out"
               style={{ transform: `translateX(-${activeIndex * 100}%)` }}
             >
               {SERVICE_KEYS.map((key, index) => (
                 <div
                   key={key}
-                  className="w-full flex-shrink-0 grid md:grid-cols-2 gap-8 md:gap-12 items-center px-6 py-12 sm:px-12 md:px-16"
+                  className="grid w-full flex-shrink-0 items-center gap-8 px-5 pb-10 pt-8 sm:px-8 sm:pb-12 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] md:gap-12 lg:px-12 lg:pb-14 lg:pt-10"
                 >
-                  {/* LEFT: Content */}
-                  <div className="flex flex-col items-start text-left z-10 order-1">
-                    {/* Badge */}
-                    <div className="mb-5 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 text-xs font-black uppercase tracking-widest">
-                      {SERVICE_DATA[key].badge}
-                    </div>
-
-                    {/* Headline */}
-                    <h1
-                      className="font-black tracking-tighter leading-[1.1] mb-4"
-                      style={{ fontSize: "clamp(2.25rem, 6vw, 4.5rem)" }}
-                    >
+                  <div className="relative z-10 order-2 flex flex-col items-start text-left md:order-1">
+                    <p className="mb-4 text-[11px] font-black uppercase tracking-[0.18em] text-yellow-700 dark:text-yellow-400 sm:text-xs">
+                      {SERVICE_DATA[key].eyebrow}
+                    </p>
+                    <h1 className="mb-5 max-w-xl text-[2.65rem] font-black leading-[0.98] tracking-[-0.055em] sm:text-6xl lg:text-7xl">
                       {SERVICE_DATA[key].title}
                     </h1>
-
-                    {/* Description */}
-                    <p className="text-base sm:text-lg font-medium opacity-70 max-w-xl mb-8 leading-relaxed">
+                    <p className="mb-7 max-w-lg text-base font-medium leading-7 text-gray-600 dark:text-gray-300 sm:text-lg">
                       {SERVICE_DATA[key].desc}
                     </p>
-
-                    {/* ── Primary CTA ── */}
-                    <Link
-                      href={SERVICE_DATA[key].link}
-                      className="inline-flex items-center gap-3 px-8 py-4 sm:px-10 sm:py-5 rounded-2xl bg-yellow-400 text-black font-black text-lg hover:bg-yellow-300 transition-all active:scale-95 hover:scale-105 mb-4"
-                    >
-                      {SERVICE_DATA[key].cta}
-                      <ArrowRight size={22} />
-                    </Link>
-
-                    {/* ── Store Buttons — on their own row, always visible ── */}
-                    <StoreButtons
-                      androidUrl={CUSTOMER_ANDROID_URL}
-                      iosUrl={CUSTOMER_IOS_URL}
-                      darkMode={darkMode}
-                      size="sm"
-                    />
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Link
+                        href={SERVICE_DATA[key].link}
+                        className="inline-flex items-center gap-2 rounded-xl bg-yellow-400 px-6 py-3.5 text-sm font-black text-black shadow-lg shadow-yellow-400/15 transition hover:bg-yellow-300 active:scale-[0.98] sm:px-7 sm:py-4"
+                      >
+                        {SERVICE_DATA[key].cta}
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
+                      <Link
+                        href="/about"
+                        className="rounded-xl px-5 py-3.5 text-sm font-extrabold text-gray-600 transition hover:bg-black/5 hover:text-black dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
+                      >
+                        Learn about Asoose
+                      </Link>
+                    </div>
+                    <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-xs font-bold text-gray-500 dark:text-gray-400">
+                      <span className="flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-yellow-600" /> Verified partners</span>
+                      <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-yellow-600" /> Live tracking</span>
+                      <span className="flex items-center gap-1.5"><Wallet className="h-4 w-4 text-yellow-600" /> Secure payments</span>
+                    </div>
                   </div>
 
-                  {/* RIGHT: Image */}
-                  <div className="relative w-full h-[260px] md:h-[450px] rounded-3xl overflow-hidden order-2 bg-zinc-100 dark:bg-zinc-900">
+                  <div className="relative order-1 h-[260px] w-full overflow-hidden rounded-[1.5rem] bg-zinc-100 shadow-2xl shadow-black/10 sm:h-[360px] md:order-2 md:h-[470px] md:rounded-[2rem] dark:bg-zinc-900">
                     <Image
                       src={SERVICE_DATA[key].image}
                       alt={SERVICE_DATA[key].title}
                       fill
-                      className="object-cover hover:scale-105 transition-transform duration-700"
+                      className="object-cover transition-transform duration-700 hover:scale-[1.02]"
                       priority={index === 0}
                       loading={index === 0 ? "eager" : "lazy"}
                       sizes="(max-width: 768px) 100vw, 50vw"
@@ -318,35 +340,21 @@ export default function AsooseLanding() {
                       placeholder="blur"
                       blurDataURL={BLUR_MAP[SERVICE_DATA[key].image]}
                     />
-                    <div className="absolute inset-0 bg-black/5 dark:bg-white/5 pointer-events-none" />
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+                    <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between rounded-2xl border border-white/20 bg-black/45 px-4 py-3 text-white backdrop-blur-md sm:bottom-5 sm:left-5 sm:right-5">
+                      <div><p className="text-[10px] font-bold uppercase tracking-widest text-white/60">Available in your city</p><p className="mt-0.5 text-sm font-black">Fast. Local. Dependable.</p></div>
+                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-yellow-400 text-black"><ArrowRight className="h-4 w-4" /></span>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Pagination dots */}
-            <div className="absolute bottom-8 left-0 right-0 flex justify-center gap-3 z-20">
-              {SERVICE_KEYS.map((key, i) => (
-                <button
-                  key={key}
-                  onClick={() => setActiveService(key)}
-                  aria-label={`Go to ${key} slide`}
-                  aria-current={i === activeIndex ? "true" : undefined}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${
-                    i === activeIndex
-                      ? "w-8 bg-yellow-400"
-                      : "w-2 bg-gray-300 dark:bg-white/20 hover:bg-yellow-400/50"
-                  }`}
-                />
-              ))}
-            </div>
-
-            {/* Progress bar */}
             {!isPaused && (
-              <div className="absolute bottom-0 left-0 h-1 bg-yellow-400/20 w-full z-20">
+              <div className="absolute bottom-0 left-0 z-20 h-0.5 w-full bg-yellow-400/15">
                 <div
                   key={activeService}
-                  className="h-full bg-yellow-400 w-full origin-left animate-[progress_5s_linear_forwards]"
+                  className="h-full w-full origin-left animate-[progress_5s_linear_forwards] bg-yellow-400"
                 />
               </div>
             )}
@@ -354,13 +362,14 @@ export default function AsooseLanding() {
         </header>
 
         {/* ── HOW IT WORKS ──────────────────────────────────────────────── */}
-        <section className="py-16 sm:py-20 md:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-black/5 dark:border-white/5">
-          <h3 className="text-2xl sm:text-3xl font-black mb-12 sm:mb-16 text-center tracking-tight">
-            How it works
-          </h3>
+        <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
+          <div className="mb-10 text-center sm:mb-14">
+            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-yellow-600">Simple from start to finish</p>
+            <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">How Asoose works</h2>
+            <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-gray-500 sm:text-base">Whatever you need around the city, the experience stays clear and predictable.</p>
+          </div>
 
-          <div className="flex flex-col sm:flex-row relative">
-            <div className="hidden sm:block absolute top-7 left-[16.66%] right-[16.66%] h-px bg-yellow-400/30" />
+          <div className="relative grid gap-3 sm:grid-cols-3">
 
             {[
               {
@@ -381,25 +390,23 @@ export default function AsooseLanding() {
             ].map((step, i) => (
               <div
                 key={i}
-                className="group flex sm:flex-col items-start sm:items-center gap-4 sm:gap-0 sm:flex-1 sm:text-center px-0 sm:px-6 py-6 sm:py-0"
+                className={`group flex items-start gap-4 rounded-3xl border p-5 sm:flex-col sm:p-6 ${darkMode ? "border-white/[0.07] bg-white/[0.03]" : "border-black/[0.05] bg-[#fafaf8]"}`}
               >
                 <div className="relative flex-shrink-0">
                   <div
-                    className={`w-14 h-14 rounded-full flex items-center justify-center transition-transform group-hover:scale-110 relative z-10 ${
+                    className={`relative z-10 flex h-12 w-12 items-center justify-center rounded-2xl transition-transform group-hover:-translate-y-0.5 ${
                       darkMode
-                        ? "bg-[#1e1e1e] border border-white/10"
-                        : "bg-white border border-black/8 shadow-sm"
+                        ? "bg-yellow-400/10"
+                        : "bg-yellow-100"
                     }`}
                   >
                     {step.icon}
                   </div>
-                  <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-yellow-400 text-black text-[10px] font-black flex items-center justify-center z-20">
-                    {i + 1}
-                  </span>
                 </div>
-                <div className="sm:mt-5">
-                  <h4 className="font-bold text-base sm:text-lg mb-1">{step.title}</h4>
-                  <p className="opacity-60 text-sm leading-relaxed max-w-[200px] sm:mx-auto">
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Step {i + 1}</span>
+                  <h3 className="mt-1 text-base font-black sm:text-lg">{step.title}</h3>
+                  <p className="mt-1 max-w-[240px] text-sm leading-relaxed text-gray-500">
                     {step.desc}
                   </p>
                 </div>
@@ -495,6 +502,13 @@ export default function AsooseLanding() {
                   </li>
                 ))}
               </ul>
+              <StoreButtons
+                androidUrl={RIDER_ANDROID_URL}
+                iosUrl={RIDER_IOS_URL}
+                darkMode={darkMode}
+                appName="rider"
+                size="sm"
+              />
             </div>
           </div>
         </section>
@@ -550,15 +564,18 @@ export default function AsooseLanding() {
         </section>
 
         {/* ── DOWNLOAD CTA ──────────────────────────────────────────────── */}
-        <section className="py-24 px-6 border-t border-black/5 dark:border-white/5">
-          <div className="max-w-5xl mx-auto text-center space-y-8">
+        <section className="px-4 py-16 sm:px-6 sm:py-20">
+          <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[2rem] bg-[#171714] px-5 py-12 text-center text-white shadow-2xl shadow-black/15 sm:px-10 sm:py-16">
+            <div className="absolute -left-16 -top-20 h-64 w-64 rounded-full bg-yellow-400/15 blur-3xl" />
+            <div className="absolute -bottom-24 -right-12 h-64 w-64 rounded-full bg-yellow-400/10 blur-3xl" />
+            <div className="relative z-10 space-y-8">
             <div className="space-y-4">
-              <h3 className="text-4xl md:text-6xl font-black tracking-tighter">
-                Get the app
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-yellow-400">Asoose in your pocket</p>
+              <h3 className="text-4xl font-black tracking-[-0.04em] md:text-6xl">
+                One app. More possibilities.
               </h3>
-              <p className="text-lg md:text-xl opacity-60 font-medium max-w-lg mx-auto leading-relaxed">
-                Experience the full Asoose ecosystem. Real-time tracking,
-                exclusive offers, and seamless payments.
+              <p className="mx-auto max-w-xl text-base font-medium leading-7 text-white/65 md:text-lg">
+                Shop, ride, send packages and manage payments with real-time updates from one place.
               </p>
             </div>
 
@@ -568,10 +585,11 @@ export default function AsooseLanding() {
                 <StoreButtons
                   androidUrl={CUSTOMER_ANDROID_URL}
                   iosUrl={CUSTOMER_IOS_URL}
-                  darkMode={darkMode}
+                  darkMode={true}
                   size="lg"
                 />
               </div>
+            </div>
             </div>
           </div>
         </section>

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Building2, Home, Loader2, MapPin, RefreshCw } from "lucide-react";
 import { useSession } from "next-auth/react";
 import LocationInput from "@/components/LocationInput";
-import { ApiService } from "@/services/api.service";
 import {
   AddressService,
   type SavedAddress,
@@ -30,6 +29,7 @@ export function LocationDropdown({ onClose, onSelect }: LocationDropdownProps) {
   const setCityId = useRideStore((state) => state.setCityId);
   const selectedCity = useCityStore((state) => state.selectedCity);
   const setSelectedCity = useCityStore((state) => state.setSelectedCity);
+  const setLocationLabel = useCityStore((state) => state.setLocationLabel);
 
   const loadCities = useCallback(async () => {
     setLoading(true);
@@ -72,14 +72,24 @@ export function LocationDropdown({ onClose, onSelect }: LocationDropdownProps) {
 
   const selectCoordinates = async (address: string, lat: number, lng: number) => {
     setUserLocation({ lat, lng });
+    setLocationLabel(address);
     try {
-      const resolved = await ApiService.post<any>("/locations/resolve-city", {
-        latitude: lat,
-        longitude: lng,
-      });
-      if (resolved?.city?.id) setCityId(resolved.city.id);
+      const resolved = await LocationService.resolveCity(lat, lng);
+      if (resolved.serviceAvailable && resolved.city?.id) {
+        setCityId(resolved.city.id);
+        setSelectedCity({
+          ...resolved.city,
+          latitude: lat,
+          longitude: lng,
+        });
+      } else {
+        setCityId(null);
+        setSelectedCity(null);
+      }
     } catch {
       // The precise location is still usable if city resolution is unavailable.
+      setCityId(null);
+      setSelectedCity(null);
     }
     setQuery(address);
     onSelect?.({ label: "Location", details: address });
@@ -102,6 +112,7 @@ export function LocationDropdown({ onClose, onSelect }: LocationDropdownProps) {
         }
       }
       setSelectedCity({ ...city, latitude, longitude });
+      setLocationLabel([city.name, city.state].filter(Boolean).join(", "));
       setCityId(city.id);
       if (latitude != null && longitude != null) {
         setUserLocation({ lat: latitude, lng: longitude });
@@ -116,14 +127,47 @@ export function LocationDropdown({ onClose, onSelect }: LocationDropdownProps) {
     }
   };
 
-  const selectSavedAddress = (address: SavedAddress) => {
+  const selectSavedAddress = async (address: SavedAddress) => {
     setUserLocation({ lat: address.latitude, lng: address.longitude });
-    if (address.cityId) setCityId(address.cityId);
+    const details =
+      [address.street, address.city].filter(Boolean).join(", ") ||
+      `${address.latitude.toFixed(4)}, ${address.longitude.toFixed(4)}`;
+    setLocationLabel(details);
+
+    const knownCity = cities.find((city) => city.id === address.cityId);
+    if (knownCity) {
+      setCityId(knownCity.id);
+      setSelectedCity({
+        ...knownCity,
+        latitude: address.latitude,
+        longitude: address.longitude,
+      });
+    } else {
+      try {
+        const resolved = await LocationService.resolveCity(
+          address.latitude,
+          address.longitude,
+        );
+        if (resolved.serviceAvailable && resolved.city?.id) {
+          setCityId(resolved.city.id);
+          setSelectedCity({
+            ...resolved.city,
+            latitude: address.latitude,
+            longitude: address.longitude,
+          });
+        } else {
+          setCityId(null);
+          setSelectedCity(null);
+        }
+      } catch {
+        setCityId(null);
+        setSelectedCity(null);
+      }
+    }
+
     onSelect?.({
       label: address.label,
-      details:
-        [address.street, address.city].filter(Boolean).join(", ") ||
-        `${address.latitude.toFixed(4)}, ${address.longitude.toFixed(4)}`,
+      details,
     });
     onClose();
   };

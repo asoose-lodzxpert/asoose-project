@@ -22,22 +22,22 @@ export default function Navbar() {
   const darkMode = resolvedTheme === "dark";
 
   const navLinks = [
-    { name: 'About', href: '/about' },
-    { name: 'Contact', href: '/contact' },
-    { name: 'Book a Ride', href: '/main/ride' },
-    { name: 'Shop online ', href: '/main/store' },
-    { name: 'Make Deliveries', href: '/main/delivery' },
+    { name: "Marketplace", href: "/main/store" },
+    { name: "Rides", href: "/main/ride" },
+    { name: "Delivery", href: "/main/delivery" },
+    { name: "About", href: "/about" },
+    { name: "Contact", href: "/contact" },
   ];
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 border-b backdrop-blur-md transition-colors ${
+      className={`fixed left-0 right-0 top-0 z-50 border-b backdrop-blur-xl transition-colors ${
         darkMode
           ? "bg-[#0a0a0a]/80 border-white/10"
           : "bg-white/80 border-black/5"
       }`}
     >
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         {/* Logo Section */}
         <Link href="/" className="flex items-center gap-3 group">
           <div className="w-10 h-10 relative transition-transform group-hover:scale-105">
@@ -59,8 +59,8 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop Links & Actions */}
-        <div className="hidden md:flex items-center gap-8">
-          <div className="flex gap-6 text-xs font-bold uppercase tracking-widest">
+        <div className="hidden items-center gap-7 md:flex">
+          <div className="flex gap-6 text-sm font-bold">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
               return (
@@ -101,12 +101,18 @@ export default function Navbar() {
             >
               {darkMode ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-            
+
+            <Link
+              href="/sign-in"
+              className={`text-sm font-bold transition-colors hover:text-yellow-600 ${darkMode ? "text-zinc-300" : "text-zinc-600"}`}
+            >
+              Sign in
+            </Link>
             <Link 
               href="/sign-up" 
-              className="bg-yellow-400 text-black px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-yellow-300 transition-all active:scale-95"
+              className="rounded-xl bg-yellow-400 px-5 py-2.5 text-sm font-black text-black transition-all hover:bg-yellow-300 active:scale-95"
             >
-              Sign up
+              Get started
             </Link>
           </div>
         </div>
@@ -118,7 +124,7 @@ export default function Navbar() {
             href="/sign-up" 
             className="bg-yellow-400 text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-yellow-300 transition-all active:scale-95"
           >
-            Sign up
+            Get started
           </Link>
 
           {/* Mobile menu toggle */}
@@ -166,6 +172,14 @@ export default function Navbar() {
             <div
               className={`h-px w-full ${darkMode ? "bg-white/10" : "bg-black/5"}`}
             />
+
+            <Link
+              href="/sign-in"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={darkMode ? "text-zinc-300" : "text-zinc-600"}
+            >
+              Sign in
+            </Link>
 
             <div className="flex items-center justify-between">
               <span className={darkMode ? "text-zinc-400" : "text-zinc-600"}>

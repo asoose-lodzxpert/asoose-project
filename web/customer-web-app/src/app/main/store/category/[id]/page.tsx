@@ -1,8 +1,8 @@
 import React from "react";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import CategoryClient, { CategoryData } from "./CategoryClient";
-import { StoreSkeleton } from "@/app/main/store/skeleton";
 
 // --- CONFIG ---
 const RAW_API_URL =
@@ -28,6 +28,7 @@ async function getCategoryData(
   filterSlug: string = "all",
   lat?: string,
   lng?: string,
+  cityId?: string,
 ): Promise<CategoryData | null> {
   try {
     const sort = API_FILTER_MAP[filterSlug];
@@ -40,6 +41,7 @@ async function getCategoryData(
     }
     if (lat) params.set("lat", lat);
     if (lng) params.set("lng", lng);
+    if (cityId) params.set("cityId", cityId);
 
     const res = await fetch(`${API_URL}/catalog/storefronts?${params.toString()}`, {
       next: { revalidate: 60 },
@@ -80,7 +82,12 @@ async function getCategoryData(
 // 1. Update Types to be Promises
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ filter?: string; lat?: string; lng?: string }>;
+  searchParams: Promise<{
+    filter?: string;
+    lat?: string;
+    lng?: string;
+    cityId?: string;
+  }>;
 }
 
 export default async function CategoryPage({
@@ -94,13 +101,20 @@ export default async function CategoryPage({
   const filter = resolvedSearchParams.filter || "all";
   const lat = resolvedSearchParams.lat;
   const lng = resolvedSearchParams.lng;
+  const cityId = resolvedSearchParams.cityId;
   const categoryId = resolvedParams.id;
 
   let categoryData: CategoryData | null = null;
   let error: string | null = null;
 
   try {
-    categoryData = await getCategoryData(categoryId, filter, lat, lng);
+    categoryData = await getCategoryData(
+      categoryId,
+      filter,
+      lat,
+      lng,
+      cityId,
+    );
   } catch (err) {
     error = err instanceof Error ? err.message : "An unexpected error occurred";
   }
@@ -113,12 +127,12 @@ export default async function CategoryPage({
         </div>
         <h2 className="text-xl font-bold mb-2">Unable to load category</h2>
         <p className="text-gray-500 mb-6">{error}</p>
-        <a
+        <Link
           href="/main/store"
           className="flex items-center gap-2 px-6 py-3 bg-gray-900 dark:bg-white text-white dark:text-black rounded-xl font-bold hover:opacity-90 transition-opacity"
         >
           <ArrowLeft className="w-4 h-4" /> Go Back
-        </a>
+        </Link>
       </div>
     );
   }
