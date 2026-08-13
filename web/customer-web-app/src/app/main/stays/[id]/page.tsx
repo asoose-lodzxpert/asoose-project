@@ -11,11 +11,15 @@ import { PropertyService, type BookingQuote, type Property, type PropertyRoomTyp
 import { WalletService } from "@/services/wallet.service";
 
 const money = (value: number) => `₦${Number(value || 0).toLocaleString("en-NG")}`;
-const today = () => new Date().toISOString().slice(0, 10);
+// Format using local getters, never toISOString() — that converts to UTC and
+// shifts the date backward a day for any positive UTC-offset timezone (e.g. WAT, UTC+1).
+const toDateStr = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const today = () => toDateStr(new Date());
 const addDays = (date: string, days: number) => {
   const d = new Date(`${date}T00:00:00`);
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return toDateStr(d);
 };
 // Upcoming Friday-to-Sunday range (today counts as "upcoming" if it's already Friday).
 const nextWeekendRange = () => {
