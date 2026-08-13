@@ -13,7 +13,11 @@ interface CustomUser {
 }
 
 const SERVER_API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+  (
+    process.env.INTERNAL_API_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://localhost:3000/api/v1"
+  ).replace(/\/$/, "");
 
 if (
   process.env.NODE_ENV === "production" &&

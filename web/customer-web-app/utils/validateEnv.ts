@@ -136,9 +136,9 @@ export function validateEnv(): ValidationResult {
   }
 
   // ── 4. Backend API URL ───────────────────────────────────────────────────
-  if (!process.env.NEXT_PUBLIC_API_URL) {
+  if (!process.env.INTERNAL_API_URL && !process.env.NEXT_PUBLIC_API_URL) {
     warnings.push(
-      "NEXT_PUBLIC_API_URL is not set; server-side OAuth token exchange will fail.",
+      "Neither INTERNAL_API_URL nor NEXT_PUBLIC_API_URL is set; server-side OAuth token exchange will fail.",
     );
   }
 

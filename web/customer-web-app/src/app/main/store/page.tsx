@@ -246,7 +246,7 @@ function useStoreData() {
     }
   }, [cityId, userLocation]);
 
-  return { ...data, loading, loadError, fetchData, selectedCity };
+  return { ...data, loading, loadError, fetchData, cityId, selectedCity };
 }
 
 // --- MAIN PAGE COMPONENT ---
@@ -264,6 +264,7 @@ function StorePage() {
     searchResults,
     loading: initialLoading,
     loadError,
+    cityId,
     selectedCity,
     fetchData,
   } = useStoreData();
