@@ -26,8 +26,9 @@ export async function GET(_req: NextRequest) {
   const html = `<!doctype html>
 <html>
 <head><meta charset="utf-8" /><title>Payment complete</title></head>
-<body style="margin:0;display:flex;min-height:100vh;align-items:center;justify-content:center;background:#f7f7f5;font-family:system-ui,-apple-system,sans-serif;">
-  <p style="color:#171714;font-weight:700;font-size:14px;">Payment complete — you can close this tab.</p>
+<body style="margin:0;display:flex;min-height:100vh;flex-direction:column;gap:16px;align-items:center;justify-content:center;background:#f7f7f5;font-family:system-ui,-apple-system,sans-serif;">
+  <a href="/main/store" aria-label="Go to Asoose store"><img src="/logo.png" alt="Asoose" width="56" height="56" style="border-radius:14px;" /></a>
+  <p style="color:#171714;font-weight:700;font-size:14px;margin:0;">Payment complete — you can close this tab.</p>
   <script>
     window.close();
     setTimeout(function () { window.location.replace("/main/store"); }, 400);
