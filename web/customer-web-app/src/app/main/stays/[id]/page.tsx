@@ -12,6 +12,16 @@ import { WalletService } from "@/services/wallet.service";
 
 const money = (value: number) => `₦${Number(value || 0).toLocaleString("en-NG")}`;
 const today = () => new Date().toISOString().slice(0, 10);
+const addDays = (date: string, days: number) => {
+  const d = new Date(`${date}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+};
+// Upcoming Friday-to-Sunday range (today counts as "upcoming" if it's already Friday).
+const nextWeekendRange = () => {
+  const checkInDate = addDays(today(), (5 - new Date().getDay() + 7) % 7);
+  return { checkInDate, checkOutDate: addDays(checkInDate, 2) };
+};
 
 export default function StayDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -56,6 +66,20 @@ export default function StayDetailsPage() {
   const gallery = useMemo(() => property ? [...new Set([property.image, ...property.images].filter(Boolean) as string[])] : [], [property]);
   const secondaryImages = gallery.slice(1, 5);
   const canQuote = Boolean(room && checkIn && checkOut && checkOut > checkIn && guests > 0 && units > 0);
+  const nights = checkIn && checkOut && checkOut > checkIn
+    ? Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000)
+    : 0;
+  const weekend = nextWeekendRange();
+  const isWeekendSelected = checkIn === weekend.checkInDate && checkOut === weekend.checkOutDate;
+
+  // Quick-select presets — keeps the check-in date if one is already set (and still valid),
+  // so tapping "2 nights" after picking a start date just extends the stay from there.
+  const applyStayLength = (stayNights: number) => {
+    const start = checkIn && checkIn >= today() ? checkIn : today();
+    setCheckIn(start);
+    setCheckOut(addDays(start, stayNights));
+  };
+  const applyWeekend = () => { setCheckIn(weekend.checkInDate); setCheckOut(weekend.checkOutDate); };
 
   const getQuote = async () => {
     if (!room || !canQuote) { toast.info("Choose a room and valid check-in and check-out dates."); return; }
@@ -132,7 +156,14 @@ export default function StayDetailsPage() {
 
           <aside className="rounded-[2rem] border border-black/5 bg-white p-5 shadow-xl shadow-black/5 dark:border-white/10 dark:bg-[#151515] sm:p-6 lg:sticky lg:top-24">
             <h2 className="text-xl font-black">Reserve accommodation</h2><p className="mt-1 text-xs text-gray-500">You won’t be charged until you confirm.</p>
-            <div className="mt-5 grid grid-cols-2 overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10"><label className="border-r border-gray-200 p-3 dark:border-white/10"><span className="block text-[10px] font-black uppercase tracking-wider">Check in</span><input min={today()} type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} className="mt-1 w-full bg-transparent text-xs font-bold outline-none" /></label><label className="p-3"><span className="block text-[10px] font-black uppercase tracking-wider">Check out</span><input min={checkIn || today()} type="date" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} className="mt-1 w-full bg-transparent text-xs font-bold outline-none" /></label></div>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <button type="button" onClick={() => applyStayLength(1)} className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${nights === 1 && !isWeekendSelected ? "border-yellow-400 bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400" : "border-gray-200 text-gray-600 hover:border-yellow-300 dark:border-white/10 dark:text-gray-300"}`}>1 night</button>
+              <button type="button" onClick={() => applyStayLength(2)} className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${nights === 2 && !isWeekendSelected ? "border-yellow-400 bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400" : "border-gray-200 text-gray-600 hover:border-yellow-300 dark:border-white/10 dark:text-gray-300"}`}>2 nights</button>
+              <button type="button" onClick={applyWeekend} className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${isWeekendSelected ? "border-yellow-400 bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400" : "border-gray-200 text-gray-600 hover:border-yellow-300 dark:border-white/10 dark:text-gray-300"}`}>Weekend</button>
+              <button type="button" onClick={() => applyStayLength(7)} className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${nights === 7 && !isWeekendSelected ? "border-yellow-400 bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400" : "border-gray-200 text-gray-600 hover:border-yellow-300 dark:border-white/10 dark:text-gray-300"}`}>1 week</button>
+            </div>
+            <div className="mt-3 grid grid-cols-2 overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10"><label className="border-r border-gray-200 p-3 dark:border-white/10"><span className="block text-[10px] font-black uppercase tracking-wider">Check in</span><input min={today()} type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} className="mt-1 w-full bg-transparent text-xs font-bold outline-none" /></label><label className="p-3"><span className="block text-[10px] font-black uppercase tracking-wider">Check out</span><input min={checkIn ? addDays(checkIn, 1) : today()} type="date" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} className="mt-1 w-full bg-transparent text-xs font-bold outline-none" /></label></div>
+            {nights > 0 && <p className="mt-2 text-xs font-bold text-gray-500">{nights} night{nights > 1 ? "s" : ""} stay</p>}
             <div className="mt-3 space-y-2">{[["Guests", guests, setGuests], ["Rooms", units, setUnits]].map(([label, value, setter]) => <div key={String(label)} className="flex items-center justify-between rounded-2xl bg-gray-50 p-3 dark:bg-white/5"><span className="text-sm font-bold">{String(label)}</span><div className="flex items-center gap-3"><button type="button" onClick={() => (setter as (n:number)=>void)(Math.max(1, Number(value) - 1))} className="rounded-full border p-1.5 dark:border-white/10"><Minus className="h-3 w-3" /></button><span className="w-4 text-center text-sm font-black">{Number(value)}</span><button type="button" onClick={() => (setter as (n:number)=>void)(Number(value) + 1)} className="rounded-full border p-1.5 dark:border-white/10"><Plus className="h-3 w-3" /></button></div></div>)}</div>
             <textarea value={requests} onChange={(e) => setRequests(e.target.value)} maxLength={500} placeholder="Special requests (optional)" className="mt-3 min-h-20 w-full resize-none rounded-2xl border border-gray-200 bg-transparent p-3 text-sm outline-none focus:border-yellow-400 dark:border-white/10" />
             <div className="mt-4 grid grid-cols-2 gap-2"><button type="button" onClick={() => setPaymentMethod("CARD")} className={`rounded-2xl border p-3 text-left ${paymentMethod === "CARD" ? "border-yellow-400 bg-yellow-50 dark:bg-yellow-500/10" : "border-gray-200 dark:border-white/10"}`}><span className="block text-sm font-black">Pay online</span><span className="text-[10px] text-gray-500">Secure Paystack</span></button><button type="button" onClick={() => setPaymentMethod("WALLET")} className={`rounded-2xl border p-3 text-left ${paymentMethod === "WALLET" ? "border-yellow-400 bg-yellow-50 dark:bg-yellow-500/10" : "border-gray-200 dark:border-white/10"}`}><span className="flex items-center gap-1 text-sm font-black"><Wallet className="h-3.5 w-3.5" /> Wallet</span><span className="text-[10px] text-gray-500">{walletBalance == null ? "Sign in to view" : money(walletBalance)}</span></button></div>

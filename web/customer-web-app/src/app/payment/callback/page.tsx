@@ -40,7 +40,7 @@ function CallbackContent() {
     (title: string, message: string, reference: string) => {
       setSuccessResult({ title, message, reference });
       if (navigationTimerRef.current) clearTimeout(navigationTimerRef.current);
-      navigationTimerRef.current = setTimeout(() => router.replace("/"), 2000);
+      navigationTimerRef.current = setTimeout(() => router.replace("/main/store"), 2000);
     },
     [router],
   );
@@ -441,8 +441,8 @@ function CallbackContent() {
             <div className="flex items-start gap-3"><span className="rounded-xl bg-white p-2 text-yellow-600 shadow-sm dark:bg-white/5"><ReceiptText className="h-4 w-4" /></span><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Payment reference</p><p className="mt-1 truncate font-mono text-xs font-bold text-gray-700 dark:text-gray-200">{successResult.reference}</p></div></div>
           </div>
 
-          <button type="button" onClick={() => router.replace("/")} className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-yellow-400 py-4 text-sm font-black text-black transition hover:bg-yellow-300 active:scale-[0.98]">Go to homepage <ArrowRight className="h-4 w-4" /></button>
-          <p className="mt-4 flex items-center justify-center gap-2 text-[10px] font-bold text-gray-400"><ShieldCheck className="h-4 w-4" /> Returning to the homepage in 2 seconds</p>
+          <button type="button" onClick={() => router.replace("/main/store")} className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-yellow-400 py-4 text-sm font-black text-black transition hover:bg-yellow-300 active:scale-[0.98]">Continue to store <ArrowRight className="h-4 w-4" /></button>
+          <p className="mt-4 flex items-center justify-center gap-2 text-[10px] font-bold text-gray-400"><ShieldCheck className="h-4 w-4" /> Returning you in 2 seconds</p>
         </div>
       </div>
     );
