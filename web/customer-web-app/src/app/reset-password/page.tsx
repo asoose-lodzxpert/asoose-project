@@ -13,31 +13,29 @@ const ResetPasswordPage = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
+  const [code, setCode] = useState("");
   const [formData, setFormData] = useState({
     password: "",
     confirmPassword: "",
   });
 
-  // Guard: both email and verified OTP must be in sessionStorage
+  // The reset code is collected on the previous screen and validated by the
+  // backend together with the new password.
   useEffect(() => {
-    const storedEmail = sessionStorage.getItem("resetEmail");
-    const storedOtp = sessionStorage.getItem("resetOtp");
+    const storedCode = sessionStorage.getItem("resetCode");
 
-    if (!storedEmail || !storedOtp) {
+    if (!storedCode) {
       router.replace("/forgot-password");
       return;
     }
 
-    setEmail(storedEmail);
-    setOtp(storedOtp);
+    setCode(storedCode);
   }, [router]);
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!email || !otp) {
+    if (!code) {
       setError("Session expired. Please start over.");
       return;
     }
@@ -56,17 +54,14 @@ const ResetPasswordPage = () => {
     setError("");
 
     try {
-      // POST /auth/user/reset-password  →  { message: string }
-      // Payload: { email, token (OTP), newPassword }
-      await ApiService.post<{ message: string }>("/auth/user/reset-password", {
-        email,
-        token: otp,
-        newPassword: formData.password,
+      await ApiService.post<Record<string, never>>("/auth/reset-password", {
+        code,
+        password: formData.password,
       });
 
       // Clear session state
       sessionStorage.removeItem("resetEmail");
-      sessionStorage.removeItem("resetOtp");
+      sessionStorage.removeItem("resetCode");
 
       setSuccess(true);
 

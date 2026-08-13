@@ -54,6 +54,7 @@ export default function StayDetailsPage() {
   useEffect(() => { setQuote(null); idempotency.current = crypto.randomUUID(); }, [room?.id, checkIn, checkOut, guests, units, paymentMethod]);
 
   const gallery = useMemo(() => property ? [...new Set([property.image, ...property.images].filter(Boolean) as string[])] : [], [property]);
+  const secondaryImages = gallery.slice(1, 5);
   const canQuote = Boolean(room && checkIn && checkOut && checkOut > checkIn && guests > 0 && units > 0);
 
   const getQuote = async () => {
@@ -109,9 +110,17 @@ export default function StayDetailsPage() {
           <div className="flex items-center gap-2 text-sm font-bold"><Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />{property.rating || "New"}<span className="text-gray-400">· {property.totalReviews} reviews</span></div>
         </div>
 
-        <div className="grid h-[320px] gap-2 overflow-hidden rounded-3xl sm:h-[460px] sm:grid-cols-2">
-          <div className="relative bg-gray-200 dark:bg-white/5">{gallery[0] ? <Image src={gallery[0]} alt={property.name} fill priority sizes="(max-width: 640px) 100vw, 50vw" className="object-cover" /> : <div className="flex h-full items-center justify-center"><BedDouble className="h-14 w-14 text-gray-400" /></div>}</div>
-          <div className="hidden grid-cols-2 gap-2 sm:grid">{[gallery[1], gallery[2], gallery[3], gallery[4]].map((image, index) => <div key={image || index} className="relative bg-gray-200 dark:bg-white/5">{image && <Image src={image} alt={`${property.name} ${index + 2}`} fill sizes="25vw" className="object-cover" />}</div>)}</div>
+        <div className={`grid h-[320px] gap-2 overflow-hidden rounded-3xl sm:h-[460px] ${secondaryImages.length > 0 ? "sm:grid-cols-2" : "sm:grid-cols-1"}`}>
+          <div className="relative bg-gray-200 dark:bg-white/5">{gallery[0] ? <Image src={gallery[0]} alt={property.name} fill priority sizes={secondaryImages.length > 0 ? "(max-width: 640px) 100vw, 50vw" : "100vw"} className="object-cover" /> : <div className="flex h-full items-center justify-center"><BedDouble className="h-14 w-14 text-gray-400" /></div>}</div>
+          {secondaryImages.length > 0 && (
+            <div className={`hidden gap-2 sm:grid ${secondaryImages.length === 1 ? "grid-cols-1" : secondaryImages.length === 2 ? "grid-cols-1 grid-rows-2" : "grid-cols-2 grid-rows-2"}`}>
+              {secondaryImages.map((image, index) => (
+                <div key={image} className={`relative bg-gray-200 dark:bg-white/5 ${secondaryImages.length === 3 && index === 0 ? "row-span-2" : ""}`}>
+                  <Image src={image} alt={`${property.name} ${index + 2}`} fill sizes={secondaryImages.length === 1 ? "50vw" : "25vw"} className="object-cover" />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_390px] lg:items-start">

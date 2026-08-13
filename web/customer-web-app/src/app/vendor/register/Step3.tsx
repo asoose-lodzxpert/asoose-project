@@ -5,6 +5,7 @@ import { SignupStep3Data, OpenHour } from "@/types/vendor-signup";
 import { DAYS } from "@/constants/vendor-signup";
 import { Store, Image, MapPin, Clock, Plus, Trash2, Camera, Building2 } from "lucide-react";
 import LocationInput from "@/components/LocationInput";
+import { prioritizeMaiduguri } from "@/services/location.service";
 
 type CityItem = { id: string; name: string; state: string };
 
@@ -22,7 +23,7 @@ export default function Step3({ data, onChange }: Step3Props) {
     const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
     fetch(`${API_URL}/vendor/dashboard/cities`)
       .then((r) => (r.ok ? r.json() : []))
-      .then((d) => setCities(Array.isArray(d) ? d : []))
+      .then((d) => setCities(prioritizeMaiduguri(Array.isArray(d) ? d : [])))
       .catch(() => setCities([]))
       .finally(() => setLoadingCities(false));
   }, []);

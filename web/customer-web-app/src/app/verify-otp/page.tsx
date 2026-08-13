@@ -57,18 +57,12 @@ const VerifyOtpPage = () => {
     setError("");
 
     try {
-      // POST /auth/user/verify-otp  →  { message: string, valid: true }
-      await ApiService.post<{ message: string; valid: boolean }>(
-        "/auth/user/verify-otp",
-        { email, otp },
-      );
-
-      // Store OTP so the reset-password page can pass it as `token`
-      sessionStorage.setItem("resetOtp", otp);
+      // The reset endpoint validates the code together with the new password.
+      sessionStorage.setItem("resetCode", otp);
 
       router.push("/reset-password");
     } catch (err: any) {
-      setError(err.message || "Invalid or expired OTP. Please try again.");
+      setError(err.message || "We couldn't continue. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -81,8 +75,7 @@ const VerifyOtpPage = () => {
     setError("");
 
     try {
-      // POST /auth/user/forgot-password  →  { message: string }  (always 200)
-      await ApiService.post<{ message: string }>("/auth/user/forgot-password", {
+      await ApiService.post<Record<string, never>>("/auth/forgot-password", {
         email,
       });
 
@@ -108,7 +101,7 @@ const VerifyOtpPage = () => {
 
         <div className="text-center mb-8">
           <h1 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white mb-2">
-            Verify OTP
+            Enter reset code
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Enter the 6-digit code sent to{" "}
@@ -179,10 +172,10 @@ const VerifyOtpPage = () => {
             {isLoading ? (
               <span className="flex items-center justify-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Verifying...
+                Continuing...
               </span>
             ) : (
-              "Verify OTP"
+              "Continue"
             )}
           </button>
         </form>

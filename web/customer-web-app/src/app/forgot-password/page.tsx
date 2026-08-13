@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Loader2, ArrowLeft, Mail } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ApiService } from "@/services/api.service";
 
 const ForgotPasswordPage = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -31,25 +32,14 @@ const ForgotPasswordPage = () => {
     setError("");
 
     try {
-      const API_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
-
-      const res = await fetch(`${API_URL}/auth/user/forgot-password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
+      const normalizedEmail = email.trim().toLowerCase();
+      await ApiService.post<Record<string, never>>("/auth/forgot-password", {
+        email: normalizedEmail,
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || "Failed to send OTP");
-      }
-
       // Store email in sessionStorage for reset-password page
-      sessionStorage.setItem("resetEmail", email);
+      sessionStorage.setItem("resetEmail", normalizedEmail);
+      sessionStorage.removeItem("resetCode");
 
       // Show success state
       setEmailSent(true);
@@ -74,7 +64,7 @@ const ForgotPasswordPage = () => {
             <p className="text-sm text-gray-600 dark:text-gray-400">
               We've sent a 6-digit OTP to{" "}
               <span className="font-bold text-gray-900 dark:text-white">
-                {email}
+                {email.trim().toLowerCase()}
               </span>
             </p>
           </div>
