@@ -14,11 +14,15 @@ const UI_FILTERS = {
   "Top Rated": "top-rated",
 };
 
-const API_FILTER_MAP: Record<string, string> = {
-  "top-rated": "RATING_DESC",
+// Maps the UI filter slug to the backend's storefront sortBy/order params.
+const API_FILTER_MAP: Record<string, { sortBy: string; order: string }> = {
+  "top-rated": { sortBy: "rating", order: "desc" },
 };
 
 // --- DATA FETCHING ---
+// `id` here is the store type CODE (e.g. "RESTAURANT", "GROCERY"), not a UUID —
+// the category rail links use StoreType.code, which is what /catalog/storefronts
+// filters on via `type`.
 async function getCategoryData(
   id: string,
   filterSlug: string = "all",
@@ -26,17 +30,18 @@ async function getCategoryData(
   lng?: string,
 ): Promise<CategoryData | null> {
   try {
-    const apiSortParam = API_FILTER_MAP[filterSlug];
-    let url = `${API_URL}/marketplace/categories/${id}?`;
-
+    const sort = API_FILTER_MAP[filterSlug];
     const params = new URLSearchParams();
-    if (apiSortParam) params.set("sort", apiSortParam);
+    params.set("type", id);
+    params.set("limit", "50");
+    if (sort) {
+      params.set("sortBy", sort.sortBy);
+      params.set("order", sort.order);
+    }
     if (lat) params.set("lat", lat);
     if (lng) params.set("lng", lng);
 
-    url += params.toString();
-
-    const res = await fetch(url, {
+    const res = await fetch(`${API_URL}/catalog/storefronts?${params.toString()}`, {
       next: { revalidate: 60 },
       headers: { "Content-Type": "application/json" },
     });
@@ -46,7 +51,25 @@ async function getCategoryData(
       throw new Error(`Failed to fetch category: ${res.status}`);
     }
 
-    return await res.json();
+    const body = await res.json();
+    const page = body?.data ?? body;
+
+    if (!page?.storefronts) return null;
+
+    return {
+      id,
+      title: id.replace(/_/g, " ").toLowerCase(),
+      vendors: page.storefronts.map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        slug: s.slug,
+        image: s.logo || s.banner || undefined,
+        rating: s.rating || 0,
+        deliveryTime: `${s.preparationTime || 20} min`,
+        deliveryFee: s.deliveryFee ?? 0,
+        type: s.type,
+      })),
+    };
   } catch (error) {
     console.error("Fetch error:", error);
     throw error;

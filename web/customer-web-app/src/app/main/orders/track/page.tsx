@@ -22,7 +22,6 @@ import SmartTimeline, { TimelineStep } from "./component/smartTimeline";
 // --- Configuration ---
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1").replace(/\/$/, "");
 const MAX_RECONNECT_ATTEMPTS = 5;
-const RECONNECT_DELAY = 3000;
 
 // --- Types ---
 interface OrderData {
@@ -62,7 +61,8 @@ const fetcher = async (url: string): Promise<OrderData> => {
   });
 
   if (!res.ok) throw new Error("Failed to fetch order");
-  return res.json();
+  const payload = await res.json();
+  return payload?.data ?? payload;
 };
 
 export default function TrackOrderPage() {
@@ -71,10 +71,8 @@ export default function TrackOrderPage() {
   const orderId = params.id as string;
 
   // State
-  const [socket, setSocket] = useState<Socket | null>(null);
   const [socketConnected, setSocketConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [reconnectAttempts, setReconnectAttempts] = useState(0);
 
   const socketRef = useRef<Socket | null>(null);
 
@@ -85,7 +83,7 @@ export default function TrackOrderPage() {
     isLoading,
     mutate: updateOrder,
   } = useSWR<OrderData, ApiError>(
-    orderId ? `/users/orders/${orderId}` : null,
+    orderId ? `/orders/${orderId}` : null,
     fetcher,
     {
       revalidateOnFocus: false,
@@ -117,7 +115,6 @@ export default function TrackOrderPage() {
       newSocket.on("connect", () => {
         setSocketConnected(true);
         setConnectionError(null);
-        setReconnectAttempts(0);
         newSocket.emit("joinOrderRoom", { orderId });
       });
 
@@ -125,7 +122,6 @@ export default function TrackOrderPage() {
 
       newSocket.on("connect_error", () => {
         setConnectionError("Connection lost. Retrying...");
-        setReconnectAttempts((prev) => prev + 1);
       });
 
       // ✅ Listen for Smart Updates from Backend
@@ -157,7 +153,6 @@ export default function TrackOrderPage() {
       );
 
       socketRef.current = newSocket;
-      setSocket(newSocket);
     } catch (error) {
       console.error("Socket error:", error);
       setConnectionError("Failed to connect");

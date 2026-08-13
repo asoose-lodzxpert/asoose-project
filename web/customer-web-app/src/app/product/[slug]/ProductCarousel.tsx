@@ -100,7 +100,7 @@ export function ProductCarousel({
       {loading ? (
         <CarouselSkeleton />
       ) : (
-        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+        <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 scrollbar-hide">
           {items.map((p) => (
             <MiniProductCard key={p.id} product={p} />
           ))}

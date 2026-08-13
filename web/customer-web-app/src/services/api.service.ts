@@ -1,7 +1,13 @@
 import { getCookie } from "cookies-next"; // ✅ Import to access cookies
 
-const API_URL =
+const BACKEND_API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+
+// Browser requests use a same-origin Next.js rewrite to avoid CORS preflight
+// failures for methods such as DELETE and PATCH. Server-side calls can reach
+// the backend directly without a browser CORS boundary.
+const getApiUrl = () =>
+  typeof window === "undefined" ? BACKEND_API_URL : "/api/backend";
 
 // ── Cached session token ────────────────────────────────────────────────────
 // We cache the token from the last successful getSession() call so that
@@ -91,7 +97,7 @@ export class ApiService {
     token?: string,
   ): Promise<T> {
     const headers = await this.getHeaders(token);
-    const url = `${API_URL}${endpoint}`;
+    const url = `${getApiUrl()}${endpoint}`;
 
     // --- FormData Handling ---
     // If we're sending FormData, the browser MUST set the Content-Type header
@@ -201,11 +207,26 @@ export class ApiService {
     }
 
     const text = await response.text();
+    let parsed: unknown;
     try {
-      return text ? JSON.parse(text) : ({} as T);
+      parsed = text ? JSON.parse(text) : {};
     } catch {
       return {} as T;
     }
+
+    // The backend wraps every response as { success, message, data } —
+    // unwrap here so every caller can type T as the actual payload instead
+    // of repeating this check at every call site.
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      "success" in parsed &&
+      "data" in parsed
+    ) {
+      return (parsed as { data: T }).data;
+    }
+
+    return parsed as T;
   }
 
 

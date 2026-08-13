@@ -48,7 +48,7 @@ export function PostRidePayment() {
     }).format(amount);
 
   // ── PAY ────────────────────────────────────────────────────────────────────
-  // Calls POST /trips/rides/:id/confirm which creates a Paystack session
+  // Legacy recovery screen: the service regenerates checkout via /rides/:id/checkout.
   // and returns { rideId, authorizationUrl, reference }.
   const handlePay = async () => {
     if (!session?.accessToken || !rideId) {

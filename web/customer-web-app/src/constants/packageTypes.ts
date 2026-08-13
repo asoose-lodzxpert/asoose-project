@@ -1,30 +1,23 @@
 export const PACKAGE_TYPES = [
-  { 
-    id: 'Document', 
-    label: 'Documents', 
-    weightLabel: '< 5 kg', 
+  {
+    id: 'SMALL',
+    label: 'Small',
+    weightLabel: 'Easy to carry',
     weightValue: 2.5,
-    description: 'Letters, files, small envelopes' 
+    description: 'Documents, food packs and small boxes'
   },
-  { 
-    id: 'Parcel', // Aligned with DeliveryPage logic
-    label: 'Small Box', 
-    weightLabel: '5-20 kg', 
+  {
+    id: 'MEDIUM',
+    label: 'Medium',
+    weightLabel: 'One-person lift',
     weightValue: 12.5,
-    description: 'Shoeboxes, small electronics'
+    description: 'Electronics, cartons and medium boxes'
   },
-  { 
-    id: 'Bulk',   // Aligned with DeliveryPage logic
-    label: 'Large Item', 
-    weightLabel: '20-50 kg', 
+  {
+    id: 'LARGE',
+    label: 'Large',
+    weightLabel: 'Bulky item',
     weightValue: 35,
-    description: 'Appliances, multiple boxes' 
-  },
-  { 
-    id: 'Heavy',  // Aligned with DeliveryPage logic
-    label: 'Heavy Cargo', 
-    weightLabel: '50+ kg', 
-    weightValue: 60,
-    description: 'Furniture, machinery'
+    description: 'Appliances, large cartons and bulky items'
   }
 ] as const;

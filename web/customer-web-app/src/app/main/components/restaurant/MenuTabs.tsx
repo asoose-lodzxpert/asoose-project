@@ -6,22 +6,20 @@ interface TabProps {
 
 export const MenuTabs = ({ categories, activeTab, onSelect }: TabProps) => {
   return (
-    <div className="sticky top-[70px] z-30 bg-gray-50 dark:bg-[#0a0a0a] pt-2 pb-4 px-4 -mx-4">
-      <div className="flex overflow-x-auto gap-2 no-scrollbar">
-        {categories.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => onSelect(cat)}
-            className={`px-6 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all ${
-              activeTab === cat
-                ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/20"
-                : "bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-white/5"
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
+    <div className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 py-1 scrollbar-hide md:mx-0 md:px-0">
+      {categories.map((cat) => (
+        <button
+          key={cat}
+          onClick={() => onSelect(cat)}
+          className={`min-h-10 snap-start whitespace-nowrap rounded-xl px-4 py-2 text-xs font-extrabold transition-all sm:text-sm ${
+            activeTab === cat
+              ? "bg-[#181816] text-white shadow-md shadow-black/10 dark:bg-yellow-400 dark:text-black"
+              : "border border-black/[0.06] bg-white text-gray-600 hover:border-yellow-400/60 dark:border-white/[0.07] dark:bg-[#151515] dark:text-gray-300"
+          }`}
+        >
+          {cat}
+        </button>
+      ))}
     </div>
   );
 };

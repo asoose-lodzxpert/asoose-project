@@ -9,11 +9,15 @@ const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://asoose.com";
 
 async function getProduct(slug: string) {
   try {
-    const res = await fetch(`${API_URL}/marketplace/products/${slug}`, {
+    // Store (retail) products only — restaurant dishes have no standalone
+    // detail endpoint on this backend, they're only reachable grouped under
+    // a storefront's menu (/catalog/storefronts/:slug/items).
+    const res = await fetch(`${API_URL}/vendors/products/${slug}`, {
       next: { revalidate: 3600 },
     });
     if (!res.ok) return null;
-    return res.json();
+    const body = await res.json();
+    return body?.data ?? body;
   } catch {
     return null;
   }

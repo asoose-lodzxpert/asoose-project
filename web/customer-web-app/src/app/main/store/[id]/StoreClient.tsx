@@ -6,7 +6,6 @@ import { Search, PenLine, X } from "lucide-react";
 import { MenuTabs } from "@/app/main/components/restaurant/MenuTabs";
 import { SidebarCart } from "@/app/main/components/restaurant/sidebarcart";
 import { FloatingCart } from "@/app/main/components/home/FloatingCart";
-import BottomNav from "@/app/main/components/layout/BottomNav";
 import { StoreHero } from "@/store/StoreHero";
 import { ProductCard } from "@/store/ProductCard";
 import { StoreReviews } from "@/store/StoreReviews";
@@ -18,8 +17,6 @@ import { ProductModal, ModifierGroup } from "@/store/ProductModal";
 import { ApiService } from "@/services/api.service";
 import { useRideStore } from "@/app/main/ride/store/ride";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 const POPULAR_ITEMS_COUNT = 6;
 
 interface Product {
@@ -101,7 +98,7 @@ export default function StoreClient() {
     try {
       const saved = localStorage.getItem("asoose_recent_store_searches");
       if (saved) setRecentSearches(JSON.parse(saved));
-    } catch (e) { /* ignore */ }
+    } catch { /* ignore */ }
   }, []);
 
   const fetchStoreData = useCallback(async () => {
@@ -111,29 +108,59 @@ export default function StoreClient() {
       const locQuery = userLocation
         ? `?lat=${userLocation.lat}&lng=${userLocation.lng}`
         : "";
-      const data = await ApiService.get<Store>(
-        `/marketplace/vendor/${slugOrId}${locQuery}`,
-      );
-      // Normalise: API returns `images: string[]`; components expect `image: string`
-      const normalizedProducts = (data.products || []).map((p: any) => ({
-        ...p,
-        image:
-          p.image ||
-          (Array.isArray(p.images) && p.images.length > 0
-            ? p.images[0]
-            : undefined),
-        stock: p.stock,
-        status: p.status,
-        manageStock: p.manageStock,
-      }));
-      setStore({ ...data, products: normalizedProducts });
+
+      const [detail, items] = await Promise.all([
+        ApiService.get<any>(`/catalog/storefronts/${slugOrId}${locQuery}`),
+        ApiService.get<any>(`/catalog/storefronts/${slugOrId}/items?limit=100`),
+      ]);
+
+      // Backend splits detail (name/rating/hours) from items (products, or a
+      // menu grouped by category for restaurants) — flatten both into the
+      // single flat product list this UI already expects.
+      let normalizedProducts: Product[] = [];
+      if (items?.kind === "RESTAURANT" && items.menu) {
+        normalizedProducts = Object.entries(items.menu as Record<string, any[]>).flatMap(
+          ([categoryName, dishes]) =>
+            dishes.map((d: any) => ({
+              ...d,
+              category: { name: categoryName },
+              image: d.image || (Array.isArray(d.images) && d.images[0]) || undefined,
+            })),
+        );
+      } else if (items?.kind === "STORE" && items.products) {
+        normalizedProducts = items.products.map((p: any) => ({
+          ...p,
+          category: { name: "All" },
+          image: p.image || (Array.isArray(p.images) && p.images[0]) || undefined,
+          stock: p.stock,
+          status: p.status,
+          manageStock: p.manageStock,
+        }));
+      }
+
+      const mappedStore: Store = {
+        id: detail.id,
+        name: detail.name,
+        image: detail.logo || detail.banner,
+        rating: detail.rating,
+        type: detail.kind,
+        deliveryTime: `${detail.preparationTime || 20} min`,
+        address: detail.address,
+        isAvailableInLocation: detail.isOpen,
+        products: normalizedProducts,
+        reviews: [],
+      };
+
+      setStore(mappedStore);
       setMenuItems(normalizedProducts);
-      setReviews(data.reviews || []);
+      // Reviews live under a separate module not yet wired up here — the UI
+      // stays functional (empty state) rather than erroring.
+      setReviews([]);
 
       // Set default tab on first load based on store type
       setActiveTab((prev) =>
         prev === "All" || prev === "Popular"
-          ? data.type === "RESTAURANT"
+          ? mappedStore.type === "RESTAURANT"
             ? "Popular"
             : "All"
           : prev,
@@ -175,36 +202,15 @@ export default function StoreClient() {
     });
 
     if (result.isConfirmed) {
-      try {
-        // ✅ Get NextAuth Session
-        const session = await getSession();
-        const token = (session as any)?.accessToken;
-
-        await ApiService.delete(`/marketplace/reviews/${store.id}`, token);
-        fetchStoreData();
-      } catch (err) {
-        console.error(err);
-      }
+      // Reviews aren't wired to a backend endpoint yet — see handleReviewSubmit.
+      Swal.fire("Coming soon", "Review management isn't available yet.", "info");
     }
   };
 
-  const handleReviewSubmit = async (
-    rating: number,
-    comment: string,
-    _orderId?: string, // reserved for future backend support
-  ) => {
-    // ✅ Get NextAuth Session
-    const session = await getSession();
-    const token = (session as any)?.accessToken;
-
-    if (!token) throw new Error("Not logged in");
-
-    await ApiService.post(
-      "/marketplace/reviews",
-      { storeId: store?.id, rating, comment: comment.trim() },
-      token,
-    );
-    fetchStoreData();
+  const handleReviewSubmit = async () => {
+    // TODO: wire up once the /reviews module's request/response contract is
+    // confirmed — this UI already renders an empty review list gracefully.
+    throw new Error("Reviews aren't available yet — check back soon.");
   };
 
   const addRecentSearch = (term: string) => {
@@ -276,10 +282,10 @@ export default function StoreClient() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 pb-24">
-      <main className="max-w-7xl mx-auto md:px-6 md:py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-8">
+    <div className="min-h-screen bg-[#f7f7f5] pb-28 text-gray-900 dark:bg-[#0a0a0a] dark:text-gray-100">
+      <main className="mx-auto max-w-7xl md:px-6 md:py-6 lg:py-8">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
+          <div className="space-y-7 lg:col-span-2 lg:space-y-8">
             <StoreHero
               name={store.name}
               image={store.image}
@@ -290,11 +296,11 @@ export default function StoreClient() {
               isAvailable={store.isAvailableInLocation}
             />
 
-            <div className="space-y-6">
+            <div className="space-y-5 sm:space-y-6">
               {/* Search Input */}
               <div className="px-4 md:px-0">
                 <div className="relative group">
-                  <Search className="absolute left-4 top-3.5 w-5 h-5 text-gray-400 group-focus-within:text-yellow-500 transition-colors" />
+                  <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-yellow-500" />
                   <input
                     type="text"
                     placeholder={`Search in ${store.name}...`}
@@ -308,13 +314,14 @@ export default function StoreClient() {
                         (e.target as HTMLInputElement).blur();
                       }
                     }}
-                    className="w-full bg-white dark:bg-[#151515] h-12 rounded-xl pl-12 pr-12 border border-gray-100 dark:border-white/5 focus:outline-none focus:border-yellow-500 transition-colors"
+                    className="h-12 w-full rounded-2xl border border-black/[0.06] bg-white pl-12 pr-12 text-sm font-medium shadow-sm transition-colors placeholder:text-gray-400 focus:border-yellow-500 focus:outline-none focus:ring-4 focus:ring-yellow-500/10 dark:border-white/[0.07] dark:bg-[#151515]"
                     autoComplete="off"
                   />
                   {searchQuery && (
                     <button
                       onClick={() => setSearchQuery("")}
-                      className="absolute right-4 top-3.5 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/10"
+                      aria-label="Clear store search"
                     >
                       <X className="w-5 h-5" />
                     </button>
@@ -368,7 +375,7 @@ export default function StoreClient() {
                 </div>
               </div>
 
-              <div className="px-4 md:px-0 sticky top-0 z-20 bg-gray-50 dark:bg-[#0a0a0a] pt-2 pb-2">
+              <div className="sticky top-[64px] z-20 border-y border-black/[0.04] bg-[#f7f7f5]/95 px-4 py-2 backdrop-blur-xl md:px-0 dark:border-white/5 dark:bg-[#0a0a0a]/95">
                 <MenuTabs
                   categories={categories}
                   activeTab={activeTab}
@@ -376,20 +383,21 @@ export default function StoreClient() {
                 />
               </div>
 
-              <div className="px-4 md:px-0 min-h-[300px]">
-                <h3 className="text-xl font-black tracking-tight mb-4 flex items-center gap-2">
+              <div className="min-h-[300px] px-4 md:px-0">
+                <h3 className="mb-4 flex items-center gap-2 text-xl font-black tracking-tight sm:text-2xl">
                   {searchQuery ? "Search Results" : activeTab}{" "}
                   <span className="text-gray-400 text-base font-normal">
                     ({displayedItems.length})
                   </span>
                 </h3>
                 {displayedItems.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                     {displayedItems.map((item) => (
                       <ProductCard
                         key={item.id}
                         {...item}
                         storeId={store.id}
+                        kind={store.type === "RESTAURANT" ? "DISH" : "PRODUCT"}
                         isAvailable={store.isAvailableInLocation}
                         isSoldOut={item.manageStock && ((item.stock || 0) <= 0 || item.status === "OUT_OF_STOCK")}
                         href={
@@ -402,8 +410,10 @@ export default function StoreClient() {
                     ))}
                   </div>
                 ) : (
-                  <div className="py-16 text-center text-gray-400 border-2 border-dashed border-gray-100 dark:border-white/5 rounded-2xl">
-                    <p>No items found.</p>
+                  <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white/50 px-4 py-14 text-center text-gray-400 dark:border-white/10 dark:bg-white/[0.02]">
+                    <Search className="mx-auto mb-3 h-7 w-7 opacity-50" />
+                    <p className="font-semibold">No items found</p>
+                    <p className="mt-1 text-xs">Try a different search or category.</p>
                   </div>
                 )}
               </div>
@@ -411,9 +421,9 @@ export default function StoreClient() {
 
             <hr className="border-gray-200 dark:border-white/5 mx-4 md:mx-0" />
 
-            <div id="reviews" className="px-4 md:px-0">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-black">
+            <div id="reviews" className="px-4 pb-4 md:px-0 md:pb-0">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3 sm:mb-6">
+                <h2 className="text-xl font-black sm:text-2xl">
                   Ratings & Reviews{" "}
                   <span className="text-gray-400 text-lg ml-2">
                     ({reviews.length})
@@ -444,12 +454,11 @@ export default function StoreClient() {
       </main>
 
       <FloatingCart />
-      <BottomNav />
-
       {selectedProduct && (
         <ProductModal
           product={selectedProduct}
           storeId={store?.id || ""}
+          kind={store?.type === "RESTAURANT" ? "DISH" : "PRODUCT"}
           onClose={() => setSelectedProduct(null)}
         />
       )}

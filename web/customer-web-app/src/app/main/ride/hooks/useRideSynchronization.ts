@@ -3,10 +3,9 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRideStore, RideStage } from "../store/ride";
-import { RideService, RideStatus } from "@/services/ride.service";
+import { RideService } from "@/services/ride.service";
 import { mapRideToViewModel } from "@/services/mappers/ride.mapper";
 import { mapBackendStatusToRideStage } from "@/services/formatters/ride-status.formatter";
-import { toast } from "react-toastify";
 
 /** Polling interval in ms — acts as safety net when socket drops */
 const POLL_INTERVAL_MS = 15_000;
@@ -78,10 +77,7 @@ export function useRideSynchronization() {
         // up again after the user completed the flow.
         {
           const currentStatus = useRideStore.getState().rideStatus;
-          if (
-            currentStatus === "idle" &&
-            backendRide.status === "PAID"
-          ) {
+          if (currentStatus === "idle" && backendRide.status === "PAID") {
             return;
           }
         }
@@ -90,12 +86,13 @@ export function useRideSynchronization() {
         // Post-ride payment model: payment.status determines whether ride
         // maps to 'payment-required' or 'finished' (no pre-ride payment gate).
         const serverPaymentCompleted =
-          backendRide.payment?.status === "COMPLETED";
+          backendRide.payment?.status === "COMPLETED" ||
+          backendRide.paymentStatus === "COMPLETED";
 
         const activeRide = mapRideToViewModel(backendRide);
         const mappedStatus = mapBackendStatusToRideStage(
           activeRide.status,
-          serverPaymentCompleted
+          serverPaymentCompleted,
         );
 
         // Only update store if something actually changed
@@ -110,8 +107,14 @@ export function useRideSynchronization() {
         // after the driver has arrived. Without this guard the local state
         // would regress from 'arrived' back to 'confirmed' on every poll.
         const STAGE_ORDER: string[] = [
-          'idle', 'configuring', 'searching', 'confirmed',
-          'arrived', 'in-progress', 'payment-required', 'finished',
+          "idle",
+          "configuring",
+          "searching",
+          "confirmed",
+          "arrived",
+          "in-progress",
+          "payment-required",
+          "finished",
         ];
         const currentIdx = STAGE_ORDER.indexOf(state.rideStatus);
         const mappedIdx = STAGE_ORDER.indexOf(mappedStatus);
@@ -179,9 +182,16 @@ export function useRideSynchronization() {
         // Restore OTP (for ACCEPTED/ARRIVED — customer needs to show driver)
         if (
           (mappedStatus === "confirmed" || mappedStatus === "arrived") &&
-          backendRide.startOtp
+          (backendRide.pickupCode || backendRide.startOtp)
         ) {
-          setStartOtp(backendRide.startOtp);
+          setStartOtp(backendRide.pickupCode || backendRide.startOtp || null);
+        } else if (
+          mappedStatus === "searching" ||
+          mappedStatus === "confirmed"
+        ) {
+          RideService.getPickupCode(backendRide.id, token)
+            .then((result) => setStartOtp(result.pickupCode))
+            .catch(() => {});
         } else if (
           mappedStatus === "in-progress" ||
           mappedStatus === "finished"
@@ -207,7 +217,7 @@ export function useRideSynchronization() {
         if (activeRide.driver) {
           setDriver({
             name: activeRide.driver.name,
-            photoUrl: activeRide.driver.image || "/profile.jpg",
+            photoUrl: activeRide.driver.image || "/profile.webp",
             vehicle: {
               make: activeRide.driver.vehicleBrand || "Vehicle",
               model: activeRide.driver.vehicleModel || "Car",
@@ -219,7 +229,10 @@ export function useRideSynchronization() {
         }
 
         // Restore financials if finished or payment-required
-        if (mappedStatus === "finished" || mappedStatus === "payment-required") {
+        if (
+          mappedStatus === "finished" ||
+          mappedStatus === "payment-required"
+        ) {
           setTripSummary({
             fare: activeRide.actualFare,
             distance: activeRide.distanceKm || 0,

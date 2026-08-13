@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Loader2, ShieldCheck, CreditCard } from "lucide-react";
+import { Loader2, ShieldCheck, CreditCard, Wallet } from "lucide-react";
 
 interface OrderSummaryProps {
   cartTotal: number;
@@ -17,6 +17,7 @@ interface OrderSummaryProps {
   hasAddress?: boolean;
   onPlaceOrder: () => void;
   retryCount: number;
+  paymentMethod: "CARD" | "WALLET";
 }
 
 export const OrderSummary = ({
@@ -30,6 +31,7 @@ export const OrderSummary = ({
   isLoadingFee = false,
   hasAddress = false,
   onPlaceOrder,
+  paymentMethod,
 }: OrderSummaryProps) => {
   // When fee values are unknown (null) we must NOT silently resolve them
   // to 0 — that displays a false ₦0 delivery fee and under-quotes the total.
@@ -48,18 +50,6 @@ export const OrderSummary = ({
 
   return (
     <div className="bg-white dark:bg-[#151515] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm">
-      {/* Fixed payment method */}
-      <h3 className="font-bold text-lg mb-3">Payment</h3>
-      <div className="flex items-center gap-3 p-4 rounded-xl border border-yellow-500 bg-yellow-50 dark:bg-yellow-500/10 mb-6">
-        <div className="p-2 rounded-full bg-yellow-500 text-black">
-          <CreditCard className="w-5 h-5" />
-        </div>
-        <span className="font-bold flex-1">Paystack</span>
-        <div className="w-3 h-3 bg-yellow-500 rounded-full" />
-      </div>
-
-      <div className="my-4 border-t border-dashed border-gray-200 dark:border-white/10" />
-
       <h3 className="font-bold text-lg mb-4">Summary</h3>
       <div className="space-y-3 text-sm">
         <div className="flex justify-between text-gray-600 dark:text-gray-400">
@@ -140,7 +130,12 @@ export const OrderSummary = ({
           </>
         ) : (
           <>
-            Pay with Paystack
+            {paymentMethod === "CARD" ? (
+              <CreditCard className="h-5 w-5" />
+            ) : (
+              <Wallet className="h-5 w-5" />
+            )}
+            {paymentMethod === "CARD" ? "Pay online" : "Pay with wallet"}
             <ShieldCheck className="w-5 h-5 opacity-50" />
           </>
         )}

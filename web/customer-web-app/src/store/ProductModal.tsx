@@ -37,12 +37,15 @@ export interface Product {
 interface ProductModalProps {
   product: Product | null;
   storeId: string;
+  /** RESTAURANT storefronts add dishes (menuItemId); STORE storefronts add products (productId). */
+  kind?: "PRODUCT" | "DISH";
   onClose: () => void;
 }
 
 export const ProductModal = ({
   product,
   storeId,
+  kind = "PRODUCT",
   onClose,
 }: ProductModalProps) => {
   const [mounted, setMounted] = useState(false);
@@ -133,30 +136,26 @@ export const ProductModal = ({
     setIsSubmitting(true);
 
     try {
-      // 2. Backend Enforcement (Critical) — ApiService handles 401 redirect automatically
       const token =
         (session as any)?.accessToken || (session as any)?.user?.accessToken;
 
-      // Flatten all selected modifier IDs across all groups into a single array.
-      // Backend expects `modifierIds: string[]` — an array of Modifier record UUIDs.
+      // Flatten all selected modifier IDs — kept for local display only.
+      // The backend cart has no modifier concept, so this never reaches the API;
+      // checkout re-syncs quantity/kind only, and pricing there is base-price.
       const modifierIds: string[] = Object.values(selectedModifiers).flat();
 
-      await ApiService.post(
-        "/cart/add",
-        {
-          productId: product.id,
-          quantity,
-          // Only include modifierIds when present — backend treats absence as "no modifiers".
-          ...(modifierIds.length > 0 && { modifierIds }),
-        },
+      // Best-effort server sync — the local cart (synced again in full at
+      // checkout) is the source of truth for the shopping session, so a
+      // failure here shouldn't block the user from adding the item.
+      ApiService.post(
+        "/cart/items",
+        kind === "DISH"
+          ? { menuItemId: product.id, quantity }
+          : { productId: product.id, quantity },
         token,
         {},
-      );
+      ).catch(() => {});
 
-      // Success: sync local cart store for immediate UI update.
-      // Price stored here is display-only — the backend is the authoritative pricing source.
-
-      // Collect human-readable modifier names for display in checkout.
       const modifierNames: string[] = (product.modifierGroups || []).flatMap(
         (group) =>
           group.modifiers
@@ -171,6 +170,7 @@ export const ProductModal = ({
         quantity,
         restaurantId: storeId,
         image: product.image,
+        kind,
         modifierIds: modifierIds.length > 0 ? modifierIds : undefined,
         modifierNames: modifierNames.length > 0 ? modifierNames : undefined,
       });
@@ -187,15 +187,15 @@ export const ProductModal = ({
   if (!product || !mounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[9998] flex items-center justify-center px-4">
+    <div className="fixed inset-0 z-[9998] flex items-end justify-center sm:items-center sm:px-4">
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
 
-      <div className="relative bg-white dark:bg-[#1a1a1a] w-full max-w-lg max-h-[85vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-200">
+      <div className="relative flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-200 sm:max-h-[88vh] sm:rounded-3xl sm:zoom-in-95 dark:bg-[#1a1a1a]">
         <div className="flex-1 overflow-y-auto custom-scrollbar">
-          <div className="relative h-56 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-slate-800 dark:to-slate-900 overflow-hidden">
+          <div className="relative h-44 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 sm:h-56 dark:from-slate-800 dark:to-slate-900">
             <button
               onClick={onClose}
               className="absolute top-4 right-4 z-10 w-8 h-8 bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center transition-colors"
@@ -224,9 +224,9 @@ export const ProductModal = ({
             )}
           </div>
 
-          <div className="p-6 space-y-6">
+          <div className="space-y-5 p-4 sm:space-y-6 sm:p-6">
             <div>
-              <h2 className="text-2xl font-black leading-tight mb-2 text-gray-900 dark:text-white">
+              <h2 className="mb-2 text-xl font-black leading-tight text-gray-900 sm:text-2xl dark:text-white">
                 {product.name}
               </h2>
               <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">
@@ -258,13 +258,13 @@ export const ProductModal = ({
                     return (
                       <label
                         key={opt.id}
-                        className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer transition-colors ${
+                        className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border p-3 transition-colors ${
                           isSelected
                             ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-500/10"
                             : "border-gray-100 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5"
                         }`}
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
                           <input
                             type={group.maxSelect === 1 ? "radio" : "checkbox"}
                             name={group.id}
@@ -274,12 +274,12 @@ export const ProductModal = ({
                             }
                             className="w-4 h-4 accent-yellow-500"
                           />
-                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          <span className="min-w-0 text-sm font-medium text-gray-700 dark:text-gray-300">
                             {opt.name}
                           </span>
                         </div>
                         {opt.price > 0 && (
-                          <span className="text-sm font-bold">
+                          <span className="shrink-0 text-sm font-bold">
                             +₦{opt.price.toLocaleString()}
                           </span>
                         )}
@@ -292,7 +292,7 @@ export const ProductModal = ({
           </div>
         </div>
 
-        <div className="p-4 border-t border-gray-100 dark:border-white/5 bg-white dark:bg-[#1a1a1a]">
+        <div className="border-t border-gray-100 bg-white px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 sm:pb-4 dark:border-white/5 dark:bg-[#1a1a1a]">
           <div className="flex items-center gap-4 mb-4 justify-center">
             <button
               onClick={() => setQuantity((q) => Math.max(1, q - 1))}

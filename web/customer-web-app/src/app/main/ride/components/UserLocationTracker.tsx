@@ -8,31 +8,28 @@ export function UserLocationTracker() {
 
   useEffect(() => {
     if (!navigator. geolocation) {
-      setGeolocationError('Geolocation is not supported by your browser.');
+      setGeolocationError(null);
       return;
     }
 
     const handleSuccess = (position: GeolocationPosition) => {
       const { latitude, longitude } = position.coords;
+      if (
+        !Number.isFinite(latitude) ||
+        !Number.isFinite(longitude) ||
+        Math.abs(latitude) > 90 ||
+        Math.abs(longitude) > 180
+      ) {
+        setGeolocationError(null);
+        return;
+      }
       setUserLocation({ lat: latitude, lng: longitude });
+      setGeolocationError(null);
     };
 
     const handleError = (error: GeolocationPositionError) => {
-      console.error('Error getting user location:', error);
-      let errorMessage = 'An unknown error occurred while getting your location.';
-      switch (error.code) {
-        case error.PERMISSION_DENIED:
-          errorMessage =
-            'Location access was denied. Please enable it in your browser settings to use this feature.';
-          break;
-        case error.POSITION_UNAVAILABLE:
-          errorMessage = 'Your location information is currently unavailable.';
-          break;
-        case error.TIMEOUT:
-          errorMessage = 'Getting your location timed out. Please try again.';
-          break;
-      }
-      setGeolocationError(errorMessage);
+      console.warn('Browser location unavailable:', error.message);
+      setGeolocationError(null);
     };
 
     const options = {

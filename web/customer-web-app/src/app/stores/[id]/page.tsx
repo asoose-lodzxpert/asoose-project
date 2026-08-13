@@ -142,7 +142,7 @@ function buildLocalBusinessSchema(store: StoreDetail, storeUrl: string) {
     store.image ||
     store.logo ||
     store.banner ||
-    `${SITE_URL}/placeholder-store.png`;
+    `${SITE_URL}/placeholder-store.webp`;
 
   const typeMap: Record<string, string> = {
     RESTAURANT: "Restaurant",
@@ -225,7 +225,7 @@ function buildProductListSchema(store: StoreDetail, storeUrl: string) {
           sku: p.id,
           brand: {
             "@type": "Brand",
-            name: store.name
+            name: store.name,
           },
           url: `${SITE_URL}/product/${p.slug ?? p.id}`,
           ...(productImage && { image: productImage }),
@@ -257,14 +257,15 @@ function buildProductListSchema(store: StoreDetail, storeUrl: string) {
             seller: { "@type": "Organization", name: store.name },
             hasMerchantReturnPolicy: {
               "@type": "MerchantReturnPolicy",
-              returnPolicyCategory: "https://schema.org/MerchantReturnNotPermitted"
+              returnPolicyCategory:
+                "https://schema.org/MerchantReturnNotPermitted",
             },
             shippingDetails: {
               "@type": "OfferShippingDetails",
               shippingRate: {
                 "@type": "MonetaryAmount",
                 value: store.deliveryFee ?? 500,
-                currency: "NGN"
+                currency: "NGN",
               },
               deliveryTime: {
                 "@type": "ShippingDeliveryTime",
@@ -272,16 +273,16 @@ function buildProductListSchema(store: StoreDetail, storeUrl: string) {
                   "@type": "QuantitativeValue",
                   minValue: 0,
                   maxValue: 1,
-                  unitCode: "d"
+                  unitCode: "d",
                 },
                 transitTime: {
                   "@type": "QuantitativeValue",
                   minValue: 0,
                   maxValue: 1,
-                  unitCode: "d"
-                }
-              }
-            }
+                  unitCode: "d",
+                },
+              },
+            },
           },
         },
       };
@@ -325,7 +326,7 @@ export default async function StoreDetailPage({
   const storeSlug = store.slug ?? store.id;
   const storeUrl = `${SITE_URL}/stores/${storeSlug}`;
   const coverImage =
-    store.image || store.banner || store.logo || "/placeholder-store.png";
+    store.image || store.banner || store.logo || "/placeholder-store.webp";
 
   const productListSchema = buildProductListSchema(store, storeUrl);
 

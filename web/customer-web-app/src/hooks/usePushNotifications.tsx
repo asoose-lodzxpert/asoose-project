@@ -81,9 +81,17 @@ export function usePushNotifications() {
     if (status !== "authenticated" || !accessToken) return;
     // Browser must support notifications
     if (typeof window === "undefined" || !("Notification" in window)) return;
-    // Firebase must be configured
-    if (!process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
-      console.warn("[Push] Firebase env vars not set — skipping.");
+    // Firebase must be configured with real (non-placeholder) values — the
+    // .env.example defaults ("your-vapid-key" etc.) are non-empty strings
+    // that pass a plain truthiness check but aren't valid Firebase config,
+    // and an invalid VAPID key throws InvalidAccessError from PushManager.
+    if (
+      !process.env.NEXT_PUBLIC_FIREBASE_API_KEY ||
+      !VAPID_KEY ||
+      process.env.NEXT_PUBLIC_FIREBASE_API_KEY.startsWith("your-") ||
+      VAPID_KEY.startsWith("your-")
+    ) {
+      console.warn("[Push] Firebase env vars not configured — skipping.");
       return;
     }
     // Don't double-run within the same page session

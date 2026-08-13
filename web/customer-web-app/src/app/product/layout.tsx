@@ -9,7 +9,7 @@ export default function ProductLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen flex flex-col bg-[#f5f5f5] dark:bg-[#0a0a0a]">
+    <div className="flex min-h-screen flex-col bg-[#f7f7f5] dark:bg-[#0a0a0a]">
       <HomeHeader />
 
       <main className="flex-1">{children}</main>

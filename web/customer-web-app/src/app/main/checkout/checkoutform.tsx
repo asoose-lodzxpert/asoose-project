@@ -3,17 +3,27 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useCartStore } from "@/store/useCartStore";
+import { useCartStore, CartItem } from "@/store/useCartStore";
 import { useSession } from "next-auth/react";
-import { WifiOff, Loader2, Phone, MapPin, Plus } from "lucide-react";
-import Swal from "sweetalert2";
-import { toast } from "react-toastify";
 import {
-  paymentService,
-  InitiatePaymentPayload,
-} from "@/services/payment.service";
-import { DEFAULT_PAYMENT_METHOD } from "../ride/constants/config";
+  WifiOff,
+  Loader2,
+  Phone,
+  MapPin,
+  Plus,
+  CreditCard,
+  Wallet,
+  NotebookPen,
+} from "lucide-react";
+import { toast } from "react-toastify";
+import { ApiService } from "@/services/api.service";
 import { savePurchaseContext } from "@/lib/meta-pixel";
+import { WalletService } from "@/services/wallet.service";
+import { CartService, mapServerCartItems } from "@/services/cart.service";
+import {
+  AddressService,
+  type AddressLabel,
+} from "@/services/address.service";
 
 // Components
 import { Address } from "./types";
@@ -22,15 +32,27 @@ import { CartItemsList } from "@/app/main/components/checkout/cartitemslist";
 import { OrderSummary } from "@/app/main/components/checkout/ordersummary";
 import { AddressPickerModal } from "@/app/main/components/checkout/address-picker-modal";
 
-// Constants
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+// The backend prices and places orders from its own server-side cart
+// (/cart/items), not from a list of items sent with the request — the local
+// Zustand cart is the source of truth during shopping, so this pushes it to
+// the server right before quoting/checking out. Modifiers aren't synced —
+// the backend cart has no modifier concept yet.
+async function syncCartToServer(items: CartItem[], token: string) {
+  await CartService.clear(token).catch(() => {});
+  for (const item of items) {
+    const body =
+      item.kind === "DISH"
+        ? { menuItemId: item.id, quantity: item.quantity }
+        : { productId: item.id, quantity: item.quantity };
+    await CartService.add(body, token);
+  }
+}
 
 export default function CheckoutForm() {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const abortControllerRef = useRef<AbortController | null>(null);
   const isOrderCreated = useRef(false);
+  const idempotencyKeyRef = useRef<string | null>(null);
 
   const [mounted, setMounted] = useState(false);
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -40,12 +62,20 @@ export default function CheckoutForm() {
   const [isOnline, setIsOnline] = useState(true);
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
   const [showAddressPicker, setShowAddressPicker] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"CARD" | "WALLET">(
+    "CARD",
+  );
+  const [deliveryNote, setDeliveryNote] = useState("");
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [showTopup, setShowTopup] = useState(false);
+  const [topupAmount, setTopupAmount] = useState("20000");
+  const [topupLoading, setTopupLoading] = useState(false);
 
   // Phone number state – prefilled from user profile, required for checkout
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
-  const profilePhoneRef = useRef<string>(""); // track the phone already saved on the backend
 
   // Live fee state fetched from backend
   const [deliveryFee, setDeliveryFee] = useState<number | null>(null);
@@ -54,14 +84,7 @@ export default function CheckoutForm() {
   // Backend-authoritative grand total from the quote. Used as the single source
   // of truth for display — prevents discrepancies from client-side subtotal recomputation.
   const [quoteGrandTotal, setQuoteGrandTotal] = useState<number | null>(null);
-  // Price-lock token returned by the quote endpoint. Must be sent back with the
-  // order so the backend uses the exact same amounts without recalculating.
-  const [quoteToken, setQuoteToken] = useState<string | null>(null);
   const [isLoadingFee, setIsLoadingFee] = useState(false);
-  const quoteAbortRef = useRef<AbortController | null>(null);
-
-  // Paystack is the only payment method
-  const selectedPaymentMethod = DEFAULT_PAYMENT_METHOD;
 
   const {
     items: cartItems,
@@ -82,6 +105,16 @@ export default function CheckoutForm() {
     ),
   );
 
+  useEffect(() => {
+    idempotencyKeyRef.current = null;
+  }, [
+    cartFingerprint,
+    selectedAddress?.id,
+    paymentMethod,
+    deliveryNote,
+    phone,
+  ]);
+
   // Fetch live quote from backend whenever address or cart changes
   const fetchQuote = useCallback(
     async (address: typeof selectedAddress) => {
@@ -89,85 +122,48 @@ export default function CheckoutForm() {
         setDeliveryFee(null);
         setServiceFee(null);
         setVatAmount(null);
+        setQuoteGrandTotal(null);
         return;
       }
       const token = session?.accessToken;
       if (!token) return;
 
-      quoteAbortRef.current?.abort();
-      quoteAbortRef.current = new AbortController();
       setIsLoadingFee(true);
 
       try {
-        const res = await fetch(`${API_URL}/users/cart/quote`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          signal: quoteAbortRef.current.signal,
-          body: JSON.stringify({
-            addressId: address.id,
-            items: cartItems.map((item) => ({
-              id: item.id,
-              quantity: item.quantity,
-              ...(item.modifierIds && item.modifierIds.length > 0
-                ? { modifierIds: item.modifierIds }
-                : {}),
-            })),
-          }),
-        });
+        // The backend prices from its own server-side cart, not from a list
+        // of items we send — push the local cart there first so the quote
+        // reflects what's actually in it.
+        await syncCartToServer(cartItems, token);
 
-        if (res.ok) {
-          const data = await res.json();
-          // data.totalDeliveryFee is the route-optimized total
-          // data.groups[*].serviceFee summed = total service fee
-          // data.groups[*].vatAmount summed = total VAT
-          const totalServiceFee = (data.groups ?? []).reduce(
-            (sum: number, g: any) => sum + (g.serviceFee ?? 0),
-            0,
-          );
-          const totalVatAmount = (data.groups ?? []).reduce(
-            (sum: number, g: any) => sum + (g.vatAmount ?? 0),
-            0,
-          );
-          setDeliveryFee(data.totalDeliveryFee ?? null);
-          setServiceFee(totalServiceFee || null);
-          setVatAmount(totalVatAmount || null);
-          // Use the backend-computed grand total as the single source of truth.
-          setQuoteGrandTotal(data.grandTotal ?? null);
-          // Store the price-lock token so we can send it back with the order.
-          setQuoteToken(data.quoteToken ?? null);
-        } else {
-          const errData = await res.json().catch(() => ({}));
-          console.error("[CheckoutForm] Quote API error:", res.status, errData);
-          
-          // Display the specific backend error (e.g. "Store does not deliver to your current city")
-          const errorMsg = errData.message || "Could not calculate delivery fee. Please double check your address.";
-          toast.error(errorMsg);
+        const data = await ApiService.post<{
+          pricing: {
+            deliveryFee: number;
+            serviceFee: number;
+            vat: number;
+            total: number;
+          };
+        }>("/orders/quote", { deliveryAddressId: address.id }, token);
 
-          setDeliveryFee(null);
-          setServiceFee(null);
-          setVatAmount(null);
-          setQuoteGrandTotal(null);
-          setQuoteToken(null);
-        }
+        setDeliveryFee(data.pricing.deliveryFee ?? null);
+        setServiceFee(data.pricing.serviceFee ?? null);
+        setVatAmount(data.pricing.vat ?? null);
+        setQuoteGrandTotal(data.pricing.total ?? null);
       } catch (err: any) {
-        if (err.name !== "AbortError") {
-          toast.warn(
-            "Could not calculate delivery fee. You can still place your order.",
-          );
-          setDeliveryFee(null);
-          setServiceFee(null);
-          setVatAmount(null);
-          setQuoteGrandTotal(null);
-          setQuoteToken(null);
-        }
+        // Display the specific backend error when there is one (e.g. "Store
+        // does not deliver to your current city"), otherwise a generic notice.
+        toast.error(
+          err?.message ||
+            "Could not calculate delivery fee. Please double check your address.",
+        );
+        setDeliveryFee(null);
+        setServiceFee(null);
+        setVatAmount(null);
+        setQuoteGrandTotal(null);
       } finally {
         setIsLoadingFee(false);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [session?.accessToken, cartItems],
   );
 
@@ -182,6 +178,29 @@ export default function CheckoutForm() {
     return "";
   };
 
+  const normalizePhone = (value: string) => {
+    const cleaned = value.replace(/[\s-]/g, "");
+    if (cleaned.startsWith("+234")) return cleaned;
+    if (cleaned.startsWith("234")) return `+${cleaned}`;
+    if (cleaned.startsWith("0")) return `+234${cleaned.slice(1)}`;
+    return cleaned;
+  };
+
+  const fetchWalletBalance = useCallback(async () => {
+    const token = session?.accessToken;
+    if (!token) return;
+
+    setWalletLoading(true);
+    try {
+      const wallet = await WalletService.getMyWallet(token);
+      setWalletBalance(wallet.balance);
+    } catch {
+      setWalletBalance(null);
+    } finally {
+      setWalletLoading(false);
+    }
+  }, [session?.accessToken]);
+
   useEffect(() => {
     useCartStore.persist.rehydrate();
     setMounted(true);
@@ -195,7 +214,6 @@ export default function CheckoutForm() {
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
-      abortControllerRef.current?.abort();
       setIsProcessing(false);
     };
   }, []);
@@ -212,15 +230,9 @@ export default function CheckoutForm() {
       return;
     }
     try {
-      const res = await fetch(`${API_URL}/users/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const saved = data.phone || "";
-        profilePhoneRef.current = saved;
-        setPhone(saved);
-      }
+      const data = await ApiService.get<{ phone?: string }>("/users/me", token);
+      const saved = data.phone || "";
+      setPhone(saved);
     } catch {
       // Non-fatal — user can still enter phone manually
     } finally {
@@ -241,28 +253,25 @@ export default function CheckoutForm() {
     }
 
     try {
-      abortControllerRef.current?.abort();
-      abortControllerRef.current = new AbortController();
-
       setIsLoadingAddresses(true);
 
-      const res = await fetch(`${API_URL}/users/addresses`, {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: abortControllerRef.current.signal,
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setAddresses(data);
-        const defaultAddr = data.find((a: Address) => a.isDefault) || data[0];
-        if (defaultAddr) setSelectedAddress(defaultAddr);
-      } else {
-        toast.error("Failed to load addresses");
-      }
+      const data = await AddressService.list(token);
+      // Backend uses latitude/longitude; this form's Address type uses lat/lng.
+      const mapped: Address[] = data.map((a) => ({
+        id: a.id,
+        label: a.label,
+        street: a.street || "",
+        city: a.city || undefined,
+        state: a.state || undefined,
+        isDefault: a.isDefault,
+        lat: a.latitude,
+        lng: a.longitude,
+      }));
+      setAddresses(mapped);
+      const defaultAddr = mapped.find((a) => a.isDefault) || mapped[0];
+      if (defaultAddr) setSelectedAddress(defaultAddr);
     } catch (error: any) {
-      if (error.name !== "AbortError") {
-        toast.error("Failed to load addresses");
-      }
+      toast.error(error?.message || "Failed to load addresses");
     } finally {
       setIsLoadingAddresses(false);
     }
@@ -272,11 +281,12 @@ export default function CheckoutForm() {
     if (status === "authenticated") {
       fetchAddresses();
       fetchProfile();
+      fetchWalletBalance();
     }
     if (status === "unauthenticated") {
       setIsLoadingProfile(false);
     }
-  }, [status, fetchAddresses, fetchProfile]);
+  }, [status, fetchAddresses, fetchProfile, fetchWalletBalance]);
 
   // Fetch quote whenever address is selected, cart changes, or token becomes available.
   // `fetchQuote` MUST be in the dep array — it closes over `session?.accessToken`
@@ -286,7 +296,7 @@ export default function CheckoutForm() {
     if (status === "authenticated") {
       fetchQuote(selectedAddress);
     }
-  }, [selectedAddress?.id, cartFingerprint, status, fetchQuote]);
+  }, [selectedAddress, cartFingerprint, status, fetchQuote]);
 
   // ✅ FIXED: Detect and handle cancelled/failed order payments on return
   // This runs when user returns from payment cancellation and allows them to retry
@@ -308,31 +318,28 @@ export default function CheckoutForm() {
         }
 
         // Check order status to see if payment was cancelled
-        const orderRes = await fetch(`${API_URL}/users/orders/${lastOrderId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const order = await ApiService.get<{ paymentStatus: string }>(
+          `/orders/${lastOrderId}`,
+          token,
+        );
 
-        if (orderRes.ok) {
-          const order = await orderRes.json();
-
-          // Only show message if order is in pending/cancelled state
-          // (i.e., payment was not completed)
-          if (
-            order.paymentStatus === "CANCELLED" ||
-            order.paymentStatus === "FAILED" ||
-            order.paymentStatus === "PENDING"
-          ) {
-            toast.warn(
-              "Previous payment was " +
-                (order.paymentStatus === "CANCELLED"
-                  ? "cancelled"
-                  : "not completed") +
-                ". Your cart is ready for a fresh order.",
-            );
-            // Clear the pending context but preserve cart for immediate retry
-            localStorage.removeItem("pending_checkout");
-            localStorage.removeItem("last_order_id");
-          }
+        // Only show message if order is in pending/cancelled state
+        // (i.e., payment was not completed)
+        if (
+          order.paymentStatus === "CANCELLED" ||
+          order.paymentStatus === "FAILED" ||
+          order.paymentStatus === "PENDING"
+        ) {
+          toast.warn(
+            "Previous payment was " +
+              (order.paymentStatus === "CANCELLED"
+                ? "cancelled"
+                : "not completed") +
+              ". Your cart is ready for a fresh order.",
+          );
+          // Clear the pending context but preserve cart for immediate retry
+          localStorage.removeItem("pending_checkout");
+          localStorage.removeItem("last_order_id");
         }
       } catch (err) {
         // Non-fatal error — user can still proceed
@@ -352,20 +359,33 @@ export default function CheckoutForm() {
     if (!token) return;
 
     try {
-      const res = await fetch(`${API_URL}/users/addresses`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(addressData),
-      });
+      if (addressData.lat == null || addressData.lng == null) {
+        throw new Error("Please pin the address location before saving.");
+      }
 
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message || "Failed to add address");
+      const created = await AddressService.create(
+        {
+          label: (addressData.label || "HOME").toUpperCase() as AddressLabel,
+          latitude: addressData.lat,
+          longitude: addressData.lng,
+          ...(addressData.street ? { street: addressData.street } : {}),
+          ...(addressData.city ? { city: addressData.city } : {}),
+          ...(addressData.state ? { state: addressData.state } : {}),
+        },
+        token,
+      );
 
       await fetchAddresses();
-      setSelectedAddress(json);
+      setSelectedAddress({
+        id: created.id,
+        label: created.label,
+        street: created.street || "",
+        city: created.city || undefined,
+        state: created.state || undefined,
+        isDefault: created.isDefault,
+        lat: created.latitude,
+        lng: created.longitude,
+      });
       toast.success("Address added successfully");
       setShowAddAddressModal(false);
     } catch (error: any) {
@@ -373,70 +393,84 @@ export default function CheckoutForm() {
     }
   };
 
-  const processPayment = async (
-    id: string,
-    orderTotal: number,
-    isGroup = false,
-  ) => {
+  const handleRemoveCartItem = async (lineId: string) => {
+    const item = cartItems.find((entry) => (entry.lineId ?? entry.id) === lineId);
+    removeItem(lineId);
+
+    const token = session?.accessToken;
+    if (!token || !item) return;
+
     try {
-      if (!selectedPaymentMethod) return;
-
-      localStorage.setItem("pending_checkout", "true");
-      // For groups, we might need to handle differently in "orders/confirmed"
-      // But for now, we just save the ID.
-      localStorage.setItem("last_order_id", id);
-
-      const paymentPayload: InitiatePaymentPayload = {
-        amount: orderTotal,
-        email: session?.user?.email || "customer@example.com",
-        gateway: selectedPaymentMethod.gateway as any,
-        method: selectedPaymentMethod.type as "CARD" | "BANK_TRANSFER",
-        type: "ORDER",
-        // Send just the app origin — the backend GET /callback/paystack handler
-        // appends "/payment/callback" itself before redirecting the browser.
-        callbackUrl: (
-          process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"
-        ).replace(/\/+$/, ""),
-      };
-
-      // FIX: Distinguish between single Order ID and OrderGroup ID
-      if (isGroup) {
-        paymentPayload.orderGroupId = id;
-      } else {
-        paymentPayload.orderId = id;
-      }
-
-      const token = session?.accessToken;
-      if (!token) throw new Error("Authentication missing");
-
-      const paymentRes = await paymentService.initiatePayment(
-        paymentPayload,
-        token,
+      // Re-read the server cart because quote calculation can rebuild it and
+      // therefore change backend cart-item IDs.
+      const serverCart = await CartService.get(token);
+      const serverItem = serverCart.items.find((entry) =>
+        item.kind === "DISH"
+          ? entry.menuItemId === item.id
+          : entry.productId === item.id,
       );
-
-      if (paymentRes.authorizationUrl) {
-        savePurchaseContext({
-          value: orderTotal,
-          currency: "NGN",
-          contentCategory: "shopping",
-          contentId: id,
-        });
-        window.location.href = paymentRes.authorizationUrl;
-      } else {
-        throw new Error("Payment authorization URL not received");
+      if (serverItem) await CartService.removeItem(serverItem.id, token);
+    } catch (error: any) {
+      toast.error(error?.message || "The item could not be removed from your cart.");
+      try {
+        const currentCart = await CartService.get(token);
+        useCartStore
+          .getState()
+          .replaceItems(mapServerCartItems(currentCart));
+      } catch {
+        // The optimistic local removal remains when refresh is unavailable.
       }
-    } catch (paymentError: any) {
-      console.error("Payment initialization error:", paymentError);
+    }
+  };
 
-      toast.warn(
-        "Payment initialization failed. Please check your order history.",
+  const handleClearCart = async () => {
+    if (!window.confirm("Remove every item from your cart?")) return;
+
+    const previousItems = cartItems;
+    clearCart();
+    const token = session?.accessToken;
+    if (!token) return;
+
+    try {
+      await CartService.clear(token);
+      toast.success("Cart cleared");
+    } catch (error: any) {
+      useCartStore.getState().replaceItems(previousItems);
+      toast.error(error?.message || "The cart could not be cleared.");
+    }
+  };
+
+  const handleWalletTopup = async () => {
+    const amount = Number(topupAmount);
+    if (!Number.isInteger(amount) || amount <= 0) {
+      toast.error("Enter a valid top-up amount.");
+      return;
+    }
+
+    const token = session?.accessToken;
+    if (!token) {
+      toast.error("Please log in to top up your wallet.");
+      return;
+    }
+
+    setTopupLoading(true);
+    try {
+      const result = await WalletService.initializeTopup(amount, token);
+      if (!result.authorizationUrl?.startsWith("https://checkout.paystack.com/")) {
+        throw new Error("The payment link returned by the server is invalid.");
+      }
+
+      localStorage.setItem(
+        "pending_wallet_topup",
+        JSON.stringify({
+          reference: result.reference,
+          returnTo: "/main/checkout",
+        }),
       );
-      // If group, maybe redirect to orders list?
-      if (isGroup) {
-        router.push("/main/orders");
-      } else {
-        router.push(`/main/orders/confirmed?id=${id}`);
-      }
+      window.location.href = result.authorizationUrl;
+    } catch (error: any) {
+      toast.error(error?.message || "Could not initialize wallet top-up.");
+      setTopupLoading(false);
     }
   };
 
@@ -445,7 +479,7 @@ export default function CheckoutForm() {
       toast.error("No internet connection.");
       return;
     }
-    if (!selectedAddress || !selectedPaymentMethod) {
+    if (!selectedAddress) {
       toast.error("Please select a delivery address");
       return;
     }
@@ -474,10 +508,14 @@ export default function CheckoutForm() {
       return;
     }
 
-    // FIX: Don't force restaurantId if multi-vendor.
-    // The backend's createMultiOrder groups items itself.
-    // However, if we are hitting 'createOrder' endpoint it might expect one.
-    // We'll trust the payload construction handles it.
+    if (
+      paymentMethod === "WALLET" &&
+      (walletBalance === null || walletBalance < (quoteGrandTotal ?? 0))
+    ) {
+      toast.error("Your wallet balance is not enough for this order.");
+      setShowTopup(true);
+      return;
+    }
 
     const token = session?.accessToken;
 
@@ -489,76 +527,57 @@ export default function CheckoutForm() {
     setIsProcessing(true);
 
     try {
-      // Persist phone to user profile if it was added or changed
-      const normalizedPhone = phone.trim();
-      if (normalizedPhone !== profilePhoneRef.current) {
-        if (token) {
-          const profileRes = await fetch(`${API_URL}/users/profile`, {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              name: session?.user?.name || "",
-              phone: normalizedPhone,
-            }),
-          });
-          if (profileRes.ok) {
-            profilePhoneRef.current = normalizedPhone;
-          } else {
-            const err = await profileRes.json().catch(() => ({}));
-            throw new Error(err?.message || "Failed to save phone number");
-          }
-        }
+      // Re-sync cart (in case it changed since the last quote) then check out
+      // in one call — the backend creates the order from its own cart and,
+      // for CARD, returns a Paystack authorizationUrl directly. There's no
+      // separate payment-initialize step.
+      await syncCartToServer(cartItems, token);
+
+      if (!idempotencyKeyRef.current) {
+        idempotencyKeyRef.current = `chk-${session?.user.id ?? "customer"}-${Date.now()}`;
       }
-
-      const idempotencyKey = crypto.randomUUID();
-      const payload = {
-        addressId: selectedAddress.id,
-        restaurantId: cartItems[0].restaurantId, // Kept for backward compat with single-order endpoint logic
-        items: cartItems.map((item) => ({
-          id: item.id,
-          quantity: item.quantity,
-          // Forward modifier selections so the backend can price and persist them correctly
-          ...(item.modifierIds && item.modifierIds.length > 0
-            ? { modifierIds: item.modifierIds }
-            : {}),
-        })),
-        // Send price-lock token so the backend uses the exact quoted amounts.
-        // If quote expired (>15 min) the backend returns a clear error message.
-        ...(quoteToken ? { quoteToken } : {}),
-      };
-
-      const res = await fetch(`${API_URL}/users/orders`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          "Idempotency-Key": idempotencyKey,
+      const data = await ApiService.post<{
+        orderId: string;
+        total?: number;
+        pricing?: { total: number };
+        authorizationUrl?: string;
+      }>(
+        "/orders/checkout",
+        {
+          deliveryAddressId: selectedAddress.id,
+          paymentMethod,
+          deliveryNote: deliveryNote.trim() || undefined,
+          alternatePhone: normalizePhone(phone),
+          idempotencyKey: idempotencyKeyRef.current,
         },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Order creation failed");
+        token,
+      );
 
       isOrderCreated.current = true;
-      // FIX C1: Do NOT clear cart here — cart is cleared in /payment/callback
-      // only after payment is verified successfully. Clearing before payment
-      // means the user loses items if they cancel or payment fails.
+      // Cart is cleared after payment is verified (payment callback), not here —
+      // clearing early would lose items if the user cancels or payment fails.
 
-      // Paystack (CARD) is the only payment method — always redirect to checkout
-      if (data.orderGroupId) {
-        // Multi-order group
-        await processPayment(
-          data.orderGroupId,
-          data.grandTotal || data.total,
-          true,
-        );
+      const orderTotal = data.pricing?.total ?? data.total ?? 0;
+
+      if (data.authorizationUrl) {
+        if (!data.authorizationUrl.startsWith("https://checkout.paystack.com/")) {
+          throw new Error("The payment link returned by the server is invalid.");
+        }
+        localStorage.setItem("pending_checkout", "true");
+        localStorage.setItem("last_order_id", data.orderId);
+        savePurchaseContext({
+          value: orderTotal,
+          currency: "NGN",
+          contentCategory: "shopping",
+          contentId: data.orderId,
+        });
+        window.location.href = data.authorizationUrl;
+      } else if (paymentMethod === "WALLET") {
+        // WALLET — already paid, nothing further to redirect to a gateway for.
+        clearCart();
+        router.push(`/main/orders/confirmed?id=${data.orderId}`);
       } else {
-        // Single order
-        await processPayment(data.id, data.total, false);
+        throw new Error("The online payment link was not returned.");
       }
     } catch (error: any) {
       console.error("Order placement error:", error);
@@ -613,10 +632,10 @@ export default function CheckoutForm() {
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          {/* Phone Number */}
+          {/* Alternate contact number */}
           <section className="bg-white dark:bg-[#151515] p-5 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm">
             <h2 className="font-bold text-lg flex items-center gap-2 mb-4">
-              <Phone className="w-5 h-5 text-yellow-500" /> Contact Number
+              <Phone className="w-5 h-5 text-yellow-500" /> Alternate Phone
             </h2>
             {isLoadingProfile ? (
               <div className="p-4 flex items-center justify-center">
@@ -650,7 +669,7 @@ export default function CheckoutForm() {
                 )}
                 {!phone && !phoneError && (
                   <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
-                    Required — we use this to contact you about your delivery.
+                    Required — used if we cannot reach your primary number.
                   </p>
                 )}
               </div>
@@ -722,9 +741,10 @@ export default function CheckoutForm() {
                           )}
                         </p>
                         <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                          {selectedAddress.city
-                            ? `${selectedAddress.street}, ${selectedAddress.city}`
-                            : selectedAddress.street}
+                          {[selectedAddress.street, selectedAddress.city]
+                            .filter(Boolean)
+                            .join(", ") ||
+                            `${selectedAddress.lat.toFixed(5)}, ${selectedAddress.lng.toFixed(5)}`}
                         </p>
                       </>
                     ) : (
@@ -752,12 +772,153 @@ export default function CheckoutForm() {
             )}
           </section>
 
+          <section className="space-y-5 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/5 dark:bg-[#151515]">
+            <div>
+              <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
+                <CreditCard className="h-5 w-5 text-yellow-500" /> Payment
+              </h2>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  aria-pressed={paymentMethod === "CARD"}
+                  onClick={() => setPaymentMethod("CARD")}
+                  disabled={isProcessing}
+                  className={`flex items-center gap-3 rounded-2xl border-2 p-4 text-left transition ${paymentMethod === "CARD" ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-500/10" : "border-gray-200 dark:border-white/10"}`}
+                >
+                  <span className="rounded-xl bg-yellow-100 p-2 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400">
+                    <CreditCard className="h-5 w-5" />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-black">Pay online</span>
+                    <span className="mt-0.5 block text-xs text-gray-500">
+                      Secure Paystack checkout
+                    </span>
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  aria-pressed={paymentMethod === "WALLET"}
+                  onClick={() => {
+                    setPaymentMethod("WALLET");
+                    if (
+                      walletBalance !== null &&
+                      walletBalance < (quoteGrandTotal ?? 0)
+                    ) {
+                      setShowTopup(true);
+                    }
+                  }}
+                  disabled={isProcessing}
+                  className={`flex items-center gap-3 rounded-2xl border-2 p-4 text-left transition ${paymentMethod === "WALLET" ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-500/10" : "border-gray-200 dark:border-white/10"}`}
+                >
+                  <span className="rounded-xl bg-yellow-100 p-2 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400">
+                    <Wallet className="h-5 w-5" />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-black">Wallet</span>
+                    <span
+                      className={`mt-0.5 block text-xs ${walletBalance !== null && walletBalance < (quoteGrandTotal ?? 0) ? "text-red-500" : "text-gray-500"}`}
+                    >
+                      {walletLoading
+                        ? "Checking balance…"
+                        : walletBalance === null
+                          ? "Balance unavailable"
+                          : `Balance: ₦${walletBalance.toLocaleString()}`}
+                    </span>
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {paymentMethod === "WALLET" && (
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-black">Top up your wallet</p>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      Add funds with Paystack and return to this checkout.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowTopup((current) => !current)}
+                    className="shrink-0 rounded-xl bg-yellow-100 px-3 py-2 text-xs font-black text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400"
+                  >
+                    {showTopup ? "Close" : "Top up"}
+                  </button>
+                </div>
+
+                {showTopup && (
+                  <div className="mt-4 space-y-3 border-t border-gray-200 pt-4 dark:border-white/10">
+                    <div className="flex items-center rounded-xl border border-gray-200 bg-white px-3 focus-within:border-yellow-500 dark:border-white/10 dark:bg-[#151515]">
+                      <span className="font-bold text-gray-500">₦</span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="1"
+                        step="1"
+                        value={topupAmount}
+                        onChange={(event) => setTopupAmount(event.target.value)}
+                        aria-label="Wallet top-up amount"
+                        className="min-w-0 flex-1 bg-transparent px-2 py-3 font-black outline-none"
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[5000, 10000, 20000].map((amount) => (
+                        <button
+                          key={amount}
+                          type="button"
+                          onClick={() => setTopupAmount(String(amount))}
+                          className={`rounded-xl border px-2 py-2 text-xs font-bold ${topupAmount === String(amount) ? "border-yellow-500 bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400" : "border-gray-200 text-gray-500 dark:border-white/10"}`}
+                        >
+                          ₦{amount.toLocaleString()}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleWalletTopup}
+                      disabled={topupLoading || !topupAmount}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-gray-950 py-3 text-sm font-black text-white disabled:opacity-50 dark:bg-white dark:text-black"
+                    >
+                      {topupLoading && (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      )}
+                      {topupLoading
+                        ? "Opening Paystack…"
+                        : "Continue to Paystack"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <label className="block border-t border-gray-100 pt-5 dark:border-white/5">
+              <span className="mb-2 flex items-center gap-2 text-sm font-black">
+                <NotebookPen className="h-4 w-4 text-yellow-500" /> Delivery note
+                <span className="font-medium text-gray-400">(optional)</span>
+              </span>
+              <textarea
+                value={deliveryNote}
+                onChange={(event) => setDeliveryNote(event.target.value)}
+                maxLength={500}
+                disabled={isProcessing}
+                placeholder="e.g. Leave at the gate"
+                className="h-24 w-full resize-none rounded-2xl border border-gray-200 bg-transparent p-4 text-sm outline-none transition focus:border-yellow-500 dark:border-white/10"
+              />
+              <span className="mt-1 block text-right text-[10px] text-gray-400">
+                {deliveryNote.length}/500
+              </span>
+            </label>
+          </section>
+
           <CartItemsList
             items={cartItems}
             isProcessing={isProcessing}
             onAdd={addItem}
             onDecrease={decreaseItem}
-            onRemove={removeItem}
+            onRemove={handleRemoveCartItem}
+            onClear={handleClearCart}
           />
         </div>
 
@@ -776,10 +937,15 @@ export default function CheckoutForm() {
                 isProcessing ||
                 !selectedAddress ||
                 !isOnline ||
-                !!validatePhone(phone)
+                !!validatePhone(phone) ||
+                (paymentMethod === "WALLET" &&
+                  (walletLoading ||
+                    walletBalance === null ||
+                    walletBalance < (quoteGrandTotal ?? 0)))
               }
               onPlaceOrder={handlePlaceOrder}
               retryCount={0}
+              paymentMethod={paymentMethod}
             />
           </div>
         </div>

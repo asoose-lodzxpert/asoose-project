@@ -115,7 +115,7 @@ function buildItemListSchema(vendors: Vendor[]) {
       position: i + 1,
       url: `${SITE_URL}/stores/${v.slug ?? v.id}`,
       name: v.name,
-      image: v.logo || v.banner || `${SITE_URL}/placeholder-store.png`,
+      image: v.logo || v.banner || `${SITE_URL}/placeholder-store.webp`,
     })),
   };
 }
@@ -139,7 +139,7 @@ function buildBreadcrumbSchema() {
 // ── Store card ─────────────────────────────────────────────────────────────────
 function VendorCard({ vendor }: { vendor: Vendor }) {
   const href = `/stores/${vendor.slug ?? vendor.id}`;
-  const image = vendor.logo || vendor.banner || "/placeholder-store.png";
+  const image = vendor.logo || vendor.banner || "/placeholder-store.webp";
 
   return (
     <Link

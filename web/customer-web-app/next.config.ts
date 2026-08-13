@@ -20,6 +20,7 @@ assertValidEnv();
 // (http://localhost:3000) and production URLs are covered automatically.
 const apiUrl =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+const normalizedApiUrl = apiUrl.replace(/\/$/, "");
 const apiOrigin = (() => {
   try {
     const { origin } = new URL(apiUrl);
@@ -41,7 +42,7 @@ const CSP = [
   // Fonts
   "font-src 'self' https://fonts.gstatic.com",
   // Images: self + Maps tiles + placeholder services used in next.config images
-  "img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://maps.gstatic.com https://*.googleusercontent.com https://*.openstreetmap.org https://asoose-storage.s3.eu-north-1.amazonaws.com https://asoose-storage-migration.s3.us-east-1.amazonaws.com https://ffyfvbgcbvbgnmopmmhi.supabase.co https://avatars.githubusercontent.com https://stackable-eclair-kzms-p62.storage.railway.app https://loremflickr.com https://picsum.photos https://placehold.co https://via.placeholder.com https://www.facebook.com",
+  "img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://maps.gstatic.com https://*.googleusercontent.com https://*.openstreetmap.org https://asoose-storage.s3.eu-north-1.amazonaws.com https://asoose-storage-migration.s3.us-east-1.amazonaws.com https://ffyfvbgcbvbgnmopmmhi.supabase.co https://avatars.githubusercontent.com https://stackable-eclair-kzms-p62.storage.railway.app https://res.cloudinary.com https://images.pexels.com https://cdn.asoose.com https://loremflickr.com https://picsum.photos https://placehold.co https://via.placeholder.com https://www.facebook.com",
   // XHR/Fetch: backend API + Google Maps XHR calls (geocoding relay etc.) + Meta Pixel events
   `connect-src 'self' ${apiOrigin} https://*.googleapis.com https://maps.googleapis.com https://connect.facebook.net https://www.facebook.com wss: ws:`,
   // Frames: block all
@@ -55,10 +56,36 @@ const CSP = [
 ].join("; ");
 
 const nextConfig = {
+  async rewrites() {
+    return [
+      {
+        // Keep browser API traffic same-origin. Next.js forwards the request
+        // server-side, so backend CORS settings cannot block DELETE/PATCH.
+        source: "/api/backend/:path*",
+        destination: `${normalizedApiUrl}/:path*`,
+      },
+    ];
+  },
+
   images: {
     unoptimized: true,
     qualities: [75, 85],
     remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "images.pexels.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "cdn.asoose.com",
+        pathname: "/**",
+      },
       {
         protocol: "https",
         hostname: "asoose-storage.s3.eu-north-1.amazonaws.com",

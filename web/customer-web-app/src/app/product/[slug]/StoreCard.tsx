@@ -44,7 +44,7 @@ export function StoreCard({ store }: { store: StoreInfo }) {
   const storeHref = `/main/store/${store.slug ?? store.id}`;
 
   return (
-    <div className="bg-white dark:bg-[#151515] rounded-2xl p-5 space-y-4">
+    <section className="space-y-4 rounded-2xl border border-black/[0.06] bg-white p-4 shadow-sm sm:p-5 dark:border-white/[0.07] dark:bg-[#151515]">
       <div className="flex items-start gap-3">
         <div className="w-12 h-12 rounded-xl bg-yellow-500/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
           {logoSrc ? (
@@ -78,11 +78,11 @@ export function StoreCard({ store }: { store: StoreInfo }) {
 
       <Link
         href={storeHref}
-        className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-gray-200 dark:border-white/10 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+      className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 py-2.5 text-sm font-bold transition-colors hover:border-yellow-400 hover:bg-yellow-50 dark:border-white/10 dark:hover:bg-yellow-500/10"
       >
         <Store className="w-4 h-4" />
         Visit Store
       </Link>
-    </div>
+    </section>
   );
 }

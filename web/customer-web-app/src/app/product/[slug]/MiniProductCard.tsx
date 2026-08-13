@@ -8,7 +8,7 @@ export function MiniProductCard({ product }: { product: MiniProduct }) {
   return (
     <Link
       href={`/product/${product.slug}`}
-      className="flex-shrink-0 w-40 sm:w-44 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 overflow-hidden hover:border-yellow-500/40 transition-colors group"
+      className="group w-40 flex-shrink-0 snap-start overflow-hidden rounded-2xl border border-black/[0.06] bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-yellow-500/40 sm:w-44 dark:border-white/[0.07] dark:bg-[#151515]"
     >
       <div className="relative w-full h-40 bg-gray-100 dark:bg-white/5">
         {img ? (

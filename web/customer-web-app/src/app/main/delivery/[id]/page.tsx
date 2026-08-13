@@ -1,14 +1,17 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { toast } from "react-toastify";
-import { Loader2, ArrowLeft, AlertTriangle, Package } from "lucide-react";
+import { Loader2, ArrowLeft, AlertTriangle, Truck } from "lucide-react";
 import DeliveryProgressUI from "../components/DeliveryProgressUi";
-import { DeliveryService, Delivery } from "@/services/delivery.service";
+import {
+  DeliveryService,
+  Delivery,
+  mapParcelStatus,
+} from "@/services/delivery.service";
 import { socketService } from "@/services/socket.service";
-import BottomNav from "../../components/layout/BottomNav";
 import ReportDisputeModal from "../../orders/component/reportDisputeModal";
 import { useDeliveryStore } from "@/store/useDeliveryStore";
 
@@ -31,8 +34,18 @@ export default function DeliveryDetailsPage() {
       try {
         const token =
           (session as any)?.accessToken || (session?.user as any)?.accessToken;
-        const data = await DeliveryService.getDelivery(deliveryId, token);
-        setDelivery(data);
+        const [deliveryResult, codeResult] = await Promise.allSettled([
+          DeliveryService.getDelivery(deliveryId, token),
+          DeliveryService.getConfirmationCode(deliveryId, token),
+        ]);
+        if (deliveryResult.status === "rejected") throw deliveryResult.reason;
+        setDelivery({
+          ...deliveryResult.value,
+          confirmationCode:
+            codeResult.status === "fulfilled"
+              ? codeResult.value.confirmationCode
+              : undefined,
+        });
       } catch (error) {
         console.error(error);
         toast.error("Failed to load delivery details");
@@ -77,18 +90,20 @@ export default function DeliveryDetailsPage() {
 
           return {
             ...prev,
-            status: data.status,
+            status: mapParcelStatus(data.status),
             rider: updatedRider,
           };
         });
 
-        if (data.status === "ASSIGNED" || data.status === "ACCEPTED") {
+        const nextStatus = mapParcelStatus(data.status);
+        if (nextStatus === "ASSIGNED" || nextStatus === "ACCEPTED") {
           toast.info("A rider has accepted your request!");
         }
-        if (data.status === "PICKED_UP") toast.info("Package picked up.");
-        if (data.status === "IN_TRANSIT")
-          toast.info("Your package is on the way!");
-        if (data.status === "DELIVERED") toast.success("Delivery completed!");
+        if (nextStatus === "PICKED_UP") toast.info("Delivery picked up.");
+        if (nextStatus === "IN_TRANSIT")
+          toast.info("Your delivery is on the way!");
+        if (nextStatus === "DELIVERED")
+          toast.success("Delivery completed!");
       }
     };
 
@@ -116,15 +131,14 @@ export default function DeliveryDetailsPage() {
         >
           Start a new delivery
         </button>
-        <BottomNav />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[#0a0a0a] text-zinc-900 dark:text-white transition-colors duration-500 pb-32">
+    <div className="min-h-screen bg-[#f7f7f5] pb-32 text-zinc-900 transition-colors duration-500 dark:bg-[#0a0a0a] dark:text-white">
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 px-6 py-4 flex items-center gap-4">
+      <div className="sticky top-[64px] z-20 flex items-center gap-3 border-b border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur-md sm:px-6 dark:border-zinc-800 dark:bg-[#0a0a0a]/95">
         <button
           onClick={() => router.push("/main/delivery")}
           className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors"
@@ -134,13 +148,13 @@ export default function DeliveryDetailsPage() {
         <h1 className="font-bold text-lg">Delivery Details</h1>
       </div>
 
-      <main className="max-w-5xl mx-auto px-6 py-6 space-y-6">
+      <main className="mx-auto max-w-5xl space-y-6 px-4 py-5 sm:px-6 sm:py-6">
         {/* Main Delivery Progress */}
         <DeliveryProgressUI delivery={delivery} />
 
         {/* Actions Section */}
         <div className="space-y-4">
-          {/* Send Another Package Button - Only if Delivered */}
+          {/* Send Another Delivery Button - Only if Delivered */}
           {delivery.status === "DELIVERED" && (
             <button
               onClick={() => {
@@ -152,8 +166,8 @@ export default function DeliveryDetailsPage() {
               }}
               className="w-full py-4 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-2xl shadow-lg hover:shadow-xl transform active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >
-              <Package size={20} />
-              Send Another Package
+              <Truck size={20} />
+              Send Another Delivery
             </button>
           )}
 
@@ -184,8 +198,6 @@ export default function DeliveryDetailsPage() {
           )}
         </div>
       </main>
-
-      <BottomNav />
 
       {/* Report Dispute Modal */}
       {delivery && (

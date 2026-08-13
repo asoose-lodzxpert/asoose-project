@@ -21,15 +21,15 @@ import { trackMetaCustomEvent } from "@/lib/meta-pixel";
 
 // ── Per-image blur placeholders ───────────────────────────────────────────────
 const BLUR_MAP: Record<string, string> = {
-  "/marketplace.jpg":
+  "/marketplace.webp":
     "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/wAARCAAIAAoDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8AJQAD/9k=",
-  "/ride.jpg":
+  "/ride.webp":
     "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/wAARCAAIAAoDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABcQAAMBAAAAAAAAAAAAAAAAAAABERL/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8AnVQD/9k=",
-  "/delivery.jpg":
+  "/delivery.webp":
     "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/wAARCAAIAAoDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABcQAAMBAAAAAAAAAAAAAAAAAAABIhH/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8AlkQD/9k=",
-  "/vendor.jpg":
+  "/vendor.webp":
     "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/wAARCAAIAAoDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABcQAAMBAAAAAAAAAAAAAAAAAAABESH/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8AmRUD/9k=",
-  "/driver.jpg":
+  "/driver.webp":
     "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/wAARCAAIAAoDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABcQAAMBAAAAAAAAAAAAAAAAAAABEjL/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8AkkQD/9k=",
 };
 
@@ -167,7 +167,7 @@ export default function AsooseLanding() {
       cta: "Make order",
       link: "/main/store",
       badge: "Track your order live",
-      image: "/marketplace.jpg",
+      image: "/marketplace.webp",
     },
     ride: {
       title: "Where to?",
@@ -175,7 +175,7 @@ export default function AsooseLanding() {
       cta: "Book a ride",
       link: "/main/ride",
       badge: "Quick driver matching",
-      image: "/ride.jpg",
+      image: "/ride.webp",
     },
     package: {
       title: "Send a package",
@@ -183,7 +183,7 @@ export default function AsooseLanding() {
       cta: "Send a package",
       link: "/main/delivery",
       badge: "Upfront pricing & secure",
-      image: "/delivery.jpg",
+      image: "/delivery.webp",
     },
   };
 
@@ -255,7 +255,6 @@ export default function AsooseLanding() {
                 : "bg-white border-black/5"
             }`}
             onMouseEnter={() => setIsPaused(true)}
-            onMouseLeave={() => setIsPaused(false)}
           >
             {/* Slides */}
             <div
@@ -271,7 +270,6 @@ export default function AsooseLanding() {
                   <div className="flex flex-col items-start text-left z-10 order-1">
                     {/* Badge */}
                     <div className="mb-5 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 text-xs font-black uppercase tracking-widest">
-                      <Zap size={14} className="fill-current" />
                       {SERVICE_DATA[key].badge}
                     </div>
 
@@ -443,7 +441,7 @@ export default function AsooseLanding() {
           </div>
           <div className="order-1 md:order-2 relative h-[300px] sm:h-[400px] md:h-[450px] rounded-3xl overflow-hidden bg-zinc-100 dark:bg-zinc-900">
             <Image
-              src="/vendor.jpg"
+              src="/vendor.webp"
               alt="Become a merchant"
               fill
               className="object-cover"
@@ -451,7 +449,7 @@ export default function AsooseLanding() {
               sizes="(max-width: 768px) 100vw, 50vw"
               quality={85}
               placeholder="blur"
-              blurDataURL={BLUR_MAP["/vendor.jpg"]}
+              blurDataURL={BLUR_MAP["/vendor.webp"]}
             />
           </div>
         </section>
@@ -465,7 +463,7 @@ export default function AsooseLanding() {
           <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-10 sm:gap-12 md:gap-16 items-center">
             <div className="relative h-[300px] sm:h-[400px] md:h-[450px] rounded-3xl overflow-hidden bg-zinc-100 dark:bg-zinc-900">
               <Image
-                src="/driver.jpg"
+                src="/driver.webp"
                 alt="Become a rider"
                 fill
                 className="object-cover"
@@ -473,7 +471,7 @@ export default function AsooseLanding() {
                 sizes="(max-width: 768px) 100vw, 50vw"
                 quality={85}
                 placeholder="blur"
-                blurDataURL={BLUR_MAP["/driver.jpg"]}
+                blurDataURL={BLUR_MAP["/driver.webp"]}
               />
             </div>
             <div className="space-y-6 sm:space-y-8">
@@ -497,13 +495,6 @@ export default function AsooseLanding() {
                   </li>
                 ))}
               </ul>
-              <StoreButtons
-                androidUrl={RIDER_ANDROID_URL}
-                iosUrl={RIDER_IOS_URL}
-                darkMode={darkMode}
-                appName="rider"
-                size="sm"
-              />
             </div>
           </div>
         </section>

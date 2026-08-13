@@ -1,31 +1,40 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
-  ChevronRight,
   Loader2,
   AlertCircle,
   RefreshCw,
   CreditCard,
+  Wallet,
   CheckCircle2,
-  MapPin,
   User,
   Phone,
   ChevronLeft,
   X,
+  History,
+  Route,
+  ShieldCheck,
+  MapPinned,
+  BadgeCheck,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { deliverySwal } from "@/lib/swal-theme";
 import { useSession } from "next-auth/react";
-import BottomNav from "../components/layout/BottomNav";
 import { useDeliveryStore } from "@/store/useDeliveryStore";
 import { LocationInput } from "@/components/shared/LocationInput";
 import DeliveryProgressUI from "./components/DeliveryProgressUi";
 import PackageForm from "./components/PackageForm"; // ✅ Imported new component
+import { DeliveryMapPicker } from "./components/DeliveryMapPicker";
 import { ReviewModal } from "@/store/ReviewModal";
-import { paymentService } from "@/services/payment.service";
-import { DeliveryService } from "@/services/delivery.service";
+import { DeliveryService, ParcelEstimate } from "@/services/delivery.service";
+import { WalletService } from "@/services/wallet.service";
+import {
+  AddressService,
+  type SavedAddress,
+} from "@/services/address.service";
 import { socketService } from "@/services/socket.service";
 import {
   savePurchaseContext,
@@ -54,6 +63,7 @@ const DeliveryStage = {
 const PHONE_REGEX = /^(\+234|0)[789][01]\d{8}$/;
 // Stores { id, reference, gateway } so payment can be verified after redirect-back.
 const PENDING_DELIVERY_KEY = "pending_delivery_data";
+const PENDING_WALLET_TOPUP_KEY = "pending_wallet_topup";
 
 interface DetailInputProps {
   label: string;
@@ -62,6 +72,8 @@ interface DetailInputProps {
   value: string;
   onChange: (value: string) => void;
   error?: string | null;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+  autoComplete?: string;
 }
 
 interface SessionWithToken {
@@ -75,12 +87,10 @@ interface SessionWithToken {
 // UTILITIES
 
 const normalizePhoneNumber = (phone: string): string => {
-  let cleaned = phone.replace(/[\s-]/g, "");
-  if (cleaned.startsWith("+234")) {
-    cleaned = "0" + cleaned.slice(4);
-  } else if (cleaned.startsWith("234")) {
-    cleaned = "0" + cleaned.slice(3);
-  }
+  const cleaned = phone.replace(/[\s-]/g, "");
+  if (cleaned.startsWith("+234")) return cleaned;
+  if (cleaned.startsWith("234")) return `+${cleaned}`;
+  if (cleaned.startsWith("0")) return `+234${cleaned.slice(1)}`;
   return cleaned;
 };
 
@@ -117,11 +127,12 @@ export default function DeliveryPage() {
     setLocations,
     pickupPos,
     dropoffPos,
+    pickupAddressId,
+    dropoffAddressId,
+    setAddressIds,
     setStage,
     stage,
-    courierInfo,
     activeDeliveryId,
-    setAddressIds,
     setCalculatedFee,
     calculatedFee,
     resetDelivery,
@@ -129,12 +140,83 @@ export default function DeliveryPage() {
 
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [phoneError, setPhoneError] = useState<string | null>(null);
-  const [senderPhoneError, setSenderPhoneError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<boolean>(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [isGoingBack, setIsGoingBack] = useState(false);
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
+  const [estimate, setEstimate] = useState<ParcelEstimate | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<"WALLET" | "CARD">("CARD");
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [showTopup, setShowTopup] = useState(false);
+  const [topupAmount, setTopupAmount] = useState("20000");
+  const [isInitializingTopup, setIsInitializingTopup] = useState(false);
+  const [mapPicker, setMapPicker] = useState<"pickup" | "dropoff" | null>(null);
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const idempotencyKeyRef = useRef<string | null>(null);
   const { data: session, status } = useSession();
+
+  useEffect(() => {
+    const token = getAuthToken(session);
+    if (!token) {
+      setSavedAddresses([]);
+      return;
+    }
+
+    AddressService.list(token)
+      .then((items) =>
+        setSavedAddresses(
+          [...items].sort(
+            (first, second) => Number(second.isDefault) - Number(first.isDefault),
+          ),
+        ),
+      )
+      .catch(() => setSavedAddresses([]));
+  }, [session]);
+
+  const selectSavedAddress = (
+    kind: "pickup" | "dropoff",
+    addressId: string,
+  ) => {
+    const address = savedAddresses.find((item) => item.id === addressId);
+    if (!address) return;
+
+    const position = { lat: address.latitude, lng: address.longitude };
+    const displayAddress =
+      [address.street, address.city, address.state].filter(Boolean).join(", ") ||
+      `${address.latitude.toFixed(5)}, ${address.longitude.toFixed(5)}`;
+
+    if (kind === "pickup") {
+      setLocations(position, undefined);
+      setAddressIds(address.id, undefined);
+      setPackageInfo({ pickupAddress: displayAddress });
+    } else {
+      setLocations(undefined, position);
+      setAddressIds(undefined, address.id);
+      setPackageInfo({ destinationAddress: displayAddress });
+    }
+    setCalculatedFee(null);
+    setEstimate(null);
+  };
+
+  const refreshWalletBalance = useCallback(async () => {
+    const token = getAuthToken(session);
+    if (!token) return;
+
+    setWalletLoading(true);
+    try {
+      const wallet = await WalletService.getMyWallet(token);
+      setWalletBalance(wallet.balance);
+    } catch {
+      setWalletBalance(null);
+    } finally {
+      setWalletLoading(false);
+    }
+  }, [session]);
+
+  useEffect(() => {
+    if (stage === DeliveryStage.REVIEW_PAYMENT) refreshWalletBalance();
+  }, [stage, refreshWalletBalance]);
 
   // Redirect if we are in a backend-sourced tracking state.
   // ACCEPTED and IN_TRANSIT are valid backend DeliveryStatus values that must
@@ -166,7 +248,7 @@ export default function DeliveryPage() {
       } else {
         // Fallback: if delivery ID is lost, at least go to deliveries list
         // so the user can find their delivery instead of being stuck.
-        router.push("/main/deliveries");
+        router.push("/main/profile?tab=deliveries");
       }
     },
     [activeDeliveryId, resetDelivery, router],
@@ -192,6 +274,7 @@ export default function DeliveryPage() {
         const { id, reference, gateway = "PAYSTACK" } = JSON.parse(storedData);
         if (!id || !reference) {
           localStorage.removeItem(PENDING_DELIVERY_KEY);
+          setStage(DeliveryStage.REVIEW_PAYMENT);
           return;
         }
 
@@ -289,8 +372,13 @@ export default function DeliveryPage() {
 
   const handleSocketUpdate = useCallback(
     (data: any) => {
-      // Map backend ACCEPTED (rider confirmed) → ASSIGNED (same UI step)
-      if (data.status === "ASSIGNED" || data.status === "ACCEPTED") {
+      // Parcel events use RIDER_* names; legacy delivery events use the
+      // shorter equivalents. Both represent the same UI stages.
+      if (
+        ["ASSIGNED", "ACCEPTED", "RIDER_ASSIGNED", "RIDER_ACCEPTED"].includes(
+          data.status,
+        )
+      ) {
         useDeliveryStore.setState({
           courierInfo: data.rider,
           stage: DeliveryStage.ASSIGNED,
@@ -298,7 +386,7 @@ export default function DeliveryPage() {
         toast.info("Courier found! They are on their way.");
       } else if (data.status === "PICKED_UP") {
         setStage(DeliveryStage.PICKED_UP);
-        toast.info("Package picked up.");
+        toast.info("Delivery picked up.");
       } else if (data.status === "IN_TRANSIT") {
         // IN_TRANSIT is a valid backend status – redirect to detail tracking
         setStage(DeliveryStage.IN_TRANSIT);
@@ -337,19 +425,6 @@ export default function DeliveryPage() {
     [setPackageInfo],
   );
 
-  const handleSenderPhoneChange = useCallback(
-    (value: string) => {
-      setPackageInfo({ senderPhone: value });
-      if (!value) {
-        setSenderPhoneError(null);
-        return;
-      }
-      const validation = validatePhoneNumber(value);
-      setSenderPhoneError(validation.error);
-    },
-    [setPackageInfo],
-  );
-
   // ✅ Updated Logic: Initialize Delivery with Metadata
   const handleInitializeDelivery = async () => {
     const swal = deliverySwal();
@@ -378,45 +453,12 @@ export default function DeliveryPage() {
       });
       return;
     }
-    if (!packageInfo.senderPhone) {
-      await swal.fire({
-        icon: "warning",
-        title: "Your Phone Number Required",
-        html: `
-          <p>Please enter <strong>your phone number</strong> so the courier can contact you at pickup.</p>
-          <p class="mt-2 text-sm">Accepted formats:</p>
-          <ul class="text-sm mt-1 list-disc list-inside">
-            <li><strong>08012345678</strong> (local format)</li>
-            <li><strong>+2348012345678</strong> (international format)</li>
-          </ul>
-        `,
-        confirmButtonText: "Enter Phone",
-      });
-      return;
-    }
-    if (senderPhoneError) {
-      await swal.fire({
-        icon: "error",
-        title: "Invalid Sender Phone Number",
-        html: `
-          <p>Your phone number is <strong>not a valid Nigerian number</strong>.</p>
-          <p class="mt-2 text-sm">Accepted formats:</p>
-          <ul class="text-sm mt-1 list-disc list-inside">
-            <li><strong>080, 081, 090, 091, 070, 071</strong> prefixes — 11 digits total</li>
-            <li>e.g. <strong>08012345678</strong> or <strong>+2348012345678</strong></li>
-          </ul>
-          <p class="mt-2 text-xs" style="color:#ef4444">${senderPhoneError}</p>
-        `,
-        confirmButtonText: "Fix Number",
-      });
-      return;
-    }
     if (!packageInfo.recipientName || !packageInfo.recipientName.trim()) {
       await swal.fire({
         icon: "warning",
         title: "Recipient Name Required",
         html: `
-          <p>Please enter the <strong>full name</strong> of the person receiving the package.</p>
+          <p>Please enter the <strong>full name</strong> of the person receiving the delivery.</p>
           <p class="mt-2 text-sm">This is used by the courier to identify the recipient on delivery.</p>
         `,
         confirmButtonText: "Enter Name",
@@ -466,87 +508,32 @@ export default function DeliveryPage() {
     setApiError(false);
 
     try {
-      setStage(DeliveryStage.PROCESSING_ADDRESS);
-
-      // `label` is required (non-nullable String) by the Address Prisma model.
-      // Omitting it causes a DB constraint violation on every delivery attempt.
-      const pickupRes = await DeliveryService.saveAddress(
-        {
-          label: "Pickup Location",
-          street: sanitizeInput(packageInfo.pickupAddress),
-          lat: pickupPos.lat,
-          lng: pickupPos.lng,
-        },
-        token,
-      );
-
-      const dropoffRes = await DeliveryService.saveAddress(
-        {
-          label: "Delivery Address",
-          street: sanitizeInput(packageInfo.destinationAddress),
-          lat: dropoffPos.lat,
-          lng: dropoffPos.lng,
-        },
-        token,
-      );
-
-      setAddressIds(pickupRes.id, dropoffRes.id);
       setStage(DeliveryStage.CALCULATING_FEE);
 
-      // Use user-provided exact weight if available, else fallback to package type logic
-      const finalWeight =
-        typeof packageInfo.weightKg === "number" && packageInfo.weightKg > 0
-          ? packageInfo.weightKg
-          : 2.5; // Default fallback
-
-      const deliveryRes = await DeliveryService.createDelivery(
+      // The backend prices and creates the parcel from pickup/dropoff
+      // coordinates directly — no separate "save address, get an ID back"
+      // step. Estimate here just previews the fare; the parcel itself (and
+      // payment) is created in handlePayment once the user confirms.
+      const estimate = await DeliveryService.estimateParcel(
         {
-          pickupAddressId: pickupRes.id,
-          dropoffAddressId: dropoffRes.id,
-          recipientName: sanitizeInput(packageInfo.recipientName),
-          recipientPhone: normalizePhoneNumber(packageInfo.recipientPhone),
-          senderName: packageInfo.senderName.trim() || undefined,
-          senderPhone: packageInfo.senderPhone
-            ? normalizePhoneNumber(packageInfo.senderPhone)
-            : undefined,
-          // Avoid a trailing dash ("Document - ") when instructions are empty.
-          packageDetails: sanitizeInput(
-            packageInfo.instructions
-              ? `${packageInfo.type} - ${packageInfo.instructions}`
-              : packageInfo.type,
-          ),
-
-          // Optional Metadata Fields
-          weightKg: finalWeight,
-          declaredValue:
-            typeof packageInfo.declaredValue === "number"
-              ? packageInfo.declaredValue
-              : undefined,
-          fragile: packageInfo.isFragile,
-          perishable: packageInfo.isPerishable,
-          containsLiquid: packageInfo.containsLiquid,
+          latitude: pickupPos.lat,
+          longitude: pickupPos.lng,
+          address: sanitizeInput(packageInfo.pickupAddress),
         },
+        {
+          latitude: dropoffPos.lat,
+          longitude: dropoffPos.lng,
+          address: sanitizeInput(packageInfo.destinationAddress),
+        },
+        packageInfo.size,
         token,
       );
 
-      if (deliveryRes?.delivery?.id) {
-        trackMetaCustomEvent(
-          "DispatchRequest",
-          {
-            package_type: packageInfo.type,
-            value: deliveryRes.deliveryFee,
-            currency: "NGN",
-          },
-          `dispatch:${deliveryRes.delivery.id}`,
-        );
-        useDeliveryStore.setState({
-          activeDeliveryId: deliveryRes.delivery.id,
-        });
-        setCalculatedFee(deliveryRes.deliveryFee);
-        setStage(DeliveryStage.REVIEW_PAYMENT);
-      } else {
-        throw new Error("Invalid server response");
-      }
+      setCalculatedFee(estimate.fare);
+      setEstimate(estimate);
+      setStage(DeliveryStage.REVIEW_PAYMENT);
+
+      refreshWalletBalance();
     } catch (error: any) {
       console.error("Init Error:", error);
       toast.error(error.message || "Failed to initialize delivery.");
@@ -555,77 +542,129 @@ export default function DeliveryPage() {
     }
   };
 
-  const handlePayment = async () => {
-    if (!activeDeliveryId || !calculatedFee) return;
+  const handleWalletTopup = async () => {
+    const amount = Number(topupAmount);
+    if (!Number.isInteger(amount) || amount <= 0) {
+      toast.error("Enter a valid top-up amount.");
+      return;
+    }
+
     const token = getAuthToken(session);
     if (!token) {
       toast.error("Session expired. Please login again.");
       return;
     }
 
+    setIsInitializingTopup(true);
+    try {
+      const result = await WalletService.initializeTopup(amount, token);
+      if (!result.authorizationUrl?.startsWith("https://checkout.paystack.com/")) {
+        throw new Error("The payment link returned by the server is invalid.");
+      }
+
+      localStorage.setItem(
+        PENDING_WALLET_TOPUP_KEY,
+        JSON.stringify({ reference: result.reference, returnTo: "/main/delivery" }),
+      );
+      window.location.href = result.authorizationUrl;
+    } catch (error: any) {
+      toast.error(error?.message || "Could not initialize wallet top-up.");
+      setIsInitializingTopup(false);
+    }
+  };
+
+  const handlePayment = async () => {
+    if (!pickupPos || !dropoffPos || !calculatedFee) return;
+    const token = getAuthToken(session);
+    if (!token) {
+      toast.error("Session expired. Please login again.");
+      return;
+    }
+
+    if (
+      paymentMethod === "WALLET" &&
+      walletBalance !== null &&
+      walletBalance < calculatedFee
+    ) {
+      toast.error("Your wallet balance is not enough for this delivery.");
+      return;
+    }
+
     try {
       setStage(DeliveryStage.PAYMENT_PENDING);
-      const userEmail =
-        session?.user?.email || `guest-${Date.now()}@asoose.com`;
 
-      // Build the frontend callback URL explicitly.
-      // The backend stores this in payment.metadata and uses it to redirect
-      // the user's browser BACK to the frontend after verifying with Paystack.
-      // Without this, the backend falls back to process.env.FRONTEND_URL which
-      // may be unset or wrong. NEXT_PUBLIC_APP_URL must be this app's port (3001),
-      // NOT the backend port (3000).
-      const appUrl = (
-        process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"
-      ).replace(/\/+$/, "");
-      // Send just the base URL — the backend GET /callback/paystack handler
-      // appends "/payment/callback" itself before redirecting the browser.
-      const frontendCallbackUrl = appUrl;
+      // The backend creates the parcel AND initiates payment in one call —
+      // there's no separate "create, then initiate payment" step. For CARD
+      // it returns a Paystack authorizationUrl directly.
+      if (!idempotencyKeyRef.current) {
+        idempotencyKeyRef.current = `parcel-${session?.user?.id ?? "customer"}-${Date.now()}`;
+      }
 
-      const paymentRes = await paymentService.initiatePayment(
+      const result = await DeliveryService.createDelivery(
         {
-          amount: calculatedFee,
-          email: userEmail,
-          gateway: "PAYSTACK",
-          method: "CARD",
-          type: "DELIVERY",
-          // deliveryId at the top level is used by the backend to look up the
-          // delivery record and authoritative fee — amount above is a hint only.
-          deliveryId: activeDeliveryId,
-          // callbackUrl goes into payment.metadata so the backend GET callback
-          // handler knows where to redirect the browser after verification.
-          callbackUrl: frontendCallbackUrl,
-          metadata: {
-            deliveryId: activeDeliveryId,
-            purpose: "DELIVERY_REQUEST",
+          pickup: {
+            latitude: pickupPos.lat,
+            longitude: pickupPos.lng,
+            address: sanitizeInput(packageInfo.pickupAddress),
           },
+          dropoff: {
+            latitude: dropoffPos.lat,
+            longitude: dropoffPos.lng,
+            address: sanitizeInput(packageInfo.destinationAddress),
+          },
+          size: packageInfo.size,
+          recipientName: sanitizeInput(packageInfo.recipientName),
+          recipientPhone: normalizePhoneNumber(packageInfo.recipientPhone),
+          description: sanitizeInput(
+            packageInfo.instructions || packageInfo.type,
+          ),
+          paymentMethod,
+          idempotencyKey: idempotencyKeyRef.current,
         },
         token,
       );
 
-      if (paymentRes.authorizationUrl && paymentRes.reference) {
+      useDeliveryStore.setState({ activeDeliveryId: result.delivery.id });
+      trackMetaCustomEvent(
+        "DispatchRequest",
+        {
+          package_type: packageInfo.type,
+          value: result.deliveryFee,
+          currency: "NGN",
+        },
+        `dispatch:${result.delivery.id}`,
+      );
+
+      if (result.authorizationUrl) {
         savePurchaseContext({
           value: calculatedFee,
           currency: "NGN",
           contentCategory: "dispatch",
-          contentId: activeDeliveryId,
+          contentId: result.delivery.id,
         });
-        // Store gateway alongside reference so verifyPayment can use the correct
-        // gateway during recovery — without it the backend throws a validation error.
+        // The create endpoint may return only the Paystack URL. Keep the
+        // delivery ID regardless; Paystack supplies the reference on return.
         localStorage.setItem(
           PENDING_DELIVERY_KEY,
           JSON.stringify({
-            id: activeDeliveryId,
-            reference: paymentRes.reference,
+            id: result.delivery.id,
+            reference: result.reference ?? null,
             gateway: "PAYSTACK",
           }),
         );
-        window.location.href = paymentRes.authorizationUrl;
+        if (!result.authorizationUrl.startsWith("https://checkout.paystack.com/")) {
+          throw new Error("The payment link returned by the server is invalid.");
+        }
+        window.location.href = result.authorizationUrl;
       } else {
-        throw new Error("Invalid payment response");
+        // WALLET — already paid, nothing to redirect to a gateway for.
+        toast.success("Delivery requested and paid from your wallet!");
+        resetDelivery();
+        router.push(`/main/delivery/${result.delivery.id}`);
       }
     } catch (error: any) {
       console.error("Payment Error:", error);
-      toast.error("Payment initialization failed");
+      toast.error(error.message || "Payment initialization failed");
       setStage(DeliveryStage.REVIEW_PAYMENT);
     }
   };
@@ -639,7 +678,7 @@ export default function DeliveryPage() {
       try {
         const stored = localStorage.getItem(PENDING_DELIVERY_KEY);
         if (stored) gateway = JSON.parse(stored).gateway || "PAYSTACK";
-      } catch (_) {}
+      } catch {}
 
       const storedRef = localStorage.getItem(PENDING_DELIVERY_KEY);
       const reference = storedRef ? JSON.parse(storedRef).reference : null;
@@ -675,6 +714,7 @@ export default function DeliveryPage() {
 
   const handleGoBack = useCallback(() => {
     setIsGoingBack(true);
+    idempotencyKeyRef.current = null;
     // Update stage immediately, the state change will handle the transition
     setStage(DeliveryStage.CONFIGURING);
     // Use setTimeout to ensure the loader is seen briefly if transition is too fast
@@ -711,6 +751,7 @@ export default function DeliveryPage() {
       } catch (error) {
         console.error("Cancel Error:", error);
       } finally {
+        idempotencyKeyRef.current = null;
         resetDelivery();
         setStage(DeliveryStage.CONFIGURING);
         setIsCancelling(false);
@@ -785,7 +826,13 @@ export default function DeliveryPage() {
               <p className="text-zinc-500">Total Delivery Fee</p>
             </div>
 
-            <div className="bg-zinc-50 dark:bg-zinc-800/50 p-6 rounded-2xl mb-6 flex justify-between items-center border border-zinc-100 dark:border-zinc-700">
+            <div className="mb-4 rounded-2xl border border-zinc-100 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800/50">
+              <div className="flex gap-3"><span className="mt-1 h-3 w-3 shrink-0 rounded-full border-[3px] border-yellow-500 bg-white dark:bg-zinc-900" /><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Pickup</p><p className="mt-1 truncate text-sm font-bold">{packageInfo.pickupAddress}</p></div></div>
+              <div className="ml-[5px] h-5 border-l-2 border-dotted border-zinc-300 dark:border-zinc-600" />
+              <div className="flex gap-3"><span className="mt-1 h-3 w-3 shrink-0 rounded-sm bg-blue-500" /><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Drop-off</p><p className="mt-1 truncate text-sm font-bold">{packageInfo.destinationAddress}</p></div></div>
+            </div>
+
+            <div className="mb-4 flex items-center justify-between rounded-2xl border border-zinc-100 bg-zinc-50 p-5 dark:border-zinc-700 dark:bg-zinc-800/50 sm:p-6">
               <span className="font-medium text-zinc-600 dark:text-zinc-400">
                 Amount to Pay
               </span>
@@ -794,24 +841,155 @@ export default function DeliveryPage() {
               </span>
             </div>
 
-            <div className="flex items-start gap-3 bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl mb-8">
+            {estimate && (
+              <div className="mb-4 grid grid-cols-3 gap-2">
+                <div className="rounded-xl bg-zinc-50 p-3 text-center dark:bg-zinc-800/50">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Distance</p>
+                  <p className="mt-1 text-sm font-black">{estimate.distanceKm.toFixed(1)} km</p>
+                </div>
+                <div className="rounded-xl bg-zinc-50 p-3 text-center dark:bg-zinc-800/50">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Duration</p>
+                  <p className="mt-1 text-sm font-black">~{estimate.estimatedDurationMinutes} min</p>
+                </div>
+                <div className="rounded-xl bg-zinc-50 p-3 text-center dark:bg-zinc-800/50">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Size</p>
+                  <p className="mt-1 text-sm font-black capitalize">{packageInfo.size.toLowerCase()}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="mb-6 flex items-start gap-3 rounded-xl bg-blue-50 p-4 dark:bg-blue-900/10">
               <CheckCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
               <p className="text-sm text-blue-700 dark:text-blue-300">
-                Vehicle assigned automatically based on package weight (
-                {typeof packageInfo.weightKg === "number"
-                  ? `${packageInfo.weightKg}kg`
-                  : packageInfo.weight}
-                ).
+                A suitable rider will be assigned automatically for this {packageInfo.size.toLowerCase()} delivery.
               </p>
             </div>
 
             <div className="space-y-3">
+              <div>
+                <p className="mb-3 text-xs font-black uppercase tracking-widest text-zinc-400">Choose payment method</p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    aria-pressed={paymentMethod === "CARD"}
+                    onClick={() => {
+                      setPaymentMethod("CARD");
+                      idempotencyKeyRef.current = null;
+                    }}
+                    className={`flex items-center gap-3 rounded-2xl border-2 p-4 text-left transition ${paymentMethod === "CARD" ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-500/10" : "border-zinc-200 dark:border-zinc-700"}`}
+                  >
+                    <CreditCard className="h-5 w-5 shrink-0 text-yellow-600" />
+                    <div>
+                      <p className="text-sm font-bold">Pay online</p>
+                      <p className="text-xs text-zinc-400">Secure Paystack checkout</p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={paymentMethod === "WALLET"}
+                    onClick={() => {
+                      setPaymentMethod("WALLET");
+                      idempotencyKeyRef.current = null;
+                      if (
+                        walletBalance !== null &&
+                        walletBalance < (calculatedFee ?? 0)
+                      ) {
+                        setShowTopup(true);
+                      }
+                    }}
+                    className={`flex items-center gap-3 rounded-2xl border-2 p-4 text-left transition ${paymentMethod === "WALLET" ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-500/10" : "border-zinc-200 dark:border-zinc-700"}`}
+                  >
+                    <Wallet className="h-5 w-5 shrink-0 text-yellow-600" />
+                    <div>
+                      <p className="text-sm font-bold">Wallet</p>
+                      <p className={`text-xs ${walletBalance !== null && walletBalance < (calculatedFee ?? 0) ? "text-red-500" : "text-zinc-400"}`}>
+                        {walletLoading ? "Checking balance…" : walletBalance === null ? "Balance unavailable" : `Balance: ₦${walletBalance.toLocaleString()}`}
+                      </p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {paymentMethod === "WALLET" && (
+                <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800/50">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-bold dark:text-white">
+                        Need more wallet funds?
+                      </p>
+                      <p className="mt-0.5 text-xs text-zinc-500">
+                        Top up securely with Paystack, then return here to pay.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowTopup((current) => !current)}
+                      className="shrink-0 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs font-black text-yellow-700 transition hover:bg-yellow-500/20 dark:text-yellow-400"
+                    >
+                      {showTopup ? "Close" : "Top up"}
+                    </button>
+                  </div>
+
+                  {showTopup && (
+                    <div className="mt-4 space-y-3 border-t border-zinc-200 pt-4 dark:border-zinc-700">
+                      <label className="block">
+                        <span className="mb-2 block text-xs font-bold text-zinc-500">
+                          Top-up amount
+                        </span>
+                        <div className="flex items-center rounded-xl border border-zinc-200 bg-white px-3 focus-within:border-yellow-500 dark:border-zinc-700 dark:bg-zinc-900">
+                          <span className="font-bold text-zinc-500">₦</span>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min="1"
+                            step="1"
+                            value={topupAmount}
+                            onChange={(event) => setTopupAmount(event.target.value)}
+                            className="min-w-0 flex-1 bg-transparent px-2 py-3 text-base font-black outline-none dark:text-white"
+                            placeholder="20000"
+                          />
+                        </div>
+                      </label>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        {[5000, 10000, 20000].map((amount) => (
+                          <button
+                            key={amount}
+                            type="button"
+                            onClick={() => setTopupAmount(String(amount))}
+                            className={`rounded-xl border px-2 py-2 text-xs font-bold transition ${topupAmount === String(amount) ? "border-yellow-500 bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400" : "border-zinc-200 bg-white text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"}`}
+                          >
+                            ₦{amount.toLocaleString()}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleWalletTopup}
+                        disabled={isInitializingTopup || !topupAmount}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-900 py-3 text-sm font-black text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black"
+                      >
+                        {isInitializingTopup && (
+                          <Loader2 size={17} className="animate-spin" />
+                        )}
+                        {isInitializingTopup
+                          ? "Opening Paystack…"
+                          : "Continue to Paystack"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <button
+                type="button"
                 onClick={handlePayment}
-                className="w-full py-4 bg-yellow-500 hover:bg-yellow-600 text-white font-black rounded-xl shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                disabled={paymentMethod === "WALLET" && (walletLoading || walletBalance === null || walletBalance < (calculatedFee ?? 0))}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-yellow-500 py-4 font-black text-black shadow-lg transition-all hover:bg-yellow-400 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <CreditCard size={20} />
-                Pay Securely
+                {paymentMethod === "CARD" ? <CreditCard size={20} /> : <Wallet size={20} />}
+                {paymentMethod === "CARD" ? "Pay online" : "Pay with wallet"}
               </button>
 
               <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
@@ -880,23 +1058,31 @@ export default function DeliveryPage() {
 
       default: // CONFIGURING
         return (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 animate-in fade-in duration-500">
+          <div className="grid grid-cols-1 gap-5 animate-in fade-in duration-500 lg:grid-cols-12 lg:gap-6">
             {/* Left Column: Addresses */}
-            <div className="lg:col-span-7 space-y-12">
-              <section>
-                <div className="relative space-y-8 mt-10">
+            <div className="space-y-5 lg:col-span-7">
+              <section className="rounded-[2rem] border border-black/[0.06] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#151515] sm:p-7">
+                <div className="mb-6 flex items-start gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-yellow-400 text-sm font-black text-black">1</span><div><h2 className="text-lg font-black">Pickup and drop-off</h2><p className="mt-1 text-xs text-zinc-500">Search an address or use your current location.</p></div></div>
+                <div className="relative space-y-5">
+                  <div className="absolute bottom-12 left-[7px] top-12 border-l-2 border-dotted border-zinc-200 dark:border-white/10" />
                   {/* Pickup Address */}
-                  <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2">
-                    <label className="text-sm font-medium mb-2 flex items-center gap-2 text-zinc-500">
-                      <MapPin size={16} className="text-yellow-500" />
-                      Pickup Location
-                    </label>
+                  <div className="relative pl-6">
+                    <span className="absolute left-0 top-10 h-3.5 w-3.5 rounded-full border-[3px] border-yellow-500 bg-white dark:bg-[#151515]" />
+                    <div className="mb-2 flex items-center justify-between gap-3"><label className="text-sm font-bold text-zinc-600 dark:text-zinc-300">Pickup location</label><button type="button" onClick={() => setMapPicker("pickup")} className="flex items-center gap-1.5 rounded-lg bg-yellow-50 px-2.5 py-1.5 text-[10px] font-black text-yellow-700 transition hover:bg-yellow-100 dark:bg-yellow-500/10 dark:text-yellow-400"><MapPinned className="h-3.5 w-3.5" /> Choose on map</button></div>
+                    {savedAddresses.length > 0 && (
+                      <select value={pickupAddressId || ""} onChange={(event) => event.target.value && selectSavedAddress("pickup", event.target.value)} className="mb-2 w-full rounded-xl border border-yellow-200 bg-yellow-50 px-3 py-2.5 text-xs font-bold text-zinc-700 outline-none focus:border-yellow-400 dark:border-yellow-500/20 dark:bg-yellow-500/10 dark:text-zinc-200">
+                        <option value="">Use a saved pickup address</option>
+                        {savedAddresses.map((address) => <option className="text-black" value={address.id} key={address.id}>{address.label}{address.isDefault ? " (Default)" : ""} — {address.street || address.city || "Pinned location"}</option>)}
+                      </select>
+                    )}
                     <LocationInput
                       value={packageInfo.pickupAddress}
-                      onValueChange={(v) =>
-                        setPackageInfo({ pickupAddress: v })
-                      }
+                      onValueChange={(v) => {
+                        setAddressIds(null, undefined);
+                        setPackageInfo({ pickupAddress: v });
+                      }}
                       onLocationSelect={(location, address) => {
+                        setAddressIds(null, undefined);
                         setLocations(location, undefined);
                         setPackageInfo({ pickupAddress: address });
                       }}
@@ -906,17 +1092,23 @@ export default function DeliveryPage() {
                   </div>
 
                   {/* Delivery Address */}
-                  <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2">
-                    <label className="text-sm font-medium mb-2 flex items-center gap-2 text-zinc-500">
-                      <MapPin size={16} className="text-blue-500" />
-                      Delivery Address
-                    </label>
+                  <div className="relative border-t border-black/5 pl-6 pt-5 dark:border-white/5">
+                    <span className="absolute left-0 top-14 h-3.5 w-3.5 rounded-sm bg-blue-500" />
+                    <div className="mb-2 flex items-center justify-between gap-3"><label className="text-sm font-bold text-zinc-600 dark:text-zinc-300">Drop-off location</label><button type="button" onClick={() => setMapPicker("dropoff")} className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1.5 text-[10px] font-black text-blue-700 transition hover:bg-blue-100 dark:bg-blue-500/10 dark:text-blue-400"><MapPinned className="h-3.5 w-3.5" /> Choose on map</button></div>
+                    {savedAddresses.length > 0 && (
+                      <select value={dropoffAddressId || ""} onChange={(event) => event.target.value && selectSavedAddress("dropoff", event.target.value)} className="mb-2 w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-xs font-bold text-zinc-700 outline-none focus:border-blue-400 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-zinc-200">
+                        <option value="">Use a saved drop-off address</option>
+                        {savedAddresses.map((address) => <option className="text-black" value={address.id} key={address.id}>{address.label}{address.isDefault ? " (Default)" : ""} — {address.street || address.city || "Pinned location"}</option>)}
+                      </select>
+                    )}
                     <LocationInput
                       value={packageInfo.destinationAddress}
-                      onValueChange={(v) =>
-                        setPackageInfo({ destinationAddress: v })
-                      }
+                      onValueChange={(v) => {
+                        setAddressIds(undefined, null);
+                        setPackageInfo({ destinationAddress: v });
+                      }}
                       onLocationSelect={(location, address) => {
+                        setAddressIds(undefined, null);
                         setLocations(undefined, location);
                         setPackageInfo({ destinationAddress: address });
                       }}
@@ -926,43 +1118,16 @@ export default function DeliveryPage() {
                 </div>
               </section>
 
-              <section>
-                <h3 className="text-lg font-semibold mb-1 dark:text-white">
-                  Sender Information
-                </h3>
-                <p className="text-xs text-zinc-400 mb-4">
-                  Your details — the courier will contact you at pickup.
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <DetailInput
-                    label="Your Name (optional)"
-                    icon={User}
-                    placeholder="Your full name"
-                    value={packageInfo.senderName}
-                    onChange={(v) => setPackageInfo({ senderName: v })}
-                  />
-                  <DetailInput
-                    label="Your Phone Number"
-                    icon={Phone}
-                    placeholder="08012345678"
-                    value={packageInfo.senderPhone}
-                    onChange={handleSenderPhoneChange}
-                    error={senderPhoneError}
-                  />
-                </div>
-              </section>
-
-              <section>
-                <h3 className="text-lg font-semibold mb-4 dark:text-white">
-                  Recipient Information
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <section className="rounded-[2rem] border border-black/[0.06] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#151515] sm:p-7">
+                <div className="mb-6 flex items-start gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-sm font-black text-white dark:bg-white dark:text-black">2</span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-black">Recipient details</h2><span className="flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"><BadgeCheck className="h-3 w-3" /> Delivery contact</span></div><p className="mt-1 text-xs leading-5 text-zinc-500">Add the person who will receive the item. The rider will use these details only for this delivery.</p></div></div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <DetailInput
                     label="Recipient Name"
                     icon={User}
                     placeholder="Full name"
                     value={packageInfo.recipientName}
                     onChange={(v) => setPackageInfo({ recipientName: v })}
+                    autoComplete="name"
                   />
                   <DetailInput
                     label="Recipient Phone Number"
@@ -971,14 +1136,18 @@ export default function DeliveryPage() {
                     value={packageInfo.recipientPhone}
                     onChange={handlePhoneChange}
                     error={phoneError}
+                    inputMode="tel"
+                    autoComplete="tel"
                   />
                 </div>
+                <div className="mt-4 flex items-start gap-2 rounded-2xl bg-blue-50/70 p-3 text-xs leading-5 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"><Phone className="mt-0.5 h-4 w-4 shrink-0" /><p>Use a reachable Nigerian phone number. We’ll format local numbers such as <strong>0801…</strong> automatically when creating the delivery.</p></div>
               </section>
             </div>
 
-            {/* Right Column: Package Form */}
-            <div className="lg:col-span-5 space-y-12">
-              <section>
+            {/* Right Column: Delivery Form */}
+            <div className="lg:col-span-5">
+              <section className="rounded-[2rem] border border-black/[0.06] bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#151515] sm:p-7 lg:sticky lg:top-24">
+                <div className="mb-6 flex items-start gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-sm font-black text-white dark:bg-white dark:text-black">3</span><div><h2 className="text-lg font-black">Delivery details</h2><p className="mt-1 text-xs text-zinc-500">Choose a size and tell the rider what is inside.</p></div></div>
                 <PackageForm onContinue={handleInitializeDelivery} />
               </section>
             </div>
@@ -988,22 +1157,46 @@ export default function DeliveryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#0a0a0a] text-zinc-900 dark:text-white transition-colors duration-500">
-      <main className="max-w-5xl mx-auto px-6 pt-16 pb-32">
-        <header className="mb-16 flex justify-between items-start">
+    <div className="min-h-screen bg-[#f7f7f5] text-zinc-900 transition-colors duration-500 dark:bg-[#0a0a0a] dark:text-white">
+      <main className="mx-auto max-w-6xl px-4 pb-32 pt-6 sm:px-6 sm:pt-10">
+        <header className="mb-8 flex items-start justify-between sm:mb-12">
           <div className="space-y-2 text-left">
-            <h1 className="text-4xl font-bold">Send a Package</h1>
-            <p className="text-gray-500">Fast, reliable delivery service</p>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-yellow-600">Door-to-door delivery</p>
+            <h1 className="text-3xl font-black tracking-tight sm:text-4xl">Send a delivery</h1>
+            <p className="text-sm text-gray-500 sm:text-base">Enter the route, recipient and delivery size to get an instant estimate.</p>
           </div>
+          <Link href="/main/profile?tab=deliveries" className="hidden items-center gap-2 rounded-xl border border-black/5 bg-white px-4 py-3 text-xs font-black shadow-sm hover:border-yellow-300 dark:border-white/10 dark:bg-[#151515] sm:flex"><History className="h-4 w-4" /> My deliveries</Link>
         </header>
+
+        {(stage === DeliveryStage.IDLE || stage === DeliveryStage.CONFIGURING || stage === DeliveryStage.REVIEW_PAYMENT) && <div className="mb-6 flex items-center gap-2 overflow-x-auto rounded-2xl border border-black/5 bg-white p-2 dark:border-white/10 dark:bg-[#151515]"><div className={`flex min-w-fit items-center gap-2 rounded-xl px-3 py-2 text-xs font-black ${stage === DeliveryStage.IDLE || stage === DeliveryStage.CONFIGURING ? "bg-zinc-950 text-white dark:bg-white dark:text-black" : "text-emerald-600"}`}><Route className="h-4 w-4" /> Delivery details</div><div className="h-px w-6 shrink-0 bg-zinc-200 dark:bg-white/10" /><div className={`flex min-w-fit items-center gap-2 rounded-xl px-3 py-2 text-xs font-black ${stage === DeliveryStage.REVIEW_PAYMENT ? "bg-zinc-950 text-white dark:bg-white dark:text-black" : "text-zinc-400"}`}><CreditCard className="h-4 w-4" /> Review & pay</div><div className="h-px w-6 shrink-0 bg-zinc-200 dark:bg-white/10" /><div className="flex min-w-fit items-center gap-2 rounded-xl px-3 py-2 text-xs font-black text-zinc-400"><ShieldCheck className="h-4 w-4" /> Track delivery</div></div>}
 
         {renderStageContent()}
       </main>
-      <BottomNav />
       <ReviewModal
         isOpen={isReviewModalOpen}
         onClose={() => setIsReviewModalOpen(false)}
         onSubmit={handleReviewSubmit}
+      />
+      <DeliveryMapPicker
+        open={mapPicker !== null}
+        kind={mapPicker || "pickup"}
+        initialPosition={mapPicker === "dropoff" ? dropoffPos : pickupPos}
+        initialAddress={mapPicker === "dropoff" ? packageInfo.destinationAddress : packageInfo.pickupAddress}
+        onClose={() => setMapPicker(null)}
+        onConfirm={(position, address) => {
+          if (mapPicker === "dropoff") {
+            setAddressIds(undefined, null);
+            setLocations(undefined, position);
+            setPackageInfo({ destinationAddress: address });
+          } else {
+            setAddressIds(null, undefined);
+            setLocations(position, undefined);
+            setPackageInfo({ pickupAddress: address });
+          }
+          setCalculatedFee(null);
+          setEstimate(null);
+          setMapPicker(null);
+        }}
       />
     </div>
   );
@@ -1016,12 +1209,12 @@ const DetailInput: React.FC<DetailInputProps> = ({
   value,
   onChange,
   error,
+  inputMode,
+  autoComplete,
 }) => (
-  <div
-    className={`border-b pb-2 transition-colors ${error ? "border-red-500" : "border-zinc-200 dark:border-white/10 focus-within:border-yellow-500"}`}
-  >
+  <div className={`rounded-2xl border bg-gray-50 p-3.5 transition-all focus-within:bg-white focus-within:ring-2 dark:bg-white/[0.03] dark:focus-within:bg-white/[0.05] ${error ? "border-red-400 focus-within:ring-red-500/15" : "border-black/[0.06] focus-within:border-yellow-400 focus-within:ring-yellow-400/15 dark:border-white/10"}`}>
     <label
-      className={`flex items-center gap-2 text-sm font-medium mb-2 ${error ? "text-red-500" : "text-zinc-600 dark:text-zinc-400"}`}
+      className={`mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest ${error ? "text-red-500" : "text-zinc-400"}`}
     >
       <Icon
         size={16}
@@ -1031,10 +1224,12 @@ const DetailInput: React.FC<DetailInputProps> = ({
     </label>
     <input
       type="text"
+      inputMode={inputMode}
+      autoComplete={autoComplete}
       placeholder={placeholder}
       value={value || ""}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-transparent text-base font-normal outline-none text-zinc-900 dark:text-white placeholder:text-zinc-400"
+      className="w-full bg-transparent text-sm font-bold outline-none text-zinc-900 dark:text-white placeholder:font-medium placeholder:text-zinc-400"
     />
     {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
   </div>

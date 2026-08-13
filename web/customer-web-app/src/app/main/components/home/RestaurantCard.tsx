@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Star } from "lucide-react";
+import { Bike, Clock3, Star } from "lucide-react";
 import Image from "next/image";
 
 interface RestaurantProps {
@@ -29,90 +29,79 @@ export const RestaurantCard = ({
   tags = [],
   discount,
 }: RestaurantProps) => {
-  // ✅ LOGIC: Use state to track the image source and handle errors (expired AWS links)
-  const placeholder = "/placeholder-store.png";
-  const [imgSrc, setImgSrc] = useState<string>(image || placeholder);
+  const primaryImage = image || banner || logo;
+  const placeholder = "/placeholder-store.webp";
+  const [imgSrc, setImgSrc] = useState<string>(primaryImage || placeholder);
 
   // Sync state if image prop changes (e.g., during search)
   useEffect(() => {
-    setImgSrc(image || placeholder);
-  }, [image]);
+    setImgSrc(primaryImage || placeholder);
+  }, [primaryImage]);
 
   const deliveryText =
     delivery || (deliveryFee ? `₦${deliveryFee.toLocaleString()}` : "Free");
 
   return (
-    <div className="group relative bg-white dark:bg-[#151515] rounded-2xl p-3 shadow-sm border border-gray-100 dark:border-white/5 active:scale-[0.98] transition-all duration-300 hover:shadow-md cursor-pointer h-full flex flex-col">
-      {/* Image Area - ✅ Standardized 16:9 Aspect Ratio */}
-      <div className="aspect-video w-full bg-gray-100 dark:bg-white/5 rounded-xl relative overflow-hidden mb-3">
+    <article className="group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-[1.35rem] border border-black/[0.06] bg-white shadow-[0_10px_36px_-28px_rgba(0,0,0,0.7)] transition duration-300 hover:-translate-y-1 hover:border-yellow-400/60 hover:shadow-[0_22px_45px_-28px_rgba(0,0,0,0.55)] active:scale-[0.99] dark:border-white/[0.07] dark:bg-[#151515]">
+      <div className="relative aspect-[16/9] w-full overflow-hidden bg-gray-100 dark:bg-white/5">
         <Image
           src={imgSrc}
           alt={name}
           fill
           className="object-cover transition-transform duration-700 group-hover:scale-110"
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          // ✅ FIX: If the original image link is expired (403), switch to the generated PNG
           onError={() => setImgSrc(placeholder)}
         />
 
-        {/* Gradient Overlay for better depth */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/5" />
 
         {discount && (
-          <div className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-sm z-10 animate-in zoom-in">
+          <div className="absolute left-3 top-3 z-10 rounded-full bg-red-500 px-2.5 py-1 text-[10px] font-extrabold text-white shadow-sm animate-in zoom-in">
             {discount}
           </div>
         )}
 
-        {/* Logo Overlay / Avatar */}
-        <div className="absolute -bottom-3 left-3 w-10 h-10 bg-white dark:bg-[#222] rounded-full p-1 shadow-md z-10 flex items-center justify-center">
-          <div className="w-full h-full bg-gray-100 dark:bg-white/10 rounded-full flex items-center justify-center text-[8px] font-bold overflow-hidden relative">
-            <Image
-              src={imgSrc}
-              alt="logo"
-              fill
-              className="object-cover"
-              onError={() => setImgSrc(placeholder)}
-            />
-          </div>
+        <div className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-xs font-extrabold text-gray-900 shadow-sm backdrop-blur-sm">
+          <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-500" />
+          {rating > 0 ? rating.toFixed(1) : "New"}
         </div>
       </div>
 
-      {/* Content */}
-      <div className="pt-2 pl-1 flex-1 flex flex-col justify-between">
-        <div className="flex justify-between items-start">
-          <h4 className="font-bold text-base line-clamp-1 pr-2 text-gray-900 dark:text-gray-100">
+      <div className="flex flex-1 flex-col p-4">
+        <div>
+          <h3 className="line-clamp-1 pr-2 text-base font-extrabold tracking-tight text-gray-900 dark:text-gray-100 sm:text-lg">
             {name}
-          </h4>
-          <div
-            className={`flex items-center gap-1 text-xs font-bold px-1.5 py-0.5 rounded-md ${
-              rating >= 4.5
-                ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
-                : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400"
-            }`}
-          >
-            <Star className="w-3 h-3 fill-current" />{" "}
-            {rating > 0 ? rating.toFixed(1) : "New"}
+          </h3>
+          <div className="mt-2 flex items-center gap-3 text-xs font-semibold text-gray-500 dark:text-gray-400">
+            <span className="flex items-center gap-1.5">
+              <Clock3 className="h-3.5 w-3.5" />
+              {time}
+            </span>
+            <span className="h-1 w-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+            <span className="flex items-center gap-1.5">
+              <Bike className="h-3.5 w-3.5" />
+              {deliveryText === "Free" ? "Free delivery" : `${deliveryText} delivery`}
+            </span>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-1 mt-3">
+        <div className="mt-3 flex flex-wrap gap-1.5">
           {tags.length > 0 ? (
             tags.slice(0, 3).map((tag) => (
               <span
                 key={tag}
-                className="text-[10px] font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-white/5 px-2 py-1 rounded-md"
+                className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-bold text-gray-500 dark:bg-white/5 dark:text-gray-400"
               >
                 {tag}
               </span>
             ))
           ) : (
-            <span className="text-[10px] font-bold text-gray-400 bg-gray-100 dark:bg-white/5 px-2 py-1 rounded-md">
+            <span className="rounded-full bg-yellow-400/10 px-2.5 py-1 text-[10px] font-bold text-yellow-700 dark:text-yellow-400">
               Local Favorite
             </span>
           )}
         </div>
       </div>
-    </div>
+    </article>
   );
 };

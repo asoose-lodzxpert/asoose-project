@@ -12,8 +12,8 @@ interface ImageGalleryProps {
 /** Skeleton shown while the component mounts (before first paint). */
 function GallerySkeleton() {
   return (
-    <div className="bg-white dark:bg-[#151515] lg:rounded-2xl overflow-hidden animate-pulse">
-      <div className="w-full aspect-square bg-gray-200 dark:bg-white/10" />
+    <div className="overflow-hidden rounded-2xl border border-black/[0.06] bg-white shadow-sm animate-pulse dark:border-white/[0.07] dark:bg-[#151515]">
+      <div className="aspect-[4/3] w-full bg-gray-200 sm:aspect-[16/10] lg:aspect-square dark:bg-white/10" />
     </div>
   );
 }
@@ -35,15 +35,18 @@ export function ImageGallery({ images, productName }: ImageGalleryProps) {
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (touchStartX === null) return;
     const dx = e.changedTouches[0].clientX - touchStartX;
-    if (Math.abs(dx) > 40) dx < 0 ? nextImg() : prevImg();
+    if (Math.abs(dx) > 40) {
+      if (dx < 0) nextImg();
+      else prevImg();
+    }
     setTouchStartX(null);
   };
 
   if (!ready && validImages.length > 0) {
     // Show skeleton until the first image is loaded
     return (
-      <div className="bg-white dark:bg-[#151515] lg:rounded-2xl overflow-hidden">
-        <div className="relative w-full aspect-square bg-gray-100 dark:bg-white/5">
+      <div className="overflow-hidden rounded-2xl border border-black/[0.06] bg-white shadow-sm dark:border-white/[0.07] dark:bg-[#151515]">
+        <div className="relative aspect-[4/3] w-full bg-gray-100 sm:aspect-[16/10] lg:aspect-square dark:bg-white/5">
           {/* Preload first image silently; flip ready when done */}
           <Image
             src={validImages[0]}
@@ -61,10 +64,10 @@ export function ImageGallery({ images, productName }: ImageGalleryProps) {
   }
 
   return (
-    <div className="bg-white dark:bg-[#151515] lg:rounded-2xl overflow-hidden">
+    <div className="overflow-hidden rounded-2xl border border-black/[0.06] bg-white shadow-sm dark:border-white/[0.07] dark:bg-[#151515]">
       {/* ── Main image ───────────────────────────────────────────── */}
       <div
-        className="relative w-full aspect-square bg-gray-100 dark:bg-white/5 select-none"
+        className="relative aspect-[4/3] w-full select-none bg-gray-100 sm:aspect-[16/10] lg:aspect-square dark:bg-white/5"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >

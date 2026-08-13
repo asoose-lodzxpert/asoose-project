@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ShoppingBag, Car, Package, User } from "lucide-react";
+import { useState } from "react";
+import { ShoppingBag, Car, Package, User, Grid3X3 } from "lucide-react";
+import { MobileServicesSheet } from "./ServicesMenu";
 
 const NavItem = ({
   icon: Icon,
@@ -37,6 +38,7 @@ const NavItem = ({
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const [servicesOpen, setServicesOpen] = useState(false);
 
   const navItems = [
     { icon: ShoppingBag, label: "Order", href: "/main/store" },
@@ -55,7 +57,8 @@ export default function BottomNav() {
   };
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-[#0a0a0a] border-t border-gray-100 dark:border-white/5 py-2 px-6 z-50 safe-area-bottom">
+    <>
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-[#0a0a0a] border-t border-gray-100 dark:border-white/5 py-2 px-3 z-50 safe-area-bottom">
       <div className="flex justify-between items-end max-w-md mx-auto">
         {navItems.map((item) => (
           <NavItem
@@ -66,7 +69,10 @@ export default function BottomNav() {
             active={isActiveRoute(item.href)}
           />
         ))}
+        <button type="button" onClick={() => setServicesOpen(true)} className={`flex w-16 flex-col items-center gap-1 transition active:scale-90 ${servicesOpen || pathname.startsWith("/main/stays") ? "text-yellow-600 dark:text-yellow-500" : "text-gray-400"}`}><div className={`rounded-xl p-1.5 ${servicesOpen || pathname.startsWith("/main/stays") ? "bg-yellow-500/10" : ""}`}><Grid3X3 className="h-6 w-6" /></div><span className="text-[10px] font-bold">More</span></button>
       </div>
     </nav>
+    <MobileServicesSheet open={servicesOpen} onClose={() => setServicesOpen(false)} />
+    </>
   );
 }

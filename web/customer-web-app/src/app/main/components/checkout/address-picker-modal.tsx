@@ -139,7 +139,8 @@ export function AddressPickerModal({
                       )}
                     </div>
                     <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                      {addr.city ? `${addr.street}, ${addr.city}` : addr.street}
+                      {[addr.street, addr.city].filter(Boolean).join(", ") ||
+                        `${addr.lat.toFixed(5)}, ${addr.lng.toFixed(5)}`}
                     </p>
                   </div>
                   {isSelected && (

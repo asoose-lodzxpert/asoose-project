@@ -1,438 +1,298 @@
-﻿"use client";
+"use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
-  Wallet,
-  Eye,
-  EyeOff,
-  Copy,
-  CheckCheck,
-  Loader2,
-  Plus,
-  Building2,
-  ChevronLeft,
-  ChevronRight,
   ArrowDownLeft,
   ArrowUpRight,
-  Clock,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Wallet,
 } from "lucide-react";
 import { toast } from "react-toastify";
+import {
+  WalletService,
+  WalletTransaction,
+} from "@/services/wallet.service";
 
-interface WalletInfo {
-  balance: number;
-  currency: string;
-  balanceHidden: boolean;
-  hasWallet: boolean;
-  accountNumber: string | null;
-  bankName: string | null;
-}
-
-interface TxRecord {
-  id: string;
-  amount: number;
-  method: string;
-  status: string;
-  reference: string;
-  type: string;
-  date: string;
-}
-
-interface TxMeta {
-  total: number;
-  page: number;
-  limit: number;
-  pages: number;
-}
+const PENDING_WALLET_TOPUP_KEY = "pending_wallet_topup";
 
 interface WalletTabProps {
   token: string;
-  apiUrl: string;
 }
 
-
-const STATUS_STYLES: Record<string, string> = {
-  PAID: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  COMPLETED:
-    "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  PENDING:
-    "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-  FAILED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  REFUNDED: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+const statusClass = (status: string) => {
+  switch (status.toUpperCase()) {
+    case "COMPLETED":
+      return "bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400";
+    case "FAILED":
+      return "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400";
+    default:
+      return "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400";
+  }
 };
 
-function statusStyle(s: string) {
-  return (
-    STATUS_STYLES[s.toUpperCase()] ??
-    "bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-400"
-  );
-}
+export function WalletTab({ token }: WalletTabProps) {
+  const [balance, setBalance] = useState(0);
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showTopup, setShowTopup] = useState(false);
+  const [topupAmount, setTopupAmount] = useState("20000");
+  const [topupLoading, setTopupLoading] = useState(false);
 
-function isCredit(type: string) {
-  return type === "Wallet Top-up" || type.toLowerCase().includes("topup");
-}
-
-
-export function WalletTab({ token, apiUrl }: WalletTabProps) {
-  // wallet state
-  const [wallet, setWallet] = useState<WalletInfo | null>(null);
-  const [walletLoading, setWalletLoading] = useState(true);
-  const [provisioning, setProvisioning] = useState(false);
-  const [togglingVisibility, setTogglingVisibility] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  // history state
-  const [txRows, setTxRows] = useState<TxRecord[]>([]);
-  const [txMeta, setTxMeta] = useState<TxMeta>({
-    total: 0,
-    page: 1,
-    limit: 10,
-    pages: 1,
-  });
-  const [txLoading, setTxLoading] = useState(false);
-  const [txPage, setTxPage] = useState(1);
-
-
-  const fetchWallet = useCallback(async () => {
-    setWalletLoading(true);
+  const loadWallet = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const res = await fetch(`${apiUrl}/users/wallet`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Failed to load wallet");
-      setWallet(await res.json());
-    } catch (err: any) {
-      toast.error(err.message || "Failed to load wallet");
+      const [wallet, history] = await Promise.all([
+        WalletService.getMyWallet(token),
+        WalletService.getTransactions(page, 20, token),
+      ]);
+      setBalance(wallet.balance);
+      setTransactions(history.transactions ?? []);
+      setTotal(history.pagination?.total ?? 0);
+      setTotalPages(Math.max(history.pagination?.totalPages ?? 1, 1));
+    } catch (requestError: any) {
+      setError(requestError?.message || "Could not load your wallet.");
     } finally {
-      setWalletLoading(false);
+      setLoading(false);
     }
-  }, [token, apiUrl]);
-
-
-  const fetchHistory = useCallback(
-    async (page: number) => {
-      setTxLoading(true);
-      try {
-        const res = await fetch(
-          `${apiUrl}/users/wallet/history?page=${page}&limit=10`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        );
-        if (!res.ok) throw new Error("Failed to load history");
-        const { data, meta } = await res.json();
-        setTxRows(data ?? []);
-        setTxMeta(meta);
-      } catch (err: any) {
-        toast.error(err.message || "Failed to load wallet history");
-      } finally {
-        setTxLoading(false);
-      }
-    },
-    [token, apiUrl],
-  );
+  }, [page, token]);
 
   useEffect(() => {
-    fetchWallet();
-    fetchHistory(1);
-  }, [fetchWallet, fetchHistory]);
+    loadWallet();
+  }, [loadWallet]);
 
-  useEffect(() => {
-    fetchHistory(txPage);
-  }, [txPage, fetchHistory]);
-
-
-  const handleProvision = async () => {
-    setProvisioning(true);
-    try {
-      const res = await fetch(`${apiUrl}/users/wallet/provision`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "Failed to create wallet");
-      }
-      const data = await res.json();
-      setWallet((prev) => ({
-        ...prev!,
-        hasWallet: true,
-        accountNumber: data.accountNumber,
-        bankName: data.bankName,
-        balance: data.balance ?? 0,
-        balanceHidden: data.balanceHidden ?? false,
-      }));
-      toast.success("Wallet created successfully!");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to create wallet");
-    } finally {
-      setProvisioning(false);
+  const handleTopup = async () => {
+    const amount = Number(topupAmount);
+    if (!Number.isInteger(amount) || amount <= 0) {
+      toast.error("Enter a valid top-up amount.");
+      return;
     }
-  };
 
-  const handleToggleVisibility = async () => {
-    if (!wallet) return;
-    const newHidden = !wallet.balanceHidden;
-    setTogglingVisibility(true);
+    setTopupLoading(true);
     try {
-      const res = await fetch(`${apiUrl}/users/wallet/visibility`, {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ hidden: newHidden }),
-      });
-      if (!res.ok) throw new Error();
-      setWallet((prev) =>
-        prev ? { ...prev, balanceHidden: newHidden } : prev,
+      const result = await WalletService.initializeTopup(amount, token);
+      if (!result.authorizationUrl?.startsWith("https://checkout.paystack.com/")) {
+        throw new Error("The payment link returned by the server is invalid.");
+      }
+
+      localStorage.setItem(
+        PENDING_WALLET_TOPUP_KEY,
+        JSON.stringify({
+          reference: result.reference,
+          returnTo: "/main/profile?tab=wallet",
+        }),
       );
-    } catch {
-      toast.error("Failed to update balance visibility");
-    } finally {
-      setTogglingVisibility(false);
+      window.location.href = result.authorizationUrl;
+    } catch (topupError: any) {
+      toast.error(topupError?.message || "Could not initialize wallet top-up.");
+      setTopupLoading(false);
     }
   };
 
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      toast.success("Copied!");
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
-
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-6">
       <div className="space-y-4">
-        {/* Balance card */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-yellow-500 to-amber-600 rounded-3xl p-6 text-white shadow-xl shadow-yellow-500/20">
-          <div className="absolute -top-8 -right-8 w-40 h-40 bg-white/10 rounded-full pointer-events-none" />
-          <div className="absolute -bottom-12 -left-8 w-48 h-48 bg-white/10 rounded-full pointer-events-none" />
-
-          <div className="relative z-10">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-white/20 rounded-xl">
-                  <Wallet className="w-4 h-4" />
-                </div>
-                <span className="font-bold text-sm opacity-90">
-                  Asoose Wallet
+        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-yellow-400 via-yellow-500 to-amber-600 p-5 text-black shadow-xl shadow-yellow-500/15 sm:p-6">
+          <div className="pointer-events-none absolute -right-10 -top-12 h-44 w-44 rounded-full bg-white/20" />
+          <div className="pointer-events-none absolute -bottom-16 -left-12 h-52 w-52 rounded-full bg-white/10" />
+          <div className="relative">
+            <div className="mb-8 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-black">
+                <span className="rounded-xl bg-black/10 p-2">
+                  <Wallet className="h-4 w-4" />
                 </span>
-              </div>
-
-              {wallet && (
-                <button
-                  onClick={handleToggleVisibility}
-                  disabled={togglingVisibility}
-                  className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors disabled:opacity-50"
-                  title={wallet.balanceHidden ? "Show balance" : "Hide balance"}
-                >
-                  {togglingVisibility ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : wallet.balanceHidden ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                </button>
-              )}
-            </div>
-
-            <p className="text-xs opacity-70 mb-1">Available Balance</p>
-            {walletLoading ? (
-              <div className="h-10 w-36 bg-white/20 rounded-xl animate-pulse" />
-            ) : (
-              <p className="text-4xl font-black tracking-tight">
-                {wallet?.balanceHidden
-                  ? "₦ ••••••"
-                  : `₦ ${Number(wallet?.balance ?? 0).toLocaleString("en-NG", { minimumFractionDigits: 2 })}`}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Account info / create wallet */}
-        {walletLoading ? (
-          <div className="h-44 bg-white dark:bg-[#151515] rounded-3xl border border-gray-100 dark:border-white/5 animate-pulse" />
-        ) : wallet?.hasWallet && wallet.accountNumber ? (
-          <div className="bg-white dark:bg-[#151515] rounded-3xl border border-gray-100 dark:border-white/5 p-5 space-y-3">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="p-2 bg-yellow-100 dark:bg-yellow-500/10 text-yellow-600 rounded-xl">
-                <Building2 className="w-4 h-4" />
-              </div>
-              <h3 className="font-bold text-sm">Fund Your Wallet</h3>
-            </div>
-
-            <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-              Transfer to this account to top up instantly.
-            </p>
-
-            <div className="bg-gray-50 dark:bg-white/5 rounded-2xl px-4 py-3">
-              <p className="text-xs text-gray-400 mb-0.5">Bank</p>
-              <p className="font-bold text-sm">{wallet.bankName}</p>
-            </div>
-
-            <div className="flex items-center justify-between bg-gray-50 dark:bg-white/5 rounded-2xl px-4 py-3">
-              <div>
-                <p className="text-xs text-gray-400 mb-0.5">Account Number</p>
-                <p className="font-bold text-xl tracking-widest">
-                  {wallet.accountNumber}
-                </p>
+                Asoose Wallet
               </div>
               <button
-                onClick={() => handleCopy(wallet.accountNumber!)}
-                className="p-2 bg-yellow-500/10 text-yellow-600 rounded-xl hover:bg-yellow-500/20 transition-colors"
+                type="button"
+                onClick={loadWallet}
+                disabled={loading}
+                aria-label="Refresh wallet"
+                className="rounded-xl bg-white/25 p-2 transition hover:bg-white/40 disabled:opacity-50"
               >
-                {copied ? (
-                  <CheckCheck className="w-4 h-4 text-green-500" />
-                ) : (
-                  <Copy className="w-4 h-4" />
-                )}
+                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               </button>
             </div>
+            <p className="text-xs font-bold text-black/60">Balance</p>
+            {loading ? (
+              <div className="mt-2 h-11 w-48 animate-pulse rounded-xl bg-white/25" />
+            ) : (
+              <p className="mt-1 text-3xl font-black tracking-tight sm:text-4xl">
+                ₦{balance.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+              </p>
+            )}
+          </div>
+        </section>
 
-            <p className="text-xs text-gray-400 text-center">
-              Dedicated account · NGN transfers only
+        <section className="rounded-3xl border border-black/[0.06] bg-white p-4 shadow-sm sm:p-5 dark:border-white/[0.07] dark:bg-[#151515]">
+          <button
+            type="button"
+            onClick={() => setShowTopup((current) => !current)}
+            className="flex w-full items-center justify-between gap-4 text-left"
+          >
+            <span>
+              <span className="block text-sm font-black">Top up wallet</span>
+              <span className="mt-1 block text-xs text-gray-500">
+                Add money securely with Paystack.
+              </span>
+            </span>
+            <span className="rounded-xl bg-yellow-100 p-2 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400">
+              <Plus className="h-5 w-5" />
+            </span>
+          </button>
+
+          {showTopup && (
+            <div className="mt-4 space-y-3 border-t border-gray-100 pt-4 dark:border-white/5">
+              <div className="flex items-center rounded-xl border border-gray-200 bg-gray-50 px-3 focus-within:border-yellow-500 dark:border-white/10 dark:bg-white/5">
+                <span className="font-bold text-gray-500">₦</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  step="1"
+                  value={topupAmount}
+                  onChange={(event) => setTopupAmount(event.target.value)}
+                  className="min-w-0 flex-1 bg-transparent px-2 py-3 font-black outline-none"
+                  aria-label="Top-up amount"
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {[5000, 10000, 20000].map((amount) => (
+                  <button
+                    key={amount}
+                    type="button"
+                    onClick={() => setTopupAmount(String(amount))}
+                    className={`rounded-xl border px-2 py-2 text-xs font-bold ${topupAmount === String(amount) ? "border-yellow-500 bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400" : "border-gray-200 text-gray-500 dark:border-white/10"}`}
+                  >
+                    ₦{amount.toLocaleString()}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={handleTopup}
+                disabled={topupLoading || !topupAmount}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gray-950 py-3 text-sm font-black text-white transition hover:bg-black disabled:opacity-50 dark:bg-white dark:text-black"
+              >
+                {topupLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                {topupLoading ? "Opening Paystack…" : "Continue to Paystack"}
+              </button>
+            </div>
+          )}
+        </section>
+      </div>
+
+      <section className="overflow-hidden rounded-3xl border border-black/[0.06] bg-white shadow-sm dark:border-white/[0.07] dark:bg-[#151515]">
+        <header className="flex items-center justify-between border-b border-gray-100 bg-gray-50/70 px-4 py-4 sm:px-5 dark:border-white/5 dark:bg-white/[0.03]">
+          <div>
+            <h2 className="text-sm font-black">Transactions</h2>
+            <p className="mt-0.5 text-xs text-gray-500">
+              {total} transaction{total === 1 ? "" : "s"}
             </p>
           </div>
-        ) : (
-          <div className="bg-white dark:bg-[#151515] rounded-3xl border border-dashed border-gray-200 dark:border-white/10 p-8 flex flex-col items-center gap-4 text-center">
-            <div className="p-4 bg-yellow-100 dark:bg-yellow-500/10 text-yellow-600 rounded-2xl">
-              <Wallet className="w-7 h-7" />
-            </div>
-            <div>
-              <h3 className="font-bold text-base mb-1">No Wallet Yet</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                Create a dedicated wallet to fund rides, orders, and deliveries.
-              </p>
-            </div>
-            <button
-              onClick={handleProvision}
-              disabled={provisioning}
-              className="flex items-center gap-2 px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-2xl transition-colors disabled:opacity-50"
-            >
-              {provisioning ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Plus className="w-4 h-4" />
-              )}
-              {provisioning ? "Creating…" : "Create Wallet"}
-            </button>
-          </div>
-        )}
-      </div>
-      <div className="bg-white dark:bg-[#151515] rounded-3xl border border-gray-100 dark:border-white/5 overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/5">
-          <h3 className="font-bold text-sm">Transaction History</h3>
-          {txMeta.total > 0 && (
-            <span className="text-xs text-gray-400">
-              {txMeta.total} record{txMeta.total !== 1 ? "s" : ""}
-            </span>
-          )}
-        </div>
+          <span className="text-xs font-bold text-gray-400">
+            Page {page} of {totalPages}
+          </span>
+        </header>
 
-        {/* Rows */}
-        {txLoading ? (
-          <div className="space-y-3 p-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-12 bg-gray-100 dark:bg-white/5 rounded-xl animate-pulse"
-              />
+        {loading ? (
+          <div className="space-y-3 p-4 sm:p-5">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div key={index} className="h-16 animate-pulse rounded-2xl bg-gray-100 dark:bg-white/5" />
             ))}
           </div>
-        ) : txRows.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3 text-gray-400">
-            <Clock className="w-8 h-8 opacity-40" />
-            <p className="text-sm font-medium">No transactions yet</p>
+        ) : error ? (
+          <div className="flex min-h-72 flex-col items-center justify-center px-6 text-center">
+            <p className="text-sm font-bold text-red-600">{error}</p>
+            <button type="button" onClick={loadWallet} className="mt-4 rounded-xl bg-gray-950 px-4 py-2 text-xs font-bold text-white dark:bg-white dark:text-black">
+              Try again
+            </button>
+          </div>
+        ) : transactions.length === 0 ? (
+          <div className="flex min-h-72 flex-col items-center justify-center px-6 text-center text-gray-400">
+            <Clock3 className="mb-3 h-9 w-9 opacity-50" />
+            <p className="text-sm font-bold">No wallet transactions yet</p>
+            <p className="mt-1 text-xs">Your wallet activity will appear here.</p>
           </div>
         ) : (
-          <>
-            <div className="divide-y divide-gray-50 dark:divide-white/5">
-              {txRows.map((tx) => (
-                <div
-                  key={tx.id}
-                  className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
-                >
-                  {/* Direction icon */}
-                  <div
-                    className={`flex-shrink-0 p-2 rounded-xl ${
-                      isCredit(tx.type)
-                        ? "bg-green-100 dark:bg-green-900/20 text-green-600"
-                        : "bg-orange-100 dark:bg-orange-900/20 text-orange-600"
-                    }`}
-                  >
-                    {isCredit(tx.type) ? (
-                      <ArrowDownLeft className="w-3.5 h-3.5" />
-                    ) : (
-                      <ArrowUpRight className="w-3.5 h-3.5" />
-                    )}
+          <div className="divide-y divide-gray-100 dark:divide-white/5">
+            {transactions.map((transaction) => {
+              const isCredit = transaction.type === "CREDIT";
+              return (
+                <article key={transaction.id} className="flex gap-3 px-4 py-4 transition hover:bg-gray-50 sm:px-5 dark:hover:bg-white/[0.03]">
+                  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isCredit ? "bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400" : "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400"}`}>
+                    {isCredit ? <ArrowDownLeft className="h-5 w-5" /> : <ArrowUpRight className="h-5 w-5" />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold">{transaction.description}</p>
+                        <p className="mt-1 text-xs text-gray-400">
+                          {new Date(transaction.createdAt).toLocaleString("en-NG", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                      <p className={`shrink-0 text-sm font-black ${isCredit ? "text-green-600" : "text-gray-950 dark:text-white"}`}>
+                        {isCredit ? "+" : "−"}₦{Number(transaction.amount).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-wide">
+                      <span className={`rounded-full px-2 py-1 ${statusClass(transaction.status)}`}>
+                        {transaction.status}
+                      </span>
+                      <span className="text-gray-400">{transaction.channel}</span>
+                      <span
+                        className="text-gray-400"
+                        title={transaction.referenceId}
+                      >
+                        {transaction.referenceType}
+                        {transaction.referenceId
+                          ? ` · ${transaction.referenceId.slice(0, 8)}`
+                          : ""}
+                      </span>
+                    </div>
                   </div>
-
-                  {/* Description + date */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold truncate">{tx.type}</p>
-                    <p className="text-xs text-gray-400 truncate">
-                      {new Date(tx.date).toLocaleDateString("en-NG", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </p>
-                  </div>
-
-                  {/* Amount + status badge */}
-                  <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
-                    <p
-                      className={`text-sm font-bold ${
-                        isCredit(tx.type)
-                          ? "text-green-600 dark:text-green-400"
-                          : "text-gray-800 dark:text-gray-200"
-                      }`}
-                    >
-                      {isCredit(tx.type) ? "+" : "−"}₦
-                      {Number(tx.amount).toLocaleString("en-NG")}
-                    </p>
-                    <span
-                      className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${statusStyle(tx.status)}`}
-                    >
-                      {tx.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Pagination */}
-            {txMeta.pages > 1 && (
-              <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/5">
-                <button
-                  onClick={() => setTxPage((p) => Math.max(1, p - 1))}
-                  disabled={txPage === 1 || txLoading}
-                  className="flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronLeft className="w-4 h-4" /> Prev
-                </button>
-
-                <span className="text-xs text-gray-400">
-                  Page {txPage} of {txMeta.pages}
-                </span>
-
-                <button
-                  onClick={() =>
-                    setTxPage((p) => Math.min(txMeta.pages, p + 1))
-                  }
-                  disabled={txPage === txMeta.pages || txLoading}
-                  className="flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Next <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-          </>
+                </article>
+              );
+            })}
+          </div>
         )}
-      </div>
+
+        {!loading && !error && totalPages > 1 && (
+          <footer className="grid grid-cols-2 gap-3 border-t border-gray-100 p-4 dark:border-white/5">
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.max(current - 1, 1))}
+              disabled={page === 1}
+              className="flex items-center justify-center gap-1 rounded-xl border border-gray-200 py-2.5 text-xs font-bold disabled:opacity-40 dark:border-white/10"
+            >
+              <ChevronLeft className="h-4 w-4" /> Previous
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.min(current + 1, totalPages))}
+              disabled={page === totalPages}
+              className="flex items-center justify-center gap-1 rounded-xl bg-gray-950 py-2.5 text-xs font-bold text-white disabled:opacity-40 dark:bg-white dark:text-black"
+            >
+              Next <ChevronRight className="h-4 w-4" />
+            </button>
+          </footer>
+        )}
+      </section>
     </div>
   );
 }

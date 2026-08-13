@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
@@ -11,9 +11,6 @@ import {
   ChevronDown,
   Moon,
   Sun,
-  Car,
-  Package,
-  Store,
   User,
   Bell,
   ShoppingBag,
@@ -21,8 +18,11 @@ import {
 import { useTheme } from "next-themes";
 import { useSession } from "next-auth/react";
 import { ApiService } from "@/services/api.service";
-import { LocationPickerModal } from "./LocationPickerModal";
+import { AddressService } from "@/services/address.service";
+import { LocationDropdown } from "./LocationDropdown";
 import { useRideStore } from "@/app/main/ride/store/ride";
+import { useCityStore } from "@/store/useCityStore";
+import { DesktopServicesMenu } from "@/app/main/components/layout/ServicesMenu";
 
 const sanitizeInput = (input: string): string => {
   return input.replace(/[<>]/g, "").trim().slice(0, 100);
@@ -38,12 +38,14 @@ function HomeHeaderInner() {
     details: string;
   } | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [isLocationMenuOpen, setIsLocationMenuOpen] = useState(false);
+  const locationMenuRef = useRef<HTMLDivElement>(null);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   
   const userLocation = useRideStore((state) => state.userLocation);
   const cityId = useRideStore((state) => state.cityId);
+  const selectedCity = useCityStore((state) => state.selectedCity);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -53,15 +55,18 @@ function HomeHeaderInner() {
   const isStorePage = pathname === "/main/store";
 
   // Logic for Address visibility (Store page AND Store detail pages)
-  const isStoreSection = pathname.startsWith("/main/store");
+  const isStoreSection = ["/main/store", "/main/stays", "/main/ride", "/main/delivery"].some((path) => pathname.startsWith(path));
 
   // Logic for Branding visibility
   const showBranding = [
     "/main/ride",
     "/main/delivery",
     "/main/orders",
+    "/main/profile",
     "/main/checkout",
     "/main/notifications",
+    "/main/stays",
+    "/main/bookings",
     "/product",
   ].some((path) => pathname.startsWith(path));
 
@@ -77,10 +82,28 @@ function HomeHeaderInner() {
       if (stored) {
         setRecentSearches(JSON.parse(stored));
       }
-    } catch (e) {
+    } catch {
       // ignore
     }
   }, []);
+
+  useEffect(() => {
+    if (!isLocationMenuOpen) return;
+    const closeMenu = (event: MouseEvent) => {
+      if (locationMenuRef.current && !locationMenuRef.current.contains(event.target as Node)) {
+        setIsLocationMenuOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsLocationMenuOpen(false);
+    };
+    document.addEventListener("mousedown", closeMenu);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeMenu);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isLocationMenuOpen]);
 
   // Sync search term from URL params
   useEffect(() => {
@@ -108,8 +131,8 @@ function HomeHeaderInner() {
     const fetchAddressAndNotifications = async () => {
       try {
         const [addressResult, notifResult] = await Promise.allSettled([
-          ApiService.get<any[]>("/users/addresses", accessToken),
-          ApiService.get<any>("/notifications", accessToken),
+          AddressService.list(accessToken),
+          ApiService.get<{ unreadCount: number }>("/notifications/unread-count", accessToken),
         ]);
 
         if (cancelled) return;
@@ -117,21 +140,23 @@ function HomeHeaderInner() {
         if (addressResult.status === "fulfilled") {
           const addresses = addressResult.value;
           if (addresses && addresses.length > 0) {
-            const active =
-              addresses.find((a: any) => a.isDefault) || addresses[0];
+            const active = addresses.find((a) => a.isDefault) || addresses[0];
             setDeliveryAddress({
               label: active.label || "Home",
-              details: `${active.street}, ${active.city}`,
+              details:
+                [active.street, active.city].filter(Boolean).join(", ") ||
+                `${active.latitude.toFixed(4)}, ${active.longitude.toFixed(4)}`,
             });
 
             // Resolve cityId from the coordinates of the selected address
-            ApiService.get<any>(
-              `/maps/city-by-coords?lat=${active.lat}&lng=${active.lng}`,
-            )
-              .then((cityData) => {
-                if (cityData && cityData.id) {
+            ApiService.post<any>("/locations/resolve-city", {
+              latitude: active.latitude,
+              longitude: active.longitude,
+            })
+              .then((resolved) => {
+                if (resolved?.city?.id) {
                   import("@/app/main/ride/store/ride").then((module) => {
-                    module.useRideStore.getState().setCityId(cityData.id);
+                    module.useRideStore.getState().setCityId(resolved.city.id);
                   });
                 }
               })
@@ -142,12 +167,7 @@ function HomeHeaderInner() {
         }
 
         if (notifResult.status === "fulfilled") {
-          const response = notifResult.value;
-          const notificationsList = Array.isArray(response)
-            ? response
-            : response?.data || [];
-          const unread = notificationsList.filter((n: any) => !n.isRead).length;
-          setUnreadCount(unread);
+          setUnreadCount(notifResult.value?.unreadCount ?? 0);
         }
       } catch (error) {
         console.error("Header data load failed:", error);
@@ -271,8 +291,11 @@ function HomeHeaderInner() {
 
           {/* 2. Address (Visible only in Store Section) */}
           {isStoreSection && (
+            <div ref={locationMenuRef} className="relative">
             <button
-              onClick={() => setIsLocationModalOpen(true)}
+              onClick={() => setIsLocationMenuOpen((value) => !value)}
+              aria-expanded={isLocationMenuOpen}
+              aria-haspopup="menu"
               className="flex items-center gap-2 sm:gap-3 group min-w-fit hover:bg-gray-50 dark:hover:bg-white/5 p-1.5 sm:p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-500"
               aria-label="Change delivery address"
             >
@@ -290,7 +313,7 @@ function HomeHeaderInner() {
               <div className="text-left">
                 {/* Label: Hidden on mobile to save space */}
                 <div className="hidden sm:block text-[10px] text-gray-500 font-black uppercase tracking-widest leading-none mb-1">
-                  Deliver to
+                  {pathname.startsWith("/main/stays") ? "Explore in" : pathname.startsWith("/main/ride") ? "Ride in" : "Deliver to"}
                 </div>
 
                 {/* Address Text: Visible but truncated on mobile */}
@@ -299,20 +322,29 @@ function HomeHeaderInner() {
                     {deliveryAddress ? (
                       <>
                         {deliveryAddress.label === "Guest"
-                          ? "Set Location"
+                          ? selectedCity ? `${selectedCity.name}, ${selectedCity.state}` : "Set Location"
                           : deliveryAddress.details}
                       </>
+                    ) : selectedCity ? (
+                      <span>{selectedCity.name}, {selectedCity.state}</span>
                     ) : (
                       <span>Set Location</span>
                     )}
                   </span>
                   <ChevronDown
-                    className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 shrink-0"
+                    className={`w-3 h-3 sm:w-4 sm:h-4 text-gray-400 shrink-0 transition-transform ${isLocationMenuOpen ? "rotate-180" : ""}`}
                     aria-hidden="true"
                   />
                 </div>
               </div>
             </button>
+            {isLocationMenuOpen && (
+              <LocationDropdown
+                onClose={() => setIsLocationMenuOpen(false)}
+                onSelect={setDeliveryAddress}
+              />
+            )}
+            </div>
           )}
         </div>
 
@@ -348,25 +380,7 @@ function HomeHeaderInner() {
         {/* RIGHT: Navigation & Actions */}
         <div className="flex items-center gap-4">
           <nav className="hidden lg:flex items-center gap-1 bg-gray-100 dark:bg-white/5 p-1 rounded-xl mr-2">
-            <Link
-              href="/main/store"
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 ${isActive("/main/store") ? "bg-white dark:bg-zinc-800 text-yellow-500 shadow-sm" : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"}`}
-            >
-              <Store className="w-3.5 h-3.5" /> make order
-            </Link>
-            <Link
-              href="/main/ride"
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 ${isActive("/main/ride") ? "bg-white dark:bg-zinc-800 text-yellow-500 shadow-sm" : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"}`}
-            >
-              <Car className="w-3.5 h-3.5" /> Book a ride
-            </Link>
-            <Link
-              href="/main/delivery"
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 ${isActive("/main/delivery") ? "bg-white dark:bg-zinc-800 text-yellow-500 shadow-sm" : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"}`}
-            >
-              <Package className="w-3.5 h-3.5" /> Send a package
-            </Link>
-
+            <DesktopServicesMenu />
             <Link
               href="/main/checkout"
               className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 ${isActive("/main/checkout") ? "bg-white dark:bg-zinc-800 text-yellow-500 shadow-sm" : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"}`}
@@ -446,11 +460,6 @@ function HomeHeaderInner() {
       )}
 
       </header>
-
-      <LocationPickerModal 
-        isOpen={isLocationModalOpen} 
-        onClose={() => setIsLocationModalOpen(false)} 
-      />
     </>
   );
 }

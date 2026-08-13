@@ -8,6 +8,7 @@ import { LocationProvider } from "@/providers/LocationProvider";
 import { SessionGuard } from "@/components/SessionGuard";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { CartHydrator } from "@/app/components/CartHydrator";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -20,6 +21,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       refetchOnWindowFocus={false}
     >
       <SessionGuard>
+        <CartHydrator />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

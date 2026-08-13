@@ -11,6 +11,7 @@ interface CartItemsListProps {
   onAdd: (item: CartItem) => void;
   onDecrease: (id: string) => void;
   onRemove: (id: string) => void;
+  onClear: () => void;
 }
 
 export const CartItemsList = ({
@@ -19,17 +20,21 @@ export const CartItemsList = ({
   onAdd,
   onDecrease,
   onRemove,
+  onClear,
 }: CartItemsListProps) => {
   return (
     <section className="bg-white dark:bg-[#151515] p-5 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-bold text-lg">Order Summary</h2>
-        <Link
-          href="/"
-          className="text-sm font-bold text-yellow-600 dark:text-yellow-500"
-        >
-          Add Items
-        </Link>
+        <div className="flex items-center gap-3">
+          <button type="button" disabled={isProcessing} onClick={onClear} className="text-xs font-bold text-red-500 transition hover:text-red-600 disabled:opacity-50">Clear cart</button>
+          <Link
+            href="/main/store"
+            className="text-sm font-bold text-yellow-600 dark:text-yellow-500"
+          >
+            Add Items
+          </Link>
+        </div>
       </div>
 
       <div className="space-y-6">

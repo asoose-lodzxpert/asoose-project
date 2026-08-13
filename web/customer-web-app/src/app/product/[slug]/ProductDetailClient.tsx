@@ -28,7 +28,10 @@ export default function ProductDetailClient({ product }: { product: Product }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const modifierGroups = product.modifierGroups ?? [];
+  const modifierGroups = useMemo(
+    () => product.modifierGroups ?? [],
+    [product.modifierGroups],
+  );
 
   const toggleModifier = useCallback(
     (groupId: string, modId: string, maxSelect: number) => {
@@ -76,16 +79,21 @@ export default function ProductDetailClient({ product }: { product: Product }) {
           (session as any)?.accessToken || (session as any)?.user?.accessToken;
         const modifierIds: string[] = Object.values(mods).flat();
 
-        await ApiService.post(
-          "/cart/add",
+        // The backend cart doesn't have a modifier/options concept yet —
+        // only productId/quantity/instructions are persisted server-side.
+        // Selected modifiers still affect price and are still shown locally
+        // (below), but aren't sent to the server cart. Best-effort sync —
+        // checkout re-syncs the full local cart, so a failure here shouldn't
+        // block adding the item locally.
+        ApiService.post(
+          "/cart/items",
           {
             productId: product.id,
             quantity: 1,
-            ...(modifierIds.length > 0 && { modifierIds }),
           },
           token,
           {},
-        );
+        ).catch(() => {});
 
         const validImages = (product.images ?? []).filter((u) =>
           u?.startsWith("http"),
@@ -103,6 +111,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
           quantity: 1,
           restaurantId: product.store?.id ?? "",
           image: validImages[0] ?? null,
+          kind: "PRODUCT",
           ...(modifierIds.length > 0 && { modifierIds }),
           ...(modifierNames.length > 0 && { modifierNames }),
         });
@@ -120,6 +129,11 @@ export default function ProductDetailClient({ product }: { product: Product }) {
 
   // ── "Add to Order" click handler ─────────────────────────────────────────
   const handleAddToOrder = useCallback(async () => {
+    if (product.stock === 0) {
+      toast.error("This item is currently out of stock");
+      return;
+    }
+
     if (status !== "authenticated") {
       toast.info("Please log in to add items to your cart", {
         position: "bottom-center",
@@ -136,7 +150,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
     }
 
     await doAddToCart(selectedModifiers);
-  }, [status, isValid, doAddToCart, selectedModifiers, router]);
+  }, [status, isValid, doAddToCart, selectedModifiers, router, product.stock]);
 
   // ── Derived helpers ──────────────────────────────────────────────────────
   const validImages = useMemo(
@@ -151,17 +165,20 @@ export default function ProductDetailClient({ product }: { product: Product }) {
     : undefined;
 
   const hasRequiredModifiers = modifierGroups.some((g) => g.minSelect > 0);
+  const isOutOfStock = product.stock === 0;
 
   const addButtonLabel = isSubmitting
     ? "Adding…"
-    : hasRequiredModifiers && !isValid
-      ? "Select options below"
-      : `Add to Order · ₦${totalPrice.toLocaleString()}`;
+    : isOutOfStock
+      ? "Out of stock"
+      : hasRequiredModifiers && !isValid
+        ? "Select options below"
+        : `Add to Order · ₦${totalPrice.toLocaleString()}`;
 
   return (
     <div className="text-gray-900 dark:text-gray-100">
       {/* Back button */}
-      <div className="max-w-6xl mx-auto px-4 pt-4 pb-1 lg:px-6">
+      <div className="mx-auto max-w-7xl px-4 pb-2 pt-4 sm:px-6 sm:pt-5">
         <button
           onClick={() => router.back()}
           className="inline-flex items-center gap-2 text-sm font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors group"
@@ -173,11 +190,11 @@ export default function ProductDetailClient({ product }: { product: Product }) {
         </button>
       </div>
 
-      <div className="max-w-6xl mx-auto pb-32">
+      <div className="mx-auto max-w-7xl px-4 pb-36 sm:px-6 lg:pb-28">
         {/* Main 2-column grid */}
-        <div className="lg:grid lg:grid-cols-[1fr_420px] lg:gap-6 lg:p-6">
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
           {/* LEFT column */}
-          <div className="space-y-3">
+          <div className="min-w-0 space-y-3">
             <ImageGallery images={validImages} productName={product.name} />
 
             {/* Product info with interactive modifiers */}
@@ -187,8 +204,14 @@ export default function ProductDetailClient({ product }: { product: Product }) {
               onToggleModifier={toggleModifier}
             />
 
+            {product.store && (
+              <div className="lg:hidden">
+                <StoreCard store={product.store} />
+              </div>
+            )}
+
             {/* Mobile carousels — each self-fetches with its own skeleton */}
-            <div className="lg:hidden space-y-4 px-4 py-2">
+            <div className="space-y-5 py-3 lg:hidden">
               <ProductCarousel
                 title="More from this store"
                 endpoint={storeItemsEndpoint}
@@ -202,10 +225,9 @@ export default function ProductDetailClient({ product }: { product: Product }) {
           </div>
 
           {/* RIGHT sidebar — desktop only */}
-          <div className="hidden lg:flex flex-col gap-4">
-            {product.store && <StoreCard store={product.store} />}
-
-            <div className="sticky top-[72px] space-y-3">
+          <div className="hidden lg:block">
+            <div className="sticky top-20 space-y-4">
+              {product.store && <StoreCard store={product.store} />}
               {/* Add to Order card */}
               <div className="bg-white dark:bg-[#151515] rounded-2xl p-5">
                 <div className="mb-3">
@@ -225,7 +247,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
                 </div>
                 <button
                   onClick={handleAddToOrder}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isOutOfStock}
                   className="w-full flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-60 active:scale-95 text-black font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-yellow-500/20"
                 >
                   {isSubmitting ? (
@@ -255,7 +277,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
         </div>
 
         {/* Full-width carousels below grid (desktop) */}
-        <div className="hidden lg:block space-y-4 px-6 pb-6">
+        <div className="hidden space-y-4 pb-6 pt-6 lg:block">
           <div className="bg-white dark:bg-[#151515] rounded-2xl p-5">
             <ProductCarousel
               title="More from this store"
@@ -273,10 +295,10 @@ export default function ProductDetailClient({ product }: { product: Product }) {
       </div>
 
       {/* Mobile sticky Add to Order bar */}
-      <div className="fixed bottom-16 left-0 right-0 z-30 lg:hidden px-4 pb-2">
+      <div className="fixed bottom-16 left-0 right-0 z-30 border-t border-black/[0.05] bg-white/90 px-4 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden dark:border-white/5 dark:bg-[#111]/90">
         <button
           onClick={handleAddToOrder}
-          disabled={isSubmitting}
+          disabled={isSubmitting || isOutOfStock}
           className="w-full flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-60 active:scale-95 text-black font-bold py-4 rounded-2xl transition-all shadow-xl shadow-yellow-500/20"
         >
           {isSubmitting ? (

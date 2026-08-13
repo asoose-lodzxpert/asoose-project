@@ -6,17 +6,16 @@ import {
   ChevronRight, 
   MapPin, 
   Calendar, 
-  Car, 
+  Route,
   CheckCircle2, 
   Clock,
-  Navigation2,
   Wallet,
   AlertCircle,
   Loader2,
   User,
   Users
 } from 'lucide-react';
-import { useRideStore, BookingStage } from '../store/ride';
+import { useRideStore } from '../store/ride';
 import { LocationAutocompleteInput } from './LocationAutocompleteInput';
 import { ScheduledRideService } from '@/services/scheduled-ride.service';
 import { RideService } from '@/services/ride.service';
@@ -35,7 +34,6 @@ export function ScheduledRideWizard() {
     pickupAddress,
     dropoffAddress,
     scheduledAt, 
-    scheduledVehicleType, 
     scheduledFare,
     setBookingStage,
     setPickupLocation,
@@ -56,7 +54,7 @@ export function ScheduledRideWizard() {
 
   const [estimatedFare, setEstimatedFare] = useState<number | null>(null);
   const [fareBreakdown, setFareBreakdown] = useState<any>(null);
-  const [isLoadingFare, setIsLoadingFare] = useState(false);
+  const [, setIsLoadingFare] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,7 +77,7 @@ export function ScheduledRideWizard() {
             dropoffLat: dropoffLocation.lat,
             dropoffLng: dropoffLocation.lng,
             vehicleType: 'ECONOMY'
-          }, ''); 
+          }, accessToken);
           
           if (estimates.ECONOMY) {
             setEstimatedFare(estimates.ECONOMY.estimatedFare);
@@ -94,7 +92,7 @@ export function ScheduledRideWizard() {
       };
       fetchEstimate();
     }
-  }, [pickupLocation, dropoffLocation, setScheduledVehicle]);
+  }, [pickupLocation, dropoffLocation, setScheduledVehicle, accessToken]);
 
   const handleNext = () => {
     if (bookingStage === 'LOCATION') setBookingStage('SCHEDULE');
@@ -150,6 +148,20 @@ export function ScheduledRideWizard() {
         },
         scheduledRide?.id ? `scheduled-ride:${scheduledRide.id}` : undefined,
       );
+
+      const authorizationUrl = scheduledRide?.authorizationUrl;
+      const scheduledRideId = scheduledRide?.ride?.id;
+      if (authorizationUrl) {
+        if (!authorizationUrl.startsWith('https://checkout.paystack.com/')) {
+          throw new Error('The payment link returned by the server is invalid.');
+        }
+        localStorage.setItem('pending_ride', 'true');
+        if (scheduledRideId) {
+          localStorage.setItem('pending_ride_id', scheduledRideId);
+        }
+        window.location.href = authorizationUrl;
+        return;
+      }
 
       setBookingStage('SUCCESS');
       toast.success('Ride scheduled successfully!');
@@ -265,9 +277,9 @@ export function ScheduledRideWizard() {
                     <Calendar size={12} className="text-yellow-500" />
                     <span>{scheduledAt ? new Date(scheduledAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : ''}</span>
                   </div>
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800">
-                    <Car size={12} className="text-yellow-500" />
-                    <span>Standard Ride</span>
+                  <div className="flex items-center gap-2 rounded-full bg-zinc-100 px-2 py-1 dark:bg-zinc-800">
+                    <span className="flex items-center gap-1"><Route size={12} className="text-yellow-500" />{Number(fareBreakdown?.distance || 0).toFixed(1)} km</span>
+                    <span className="flex items-center gap-1"><Clock size={12} className="text-yellow-500" />{Math.ceil(Number(fareBreakdown?.duration || 0))} min</span>
                   </div>
                 </div>
               </div>

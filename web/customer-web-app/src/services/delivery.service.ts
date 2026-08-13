@@ -3,6 +3,7 @@ import { ApiService } from "./api.service";
 // ✅ FIX: Expanded interface to match Backend Prisma Model & UsersService response
 export interface Delivery {
   id: string;
+  trackingId?: string;
   status:
     | "PENDING"
     | "REQUESTED"
@@ -14,6 +15,11 @@ export interface Delivery {
     | "CANCELLED";
   deliveryFee: number;
   distanceKm?: number;
+  durationMinutes?: number;
+  size?: "SMALL" | "MEDIUM" | "LARGE";
+  paymentMethod?: "WALLET" | "CARD";
+  paymentStatus?: string;
+  confirmationCode?: string;
 
   // Package Info
   packageDetails?: string;
@@ -21,7 +27,6 @@ export interface Delivery {
   recipientPhone?: string;
   weightKg?: number;
   isFragile?: boolean;
-  // ✅ NEW FIELDS MATCHING BACKEND
   isPerishable?: boolean;
   containsLiquid?: boolean;
   declaredValue?: number;
@@ -41,13 +46,13 @@ export interface Delivery {
     street: string;
     city: string;
     state?: string;
-    address?: string; // UsersService might return this composite string
+    address?: string;
   };
   dropoffAddress?: {
     street: string;
     city: string;
     state?: string;
-    address?: string; // UsersService might return this composite string
+    address?: string;
   };
 
   // Timestamps
@@ -56,141 +61,203 @@ export interface Delivery {
   deliveredAt?: string;
 }
 
+/** Maps the real backend's ParcelStatus enum to the DeliveryStatus-shaped
+ *  strings the rest of the app (page.tsx, socket handlers, polling) already
+ *  compares against — keeps the UI layer unchanged. */
+export function mapParcelStatus(status: string): Delivery["status"] {
+  switch (status) {
+    case "SEARCHING_RIDER":
+      return "REQUESTED";
+    case "RIDER_ASSIGNED":
+      return "ASSIGNED";
+    case "RIDER_ACCEPTED":
+      return "ACCEPTED";
+    case "CANCELLED_BY_USER":
+    case "CANCELLED_BY_RIDER":
+    case "CANCELLED_BY_SYSTEM":
+      return "CANCELLED";
+    case "PICKED_UP":
+    case "IN_TRANSIT":
+    case "DELIVERED":
+    case "PENDING":
+      return status;
+    default:
+      return "PENDING";
+  }
+}
+
+/** SMALL/MEDIUM/LARGE is all the backend prices by — map the free-form
+ *  weight input this UI collects onto that 3-tier scale. */
+export function weightToParcelSize(
+  weightKg: number | null | undefined,
+): "SMALL" | "MEDIUM" | "LARGE" {
+  const w = weightKg ?? 2.5;
+  if (w <= 5) return "SMALL";
+  if (w <= 20) return "MEDIUM";
+  return "LARGE";
+}
+
+function mapParcelToDelivery(p: any): Delivery {
+  return {
+    id: p.id,
+    trackingId: p.trackingId,
+    status: mapParcelStatus(p.status),
+    deliveryFee: p.fare ?? 0,
+    distanceKm: p.distanceKm ?? p.distance,
+    durationMinutes: p.estimatedDurationMinutes ?? p.duration,
+    size: p.size,
+    paymentMethod: p.paymentMethod,
+    paymentStatus: p.paymentStatus,
+    packageDetails: p.description ?? undefined,
+    recipientName: p.recipientName,
+    recipientPhone: p.recipientPhone,
+    // Backend's ParcelRiderSummary is { name, vehicleType, phone, rating } —
+    // no rider id or plate/color/model exposed on this endpoint.
+    rider: p.rider
+      ? {
+          id: p.riderId ?? "",
+          name: p.rider.name,
+          phone: p.rider.phone ?? "",
+          vehicle: p.rider.vehicleType
+            ? { model: p.rider.vehicleType, color: "", plateNumber: "" }
+            : undefined,
+        }
+      : undefined,
+    pickupAddress: p.pickupAddress
+      ? { ...p.pickupAddress, address: p.pickupAddress.address ?? p.pickupAddress.street }
+      : undefined,
+    dropoffAddress: p.dropoffAddress
+      ? { ...p.dropoffAddress, address: p.dropoffAddress.address ?? p.dropoffAddress.street }
+      : undefined,
+    createdAt: p.createdAt,
+    pickedUpAt: p.pickedUpAt,
+    deliveredAt: p.deliveredAt,
+  };
+}
+
+export interface ParcelLocation {
+  latitude: number;
+  longitude: number;
+  address?: string;
+}
+
+export interface ParcelEstimate {
+  distanceKm: number;
+  estimatedDurationMinutes: number;
+  fare: number;
+  sizeMultiplier: number;
+}
+
+export interface CreateParcelResult {
+  delivery: Delivery;
+  deliveryFee: number;
+  authorizationUrl?: string;
+  reference?: string;
+  confirmationCode?: string;
+}
+
 export class DeliveryService {
-  /**
-   * Get a fare estimate BEFORE creating the delivery.
-   * Backend endpoint: POST /v1/fare/delivery
-   * DeliveryFareDto uses string coordinates: pickuplat, pickuplong, dropofflat, dropofflong
-   */
-  static async getDeliveryFareEstimate(
-    pickup: { lat: number; lng: number },
-    dropoff: { lat: number; lng: number },
+  /** POST /parcels/estimate — fare preview before creating/paying for a parcel. */
+  static async estimateParcel(
+    pickup: ParcelLocation,
+    dropoff: ParcelLocation,
+    size: "SMALL" | "MEDIUM" | "LARGE",
     token?: string,
-  ): Promise<{ fare: number; distance: number; duration: number }> {
-    return ApiService.post<{
-      fare: number;
-      distance: number;
-      duration: number;
-    }>(
-      "/fare/delivery",
-      {
-        pickuplat: String(pickup.lat),
-        pickuplong: String(pickup.lng),
-        dropofflat: String(dropoff.lat),
-        dropofflong: String(dropoff.lng),
-      },
+  ): Promise<ParcelEstimate> {
+    return ApiService.post<ParcelEstimate>(
+      "/parcels/estimate",
+      { pickup, dropoff, size },
       token,
     );
   }
 
   /**
-   * Create a new delivery request.
-   * The backend requires a unique `x-idempotency-key` header per request to
-   * prevent duplicate deliveries when the user retries after a network error.
-   * We generate a UUID v4 per call — the backend deduplicates within a 5-minute
-   * window using Redis, so retrying the same operation with the same key is safe.
+   * POST /parcels — creates AND pays for the parcel in one call (unlike the
+   * old two-step create-then-initiate-payment flow). For CARD, the response
+   * includes a Paystack authorizationUrl to redirect to.
    */
   static async createDelivery(
     data: {
-      pickupAddressId: string;
-      dropoffAddressId: string;
+      pickup: ParcelLocation;
+      dropoff: ParcelLocation;
+      size: "SMALL" | "MEDIUM" | "LARGE";
       recipientName: string;
       recipientPhone: string;
-      packageDetails: string;
-      weightKg: number;
-      senderName?: string;
-      senderPhone?: string;
-      declaredValue?: number;
-      fragile?: boolean;
-      perishable?: boolean;
-      containsLiquid?: boolean;
+      description?: string;
+      paymentMethod: "WALLET" | "CARD";
+      idempotencyKey?: string;
     },
     token?: string,
-  ): Promise<{ delivery: any; deliveryFee: number }> {
-    const idempotencyKey = crypto.randomUUID();
-    return ApiService.post<{ delivery: any; deliveryFee: number }>(
-      "/trips/deliveries/request",
-      data,
-      token,
+  ): Promise<CreateParcelResult> {
+    const idempotencyKey = data.idempotencyKey ?? `parcel-${crypto.randomUUID()}`;
+    const res = await ApiService.post<{
+      parcel: any;
+      authorizationUrl?: string;
+      confirmationCode?: string;
+    }>(
+      "/parcels",
       {
-        headers: { "x-idempotency-key": idempotencyKey },
+        pickup: data.pickup,
+        dropoff: data.dropoff,
+        size: data.size,
+        recipientName: data.recipientName,
+        recipientPhone: data.recipientPhone,
+        description: data.description,
+        paymentMethod: data.paymentMethod,
+        idempotencyKey,
       },
-    );
-  }
-
-  /**
-   * Save an address for the delivery.
-   * `label`, `street`, `lat`, and `lng` are required.
-   * `city` and `state` are optional — when omitted the backend defaults to
-   * 'Maiduguri' / 'Borno'. Never pass placeholder strings like 'Unknown' here;
-   * they are stored verbatim and would surface as "Unknown Unknown" in the UI.
-   */
-  static async saveAddress(
-    data: {
-      label: string; // REQUIRED by Prisma schema (non-nullable String)
-      street: string;
-      city?: string;
-      state?: string;
-      lat: number;
-      lng: number;
-    },
-    token?: string,
-  ) {
-    // city & state are @IsOptional() in the backend DTO — omit them rather than
-    // sending the sentinel string 'Unknown', which would be stored verbatim in the DB
-    // and cause "Unknown Unknown" to render on the Delivery Details page.
-    // The backend's createAddressFromData() falls back to 'Maiduguri' / 'Borno'
-    // when these fields are absent, which is a far safer default.
-    const payload: Record<string, unknown> = {
-      label: data.label,
-      street: data.street,
-      ...(data.city ? { city: data.city } : {}),
-      ...(data.state ? { state: data.state } : {}),
-      lat: data.lat,
-      lng: data.lng,
-    };
-    return ApiService.post<{ id: string; [key: string]: any }>(
-      "/users/addresses",
-      payload,
       token,
+      { timeoutMs: 30_000 },
     );
+
+    const delivery = mapParcelToDelivery(res.parcel);
+    return {
+      delivery,
+      deliveryFee: delivery.deliveryFee,
+      authorizationUrl: res.authorizationUrl,
+      reference: res.parcel?.paymentReference,
+      confirmationCode: res.confirmationCode,
+    };
   }
 
-  /**
-   * Get single delivery details
-   * Uses /users/deliveries/:id to ensure full details + relations are returned
-   */
   static async getDelivery(id: string, token?: string): Promise<Delivery> {
-    return ApiService.get<Delivery>(`/users/deliveries/${id}`, token);
+    const parcel = await ApiService.get<any>(`/parcels/${id}`, token);
+    return mapParcelToDelivery(parcel);
+  }
+
+  static async getConfirmationCode(
+    id: string,
+    token?: string,
+  ): Promise<{ parcelId: string; trackingId: string; confirmationCode: string }> {
+    return ApiService.get(`/parcels/${id}/confirmation-code`, token);
   }
 
   static async rateDelivery(
-    deliveryId: string,
-    rating: number,
-    comment?: string,
-    token?: string,
-  ) {
+    _deliveryId: string,
+    _rating: number,
+    _comment?: string,
+    _token?: string,
+  ): Promise<never> {
+    void _deliveryId;
+    void _rating;
+    void _comment;
+    void _token;
     // Backend does not have a delivery rating endpoint yet.
-    // Throw so callers know this operation is not available — never silently
-    // return success, which causes misleading toast messages in the UI.
     throw new Error(
       "Delivery rating is not yet available. This feature is coming soon.",
     );
   }
 
-  /**
-   * Poll delivery status after payment, waiting for backend to transition from PENDING.
-   * Backend DeliveryStatus enum: PENDING | REQUESTED | ASSIGNED | ACCEPTED | PICKED_UP | IN_TRANSIT | DELIVERED | CANCELLED
-   */
+  /** Poll parcel status after payment, waiting for it to move off PENDING. */
   static async pollDeliveryStatus(
     deliveryId: string,
-    targetStatus: string = "REQUESTED",
+    _targetStatus: string = "REQUESTED",
     maxAttempts: number = 20,
     interval: number = 3000,
     token?: string,
   ): Promise<boolean> {
+    void _targetStatus;
     let attempts = 0;
-    // Only statuses that exist in the backend DeliveryStatus enum
     const paidStatuses = [
       "REQUESTED",
       "ASSIGNED",
@@ -201,13 +268,9 @@ export class DeliveryService {
     ];
     while (attempts < maxAttempts) {
       try {
-        const res: any = await ApiService.get(
-          `/users/deliveries/${deliveryId}`,
-          token,
-        );
-        const currentStatus = res.status ?? res.data?.status;
-        if (paidStatuses.includes(currentStatus)) return true;
-        if (currentStatus === "CANCELLED") return false;
+        const delivery = await this.getDelivery(deliveryId, token);
+        if (paidStatuses.includes(delivery.status)) return true;
+        if (delivery.status === "CANCELLED") return false;
       } catch (e) {
         console.error("Polling error", e);
       }
@@ -218,31 +281,23 @@ export class DeliveryService {
   }
 
   /**
-   * Verify a payment by reference.
-   * The backend's VerifyPaymentDto requires BOTH `reference` AND `gateway`.
-   * The delivery flow always uses PAYSTACK; gateway is stored alongside the
-   * reference in localStorage so future gateways can be supported.
-   *
-   * Returns:
-   *   true  — payment confirmed
-   *   false — payment genuinely failed / not found
-   *   null  — indeterminate (network/timeout error) — caller should retry or poll
+   * Verify a payment by reference. Real endpoint is GET /payments/verify/:reference
+   * (path param, authenticated, no separate gateway param — Paystack is the
+   * only gateway this backend supports).
    */
   static async verifyPayment(
     reference: string,
-    gateway: string = "PAYSTACK",
+    _gateway: string = "PAYSTACK",
     token?: string,
   ): Promise<boolean | null> {
+    void _gateway;
     try {
       const res: any = await ApiService.get(
-        `/payment/verify?reference=${encodeURIComponent(reference)}&gateway=${gateway}`,
+        `/payments/verify/${encodeURIComponent(reference)}`,
         token,
       );
-      return res.status === "COMPLETED" || res.success === true;
+      return res.status === "COMPLETED";
     } catch (error: any) {
-      console.error("Manual verification failed", error);
-      // FIX M5: Distinguish transient network/timeout errors from genuine
-      // payment failures so callers can decide whether to retry or give up.
       if (error?.type === "network-error" || error?.type === "timeout") {
         return null; // Indeterminate — should retry
       }
@@ -250,44 +305,25 @@ export class DeliveryService {
     }
   }
 
-  /**
-   * Get full payment details including status (for recovery/debugging).
-   * ✅ FIXED: Added to support detecting CANCELLED vs FAILED payments
-   * in the delivery recovery flow.
-   *
-   * Returns:
-   *   { status: "COMPLETED" | "CANCELLED" | "FAILED" | "PENDING", ... }
-   *   or throws error if payment not found
-   */
   static async getPaymentStatus(
     reference: string,
-    gateway: string = "PAYSTACK",
+    _gateway: string = "PAYSTACK",
     token?: string,
   ): Promise<{ status: string; [key: string]: any }> {
-    try {
-      const res: any = await ApiService.get(
-        `/payment/verify?reference=${encodeURIComponent(reference)}&gateway=${gateway}`,
-        token,
-      );
-      return {
-        status: res.status || res.data?.status || "UNKNOWN",
-        ...res,
-      };
-    } catch (error: any) {
-      console.error("Payment status lookup failed", error);
-      throw error;
-    }
+    void _gateway;
+    const res: any = await ApiService.get(
+      `/payments/verify/${encodeURIComponent(reference)}`,
+      token,
+    );
+    return { status: res.status || "UNKNOWN", ...res };
   }
 
-  /**
-   * Cancel a delivery request.
-   * Backend endpoint: PATCH /v1/trips/deliveries/:id/cancel
-   */
+  /** POST /parcels/:id/cancel */
   static async cancelDelivery(
     deliveryId: string,
     reason: string = "User cancelled before payment",
     token?: string,
   ) {
-    return ApiService.patch(`/trips/deliveries/${deliveryId}/cancel`, { reason }, token);
+    return ApiService.post(`/parcels/${deliveryId}/cancel`, { reason }, token);
   }
 }
