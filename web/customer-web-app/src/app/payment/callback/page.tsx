@@ -33,15 +33,14 @@ function CallbackContent() {
   const [successResult, setSuccessResult] = useState<{
     title: string;
     message: string;
-    target: string;
     reference: string;
   } | null>(null);
 
   const showSuccessAndReturn = useCallback(
-    (target: string, title: string, message: string, reference: string) => {
-      setSuccessResult({ target, title, message, reference });
+    (title: string, message: string, reference: string) => {
+      setSuccessResult({ title, message, reference });
       if (navigationTimerRef.current) clearTimeout(navigationTimerRef.current);
-      navigationTimerRef.current = setTimeout(() => router.replace(target), 3500);
+      navigationTimerRef.current = setTimeout(() => router.replace("/"), 2000);
     },
     [router],
   );
@@ -231,16 +230,9 @@ function CallbackContent() {
 
         if (isWalletTopup) {
           let topupReference = reference;
-          let returnTo = "/main/delivery";
           try {
             const pendingTopup = JSON.parse(pendingWalletTopupRaw!);
             topupReference = pendingTopup.reference || reference;
-            if (
-              typeof pendingTopup.returnTo === "string" &&
-              pendingTopup.returnTo.startsWith("/main/")
-            ) {
-              returnTo = pendingTopup.returnTo;
-            }
           } catch {
             // The Paystack reference is still sufficient for verification.
           }
@@ -248,7 +240,6 @@ function CallbackContent() {
           await WalletService.verifyTopup(topupReference, token);
           localStorage.removeItem("pending_wallet_topup");
           showSuccessAndReturn(
-            returnTo,
             "Wallet topped up",
             "Your payment was successful and your new balance is ready to use.",
             reference,
@@ -346,13 +337,8 @@ function CallbackContent() {
         });
 
         if (metaBookingId || isBooking) {
-          const bookingId = metaBookingId ?? (() => {
-            try { return JSON.parse(pendingBookingRaw!).bookingId; }
-            catch { return null; }
-          })();
           localStorage.removeItem("pending_booking_data");
-          const target = bookingId ? `/main/bookings/${bookingId}` : "/main/bookings";
-          showSuccessAndReturn(target, "Booking payment successful", "Your accommodation has been paid for and your booking is ready.", reference);
+          showSuccessAndReturn("Booking payment successful", "Your accommodation has been paid for and your booking is ready.", reference);
         } else if (metaRideId || isRide) {
           // Restore ride context into Zustand before navigating so the ride
           // page shows the correct state without waiting for the first poll.
@@ -398,34 +384,18 @@ function CallbackContent() {
 
           localStorage.removeItem("pending_ride");
           localStorage.removeItem("pending_ride_id");
-          showSuccessAndReturn("/main/ride", "Ride payment successful", "Your ride payment has been confirmed. We’re taking you back to your ride.", reference);
+          showSuccessAndReturn("Ride payment successful", "Your ride payment has been confirmed.", reference);
         } else if (metaDeliveryId || pendingDeliveryData) {
-          // Delivery — use backend-returned ID first, then localStorage
-          const deliveryId =
-            metaDeliveryId ??
-            (() => {
-              try {
-                return JSON.parse(pendingDeliveryData!).id;
-              } catch {
-                return null;
-              }
-            })();
           resetDelivery();
           localStorage.removeItem("pending_delivery_data");
-          const target = deliveryId ? `/main/delivery/${deliveryId}` : "/main/delivery";
-          showSuccessAndReturn(target, "Delivery payment successful", "Your delivery request has been paid for and is ready for tracking.", reference);
+          showSuccessAndReturn("Delivery payment successful", "Your delivery request has been paid for and is ready for tracking.", reference);
         } else if (metaOrderGroupId || metaOrderId || isCheckout) {
           // Order — prefer backend-returned group/order ID, fall back to localStorage
           clearCart();
           localStorage.removeItem("pending_checkout");
-          const orderId =
-            metaOrderGroupId ||
-            metaOrderId ||
-            localStorage.getItem("last_order_id");
-          const target = orderId ? `/main/orders/confirmed?id=${orderId}` : "/main/orders";
-          showSuccessAndReturn(target, "Order payment successful", "Your order is confirmed and has been sent to the vendor.", reference);
+          showSuccessAndReturn("Order payment successful", "Your order is confirmed and has been sent to the vendor.", reference);
         } else {
-          showSuccessAndReturn("/main/store", "Payment successful", "Your payment has been confirmed successfully.", reference);
+          showSuccessAndReturn("Payment successful", "Your payment has been confirmed successfully.", reference);
         }
       } catch (error: any) {
         console.error("Payment verification error:", error);
@@ -471,8 +441,8 @@ function CallbackContent() {
             <div className="flex items-start gap-3"><span className="rounded-xl bg-white p-2 text-yellow-600 shadow-sm dark:bg-white/5"><ReceiptText className="h-4 w-4" /></span><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Payment reference</p><p className="mt-1 truncate font-mono text-xs font-bold text-gray-700 dark:text-gray-200">{successResult.reference}</p></div></div>
           </div>
 
-          <button type="button" onClick={() => router.replace(successResult.target)} className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-yellow-400 py-4 text-sm font-black text-black transition hover:bg-yellow-300 active:scale-[0.98]">Continue <ArrowRight className="h-4 w-4" /></button>
-          <p className="mt-4 flex items-center justify-center gap-2 text-[10px] font-bold text-gray-400"><ShieldCheck className="h-4 w-4" /> Returning you automatically in a few seconds</p>
+          <button type="button" onClick={() => router.replace("/")} className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-yellow-400 py-4 text-sm font-black text-black transition hover:bg-yellow-300 active:scale-[0.98]">Go to homepage <ArrowRight className="h-4 w-4" /></button>
+          <p className="mt-4 flex items-center justify-center gap-2 text-[10px] font-bold text-gray-400"><ShieldCheck className="h-4 w-4" /> Returning to the homepage in 2 seconds</p>
         </div>
       </div>
     );

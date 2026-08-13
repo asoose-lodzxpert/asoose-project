@@ -179,24 +179,13 @@ export class PaymentInitService {
     try {
       switch (dto.gateway) {
         case PaymentGateway.PAYSTACK: {
-          // Always route Paystack through the backend callback handler.
-          // The frontend's desired redirect URL (dto.callbackUrl) is stored
-          // in payment metadata and used by GET /callback/paystack to redirect
-          // the browser to the correct frontend page after verification.
-          // Sending the frontend URL directly to Paystack would bypass the
-          // backend handler and land the user on "/" with no verification.
-          const backendBase = (
-            process.env.BACKEND_URL || 'http://localhost:3000'
-          )
-            .replace(/\/+$/, '') // strip trailing slashes
-            .replace(/\/api\/v1$/, ''); // strip /api/v1 suffix if already present
-          const paystackCallbackUrl = `${backendBase}/api/v1/payment/callback/paystack`;
+          // Do not send callback_url here. Paystack will use the callback URL
+          // configured for the active test/live mode in the dashboard.
           response = await this.paystackService.initializePayment(
             amount,
             dto.email,
             reference,
             metadata,
-            paystackCallbackUrl,
           );
           break;
         }

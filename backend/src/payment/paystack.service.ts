@@ -28,13 +28,8 @@ export class PaystackService {
     email: string,
     reference: string,
     metadata?: any,
-    callbackUrl?: string,
   ): Promise<PaymentInitResponse> {
     try {
-      const finalCallbackUrl =
-        callbackUrl ||
-        `${process.env.BACKEND_URL}/api/v1/payment/callback/paystack`;
-
       const response = await axios.post(
         `${this.baseUrl}/transaction/initialize`,
         {
@@ -42,7 +37,6 @@ export class PaystackService {
           email,
           reference,
           metadata,
-          callback_url: finalCallbackUrl,
         },
         {
           headers: {
