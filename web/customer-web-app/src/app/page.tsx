@@ -169,7 +169,8 @@ export default function AsooseLanding() {
       cta: "Start shopping",
       link: "/main/store",
       icon: ShoppingBag,
-      image: "/marketplace.webp",
+      image:
+        "https://res.cloudinary.com/dgwnjuvlx/image/upload/f_auto,q_auto:best,w_3200,c_limit/v1787058027/marketplace_copy_ibl05r.jpg",
     },
     ride: {
       eyebrow: "Reliable rides, when you need them",
@@ -178,7 +179,8 @@ export default function AsooseLanding() {
       cta: "Book a ride",
       link: "/main/ride",
       icon: CarFront,
-      image: "/ride.webp",
+      image:
+        "https://res.cloudinary.com/dgwnjuvlx/image/upload/f_auto,q_auto:best,w_3200,c_limit/v1787058021/ride_copy_mvl8ho.jpg",
     },
     package: {
       eyebrow: "Simple, secure local delivery",
@@ -254,22 +256,24 @@ export default function AsooseLanding() {
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => setIsPaused(false)}
         >
-          <Image
-            key={activeService}
-            src={SERVICE_DATA[activeService].image}
-            alt=""
-            fill
-            className="animate-in fade-in zoom-in-105 object-cover duration-1000"
-            priority
-            sizes="100vw"
-            quality={92}
-            placeholder="blur"
-            blurDataURL={BLUR_MAP[SERVICE_DATA[activeService].image]}
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/75 to-black/10" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/20" />
+          {SERVICE_KEYS.map((service, index) => (
+            <Image
+              key={service}
+              src={SERVICE_DATA[service].image}
+              alt=""
+              fill
+              priority={index === 0}
+              loading={index === 0 ? undefined : "eager"}
+              sizes="100vw"
+              className={`object-cover transition-opacity duration-700 ${
+                activeService === service ? "opacity-100" : "opacity-0"
+              }`}
+            />
+          ))}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/65 to-transparent sm:via-black/45" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/10" />
           <div
-            className="absolute inset-0 opacity-[0.12]"
+            className="absolute inset-0 opacity-[0.06]"
             style={{
               backgroundImage: "radial-gradient(circle at center, white 1px, transparent 1px)",
               backgroundSize: "26px 26px",
