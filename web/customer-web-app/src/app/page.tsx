@@ -252,41 +252,17 @@ export default function AsooseLanding() {
       >
         {/* ── HERO ──────────────────────────────────────────────────────── */}
         <header
-          className="relative min-h-[760px] overflow-hidden bg-zinc-950 pt-16 text-white sm:min-h-[820px]"
+          className="relative overflow-hidden bg-zinc-950 pt-16 text-white"
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => setIsPaused(false)}
         >
-          {SERVICE_KEYS.map((service, index) => (
-            <Image
-              key={service}
-              src={SERVICE_DATA[service].image}
-              alt=""
-              fill
-              priority={index === 0}
-              loading={index === 0 ? undefined : "eager"}
-              sizes="100vw"
-              className={`object-cover transition-opacity duration-700 ${
-                activeService === service ? "opacity-100" : "opacity-0"
-              }`}
-            />
-          ))}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/65 to-transparent sm:via-black/45" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/10" />
-          <div
-            className="absolute inset-0 opacity-[0.06]"
-            style={{
-              backgroundImage: "radial-gradient(circle at center, white 1px, transparent 1px)",
-              backgroundSize: "26px 26px",
-            }}
-          />
-
-          <div className="relative z-10 mx-auto flex min-h-[650px] max-w-7xl items-center px-4 pb-40 pt-20 sm:px-6 sm:pb-44 sm:pt-24">
-            <div className="max-w-4xl">
+          <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 pb-40 pt-16 sm:px-6 sm:pb-44 sm:pt-20 lg:min-h-[720px] lg:grid-cols-[0.9fr_1.1fr] lg:gap-16 lg:pt-24">
+            <div className="max-w-3xl">
               <div className="mb-6 flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.22em] text-yellow-400 sm:text-xs">
                 <span className="h-0.5 w-10 bg-yellow-400" />
                 Shopping · Rides · Delivery
               </div>
-              <h1 className="max-w-4xl text-5xl font-black leading-[0.9] tracking-[-0.06em] sm:text-7xl lg:text-[6.6rem]">
+              <h1 className="text-5xl font-black leading-[0.9] tracking-[-0.06em] sm:text-7xl lg:text-[5.25rem]">
                 Asoose is your all-in-one app
                 <span className="block text-yellow-400">for everyday city life.</span>
               </h1>
@@ -308,6 +284,23 @@ export default function AsooseLanding() {
                   Download the app
                 </Link>
               </div>
+            </div>
+
+            <div className="relative min-h-[320px] overflow-hidden rounded-[2rem] bg-white sm:min-h-[440px] lg:min-h-[560px]">
+              {SERVICE_KEYS.map((service, index) => (
+                <Image
+                  key={service}
+                  src={SERVICE_DATA[service].image}
+                  alt={`${SERVICE_DATA[service].eyebrow} with Asoose`}
+                  fill
+                  priority={index === 0}
+                  loading={index === 0 ? undefined : "eager"}
+                  sizes="(max-width: 1024px) 100vw, 55vw"
+                  className={`object-contain transition-opacity duration-700 ${
+                    activeService === service ? "opacity-100" : "opacity-0"
+                  }`}
+                />
+              ))}
             </div>
           </div>
 
