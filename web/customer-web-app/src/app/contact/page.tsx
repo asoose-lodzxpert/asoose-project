@@ -104,12 +104,19 @@ export default function ContactPage() {
               </p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="grid sm:grid-cols-2 gap-x-12 gap-y-8">
               <ContactInfo
                 icon={<Mail />}
                 label="Email"
-                value="hello@asoose.com"
-                href="mailto:hello@asoose.com"
+                value="hello@asoose.ng"
+                href="mailto:hello@asoose.ng"
+                method="email"
+              />
+              <ContactInfo
+                icon={<Mail />}
+                label="Email"
+                value="asooselodzxpertnigltd@gmail.com"
+                href="mailto:asooselodzxpertnigltd@gmail.com"
                 method="email"
               />
               <ContactInfo
@@ -251,9 +258,9 @@ function ContactInfo({
   method: "email" | "phone";
 }) {
   return (
-    <div className="flex gap-4 items-center">
-      <div className="text-yellow-500">{icon}</div>
-      <div>
+    <div className="flex gap-4 items-start min-w-0">
+      <div className="text-yellow-500 shrink-0">{icon}</div>
+      <div className="min-w-0">
         <div className="text-sm opacity-60">{label}</div>
         <a
           href={href}
@@ -263,7 +270,7 @@ function ContactInfo({
               contact_method: method,
             })
           }
-          className="text-yellow-500 hover:underline font-medium break-all"
+          className="text-[clamp(0.7rem,2.4vw,0.875rem)] text-yellow-500 hover:underline font-medium whitespace-nowrap"
         >
           {value}
         </a>
