@@ -335,6 +335,13 @@ export function RideSelection() {
         return cleaned;
       };
 
+      // Only send passenger fields when booking for someone else, and only
+      // include a key when it actually has a value — the backend rejects
+      // `null`/empty strings for these optional fields.
+      const guestName = bookingForOther ? passengerName?.trim() : "";
+      const guestPhone = bookingForOther ? normalizePhone(passengerPhone) : null;
+      const guestEmail = bookingForOther ? passengerEmail.trim() : "";
+
       const payload = {
         pickup: {
           address: pickupAddress || "Pinned location",
@@ -351,11 +358,9 @@ export function RideSelection() {
         isScheduled: false,
         idempotencyKey: idempotencyKeyRef.current,
         bookedForOther: bookingForOther,
-        passengerName: bookingForOther ? passengerName : null,
-        passengerPhone: bookingForOther
-          ? normalizePhone(passengerPhone)
-          : null,
-        passengerEmail: bookingForOther ? passengerEmail.trim() || null : null,
+        ...(guestName ? { passengerName: guestName } : {}),
+        ...(guestPhone ? { passengerPhone: guestPhone } : {}),
+        ...(guestEmail ? { passengerEmail: guestEmail } : {}),
       };
 
       const accessToken = session.accessToken as string; // already guarded above

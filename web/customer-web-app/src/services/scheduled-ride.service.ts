@@ -21,6 +21,7 @@ export interface BookScheduledRideDto {
   durationMin?: number;
   passengerName?: string;
   passengerPhone?: string;
+  passengerEmail?: string;
 }
 
 export class ScheduledRideService {
@@ -41,10 +42,20 @@ export class ScheduledRideService {
       isScheduled: true,
       scheduledAt: data.scheduledAt,
       idempotencyKey: idempotencyKey ?? `ride-${crypto.randomUUID()}`,
-      bookedForOther: Boolean(data.passengerName || data.passengerPhone),
-      passengerName: data.passengerName ?? null,
-      passengerPhone: data.passengerPhone ?? null,
-      passengerEmail: null,
+      bookedForOther: Boolean(
+        data.passengerName || data.passengerPhone || data.passengerEmail,
+      ),
+      // Only include a passenger key when it has a value — the backend rejects
+      // `null`/empty strings for these optional fields.
+      ...(data.passengerName?.trim()
+        ? { passengerName: data.passengerName.trim() }
+        : {}),
+      ...(data.passengerPhone?.trim()
+        ? { passengerPhone: data.passengerPhone.trim() }
+        : {}),
+      ...(data.passengerEmail?.trim()
+        ? { passengerEmail: data.passengerEmail.trim() }
+        : {}),
     }, token);
   }
 

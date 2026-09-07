@@ -23,10 +23,13 @@ export interface RideRequestPayload {
   isScheduled: boolean;
   scheduledAt?: string | null;
   idempotencyKey: string;
-  bookedForOther: boolean;
-  passengerName: string | null;
-  passengerPhone: string | null;
-  passengerEmail: string | null;
+  bookedForOther?: boolean;
+  // Optional passenger fields — only include a key when it has a real value.
+  // The backend rejects `null`/`""` (AJV coerces null -> "" then fails the
+  // email format check), so an absent field must be omitted entirely.
+  passengerName?: string;
+  passengerPhone?: string;
+  passengerEmail?: string;
 }
 
 export interface CreateRideResponse {
