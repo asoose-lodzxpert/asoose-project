@@ -8,6 +8,7 @@ import {
   Truck,
   Car,
   ShoppingBag,
+  BedDouble,
   ArrowRight,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -35,9 +36,10 @@ export default function AboutPage() {
             About <span className="text-yellow-500">Asoose Lodzxpert</span>
           </h1>
           <p className="text-lg opacity-60">
-            Asoose Lodzxpert is a logistics, mobility, and e-commerce company
-            founded in 2023 with the mission to make last-mile delivery and
-            shared transportation reliable, safe, and accessible.
+            Asoose Lodzxpert is a logistics, mobility, e-commerce, and
+            accommodation company founded in 2023 with the mission to make
+            last-mile delivery, shared transportation, and comfortable stays
+            reliable, safe, and accessible.
           </p>
         </section>
 
@@ -53,7 +55,7 @@ export default function AboutPage() {
             </p>
             <p className="opacity-60 leading-relaxed">
               Our services include last-mile delivery, local e-commerce support,
-              and car-sharing solutions, providing affordable and flexible
+              car-sharing, and accommodation, providing affordable and flexible
               mobility options that empower livelihoods and help local
               businesses grow. By leveraging technology and a deep understanding
               of local needs, we enable communities to move goods and people
@@ -83,6 +85,11 @@ export default function AboutPage() {
                 icon: <Car className="text-yellow-500" size={20} />,
                 title: "Car-Sharing",
                 desc: "Affordable and flexible mobility options designed to create new opportunities.",
+              },
+              {
+                icon: <BedDouble className="text-yellow-500" size={20} />,
+                title: "Accommodation",
+                desc: "Comfortable and affordable places to stay, making travel and relocation easier.",
               },
             ].map((service, i) => (
               <div key={i} className="flex gap-4">
