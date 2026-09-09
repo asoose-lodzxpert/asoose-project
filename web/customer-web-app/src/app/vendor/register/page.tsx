@@ -1,5 +1,6 @@
 "use client";
 
+import { SUPPORT_WHATSAPP_URL } from "@/lib/support";
 import React, { useState } from "react";
 import { SignupData } from "@/types/vendor-signup";
 import { BUSINESS_TYPES, EMPLOYEE_RANGES } from "@/constants/vendor-signup";
@@ -268,7 +269,7 @@ export default function VendorRegistrationPage() {
         </div>
         
         <p className="mt-8 text-center text-xs text-gray-500 dark:text-gray-400 font-medium">
-          Need help? <a href="mailto:support@asoose.com" className="text-yellow-500 hover:underline">Contact our support team</a>
+          Need help? <a href={SUPPORT_WHATSAPP_URL} className="text-yellow-500 hover:underline">Contact our support team</a>
         </p>
 
         {/* Confirmation Modal */}

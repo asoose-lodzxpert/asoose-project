@@ -1,5 +1,6 @@
 "use client";
 
+import { SUPPORT_WHATSAPP_URL } from "@/lib/support";
 import React, {
   useState,
   useEffect,
@@ -577,7 +578,7 @@ function ProfilePageContent() {
                     title="No disputes filed"
                     desc="You haven't opened any disputes yet."
                     actionLabel="Contact Support"
-                    actionLink="/main/support"
+                    actionLink={SUPPORT_WHATSAPP_URL}
                   />
                 ) : (
                   disputes.map((dispute) => (

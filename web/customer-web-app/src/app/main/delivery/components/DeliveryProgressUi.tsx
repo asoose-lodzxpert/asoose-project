@@ -1,5 +1,6 @@
 "use client";
 
+import { SUPPORT_WHATSAPP_URL } from "@/lib/support";
 import React, { useState } from "react";
 import {
   Phone,
@@ -438,9 +439,9 @@ export default function DeliveryProgressUI({
               Having trouble with this delivery? Our support team is here to
               assist you.
             </p>
-            <button className="w-full py-3 rounded-xl border border-zinc-200 dark:border-zinc-700 font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors dark:text-white">
+            <a href={SUPPORT_WHATSAPP_URL} className="block text-center w-full py-3 rounded-xl border border-zinc-200 dark:border-zinc-700 font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors dark:text-white">
               Contact Support
-            </button>
+            </a>
           </div>
         </div>
       </div>

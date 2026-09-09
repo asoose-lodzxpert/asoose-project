@@ -1,5 +1,6 @@
 'use client';
 
+import { SUPPORT_WHATSAPP_URL } from "@/lib/support";
 import { AlertCircle, RotateCcw } from 'lucide-react';
 
 interface ErrorStateProps {
@@ -52,7 +53,7 @@ export function ErrorState({
         <p className="text-xs text-zinc-500 dark:text-zinc-400">
           If the issue persists, please{' '}
           <a
-            href="/support"
+            href={SUPPORT_WHATSAPP_URL}
             className="text-blue-600 dark:text-blue-400 hover:underline"
           >
             contact support

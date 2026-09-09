@@ -6,6 +6,7 @@ import { Providers } from "./providers";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import JsonLd from "@/components/JsonLd";
+import ContactSupport from "@/components/ContactSupport";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -173,6 +174,7 @@ export default function RootLayout({
         <Providers>
           <NotificationListener />
           {children}
+          <ContactSupport />
         </Providers>
         <Analytics />
         <SpeedInsights />
