@@ -67,7 +67,7 @@ export const OrderSummary = ({
           )}
         </div>
         <div className="flex justify-between text-gray-600 dark:text-gray-400">
-          <span>Service Fee (1.5%)</span>
+          <span>Service Fee</span>
           {isLoadingFee ? (
             <span className="w-12 h-4 bg-gray-200 dark:bg-white/10 rounded animate-pulse" />
           ) : (
@@ -75,7 +75,7 @@ export const OrderSummary = ({
           )}
         </div>
         <div className="flex justify-between text-gray-600 dark:text-gray-400">
-          <span>VAT (7.5%)</span>
+          <span>VAT</span>
           {isLoadingFee ? (
             <span className="w-12 h-4 bg-gray-200 dark:bg-white/10 rounded animate-pulse" />
           ) : (
