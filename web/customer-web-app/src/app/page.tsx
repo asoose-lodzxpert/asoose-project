@@ -150,7 +150,7 @@ export default function AsooseLanding() {
   const darkMode = resolvedTheme === "dark";
 
   const CUSTOMER_ANDROID_URL =
-    "https://play.google.com/store/apps/details?id=com.asoose.app";
+    "https://play.google.com/store/apps/details?id=com.afrifusion.asoose";
   const CUSTOMER_IOS_URL = "https://apps.apple.com/ng/app/asoose/id6781271502";
   const RIDER_ANDROID_URL =
     "https://play.google.com/store/apps/details?id=com.asoose.rider.app";

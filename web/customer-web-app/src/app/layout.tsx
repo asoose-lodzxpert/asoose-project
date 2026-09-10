@@ -51,7 +51,7 @@ const organizationSchema = {
     // "https://twitter.com/asoose",
     // "https://www.facebook.com/asoose",
     // "https://www.instagram.com/asoose",
-    "https://play.google.com/store/apps/details?id=com.asoose.customer",
+    "https://play.google.com/store/apps/details?id=com.afrifusion.asoose",
   ],
   description:
     "Asoose is a super-app marketplace for rides, food, grocery, pharmacy, and package delivery — connecting customers with local vendors and riders.",
