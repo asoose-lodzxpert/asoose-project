@@ -32,19 +32,26 @@ import { CartItemsList } from "@/app/main/components/checkout/cartitemslist";
 import { OrderSummary } from "@/app/main/components/checkout/ordersummary";
 import { AddressPickerModal } from "@/app/main/components/checkout/address-picker-modal";
 
-// The backend prices and places orders from its own server-side cart
-// (/cart/items), not from a list of items sent with the request — the local
-// Zustand cart is the source of truth during shopping, so this pushes it to
-// the server right before quoting/checking out. Modifiers aren't synced —
-// the backend cart has no modifier concept yet.
+// Serialize cart replacement so overlapping quote requests cannot interleave items.
+let cartSyncQueue: Promise<unknown> = Promise.resolve();
+function withServerCart<T>(operation: () => Promise<T>): Promise<T> {
+  const result = cartSyncQueue.then(operation);
+  cartSyncQueue = result.catch(() => {});
+  return result;
+}
+
 async function syncCartToServer(items: CartItem[], token: string) {
-  await CartService.clear(token).catch(() => {});
+  if (items.some((item) => item.modifierIds?.length)) {
+    throw new Error("Selected extras cannot be confirmed at checkout. Remove those items and choose items without extras to continue.");
+  }
+  // A failed clear must stop checkout; adding anyway can duplicate quantities.
+  await CartService.clear(token);
   for (const item of items) {
-    const body =
-      item.kind === "DISH"
-        ? { menuItemId: item.id, quantity: item.quantity }
-        : { productId: item.id, quantity: item.quantity };
-    await CartService.add(body, token);
+    await CartService.add({
+      ...(item.kind === "DISH" ? { menuItemId: item.id } : { productId: item.id }),
+      quantity: item.quantity,
+      instructions: item.instructions,
+    }, token);
   }
 }
 
@@ -88,22 +95,27 @@ export default function CheckoutForm() {
 
   const {
     items: cartItems,
-    getTotalPrice,
     addItem,
     decreaseItem,
     removeItem,
     clearCart,
   } = useCartStore();
 
-  const cartTotal = getTotalPrice();
+  const [quoteSubtotal, setQuoteSubtotal] = useState<number | null>(null);
+  const [quotedContext, setQuotedContext] = useState<string | null>(null);
+  const quoteRequest = useRef(0);
+  const cartTotal = quoteSubtotal;
 
   // Stable fingerprint of cart contents — triggers quote refetch when items,
   // quantities, or modifier selections change (not just array length).
   const cartFingerprint = JSON.stringify(
     cartItems.map(
-      (i) => `${i.id}:${i.quantity}:${(i.modifierIds ?? []).join(",")}`,
+      (i) => `${i.id}:${i.kind}:${i.quantity}:${i.instructions ?? ""}:${(i.modifierIds ?? []).join(",")}`,
     ),
   );
+
+  const quoteContext = JSON.stringify([cartFingerprint, selectedAddress?.id, session?.accessToken]);
+  const quoteIsCurrent = quotedContext === quoteContext && quoteSubtotal !== null;
 
   useEffect(() => {
     idempotencyKeyRef.current = null;
@@ -118,7 +130,15 @@ export default function CheckoutForm() {
   // Fetch live quote from backend whenever address or cart changes
   const fetchQuote = useCallback(
     async (address: typeof selectedAddress) => {
-      if (!address || cartItems.length === 0) {
+      const requestId = ++quoteRequest.current;
+      setQuotedContext(null);
+      setQuoteSubtotal(null);
+      setDeliveryFee(null);
+      setServiceFee(null);
+      setVatAmount(null);
+      setQuoteGrandTotal(null);
+      setIsLoadingFee(false);
+      if (!address || useCartStore.getState().items.length === 0) {
         setDeliveryFee(null);
         setServiceFee(null);
         setVatAmount(null);
@@ -131,25 +151,41 @@ export default function CheckoutForm() {
       setIsLoadingFee(true);
 
       try {
-        // The backend prices from its own server-side cart, not from a list
-        // of items we send — push the local cart there first so the quote
-        // reflects what's actually in it.
-        await syncCartToServer(cartItems, token);
-
-        const data = await ApiService.post<{
-          pricing: {
-            deliveryFee: number;
-            serviceFee: number;
-            vat: number;
-            total: number;
-          };
-        }>("/orders/quote", { deliveryAddressId: address.id }, token);
-
+        const items = useCartStore.getState().items;
+        const { data, serverCart } = await withServerCart(async () => {
+          await syncCartToServer(items, token);
+          const data = await ApiService.post<{
+            pricing: { subtotal?: number; deliveryFee: number; serviceFee: number; vat: number; total: number };
+          }>("/orders/quote", { deliveryAddressId: address.id }, token);
+          const serverCart = await CartService.get(token);
+          return { data, serverCart };
+        });
+        if (requestId !== quoteRequest.current) return;
+        const subtotal = data.pricing.subtotal ?? serverCart.summary.subtotal;
+        if (typeof subtotal !== "number" || !Number.isFinite(subtotal) ||
+            ![data.pricing.deliveryFee, data.pricing.serviceFee, data.pricing.vat, data.pricing.total]
+              .every((value) => typeof value === "number" && Number.isFinite(value))) {
+          throw new Error("Could not confirm current prices. Please try again.");
+        }
+        const confirmedItems = mapServerCartItems(serverCart);
+        if (confirmedItems.length !== items.length || items.some((item) =>
+          !confirmedItems.some((entry) => entry.id === item.id &&
+            entry.kind === (item.kind ?? "PRODUCT") && entry.quantity === item.quantity &&
+            Number.isFinite(entry.price)))) {
+          throw new Error("Your cart changed while confirming prices. Please review your cart and try again.");
+        }
+        useCartStore.getState().replaceItems(useCartStore.getState().items.map((item) => {
+          const confirmed = confirmedItems.find((entry) => entry.id === item.id && entry.kind === (item.kind ?? "PRODUCT"));
+          return confirmed ? { ...item, price: confirmed.price, serverItemId: confirmed.serverItemId } : item;
+        }));
+        setQuoteSubtotal(subtotal);
+        setQuotedContext(JSON.stringify([cartFingerprint, address.id, token]));
         setDeliveryFee(data.pricing.deliveryFee ?? null);
         setServiceFee(data.pricing.serviceFee ?? null);
         setVatAmount(data.pricing.vat ?? null);
         setQuoteGrandTotal(data.pricing.total ?? null);
       } catch (err: any) {
+        if (requestId !== quoteRequest.current) return;
         // Display the specific backend error when there is one (e.g. "Store
         // does not deliver to your current city"), otherwise a generic notice.
         toast.error(
@@ -161,10 +197,10 @@ export default function CheckoutForm() {
         setVatAmount(null);
         setQuoteGrandTotal(null);
       } finally {
-        setIsLoadingFee(false);
+        if (requestId === quoteRequest.current) setIsLoadingFee(false);
       }
     },
-    [session?.accessToken, cartItems],
+    [session?.accessToken, cartFingerprint],
   );
 
   /** Validates a phone number – accepts E.164 (+XXXXXXXXXXX) or local formats */
@@ -296,6 +332,7 @@ export default function CheckoutForm() {
     if (status === "authenticated") {
       fetchQuote(selectedAddress);
     }
+    return () => { quoteRequest.current += 1; };
   }, [selectedAddress, cartFingerprint, status, fetchQuote]);
 
   // ✅ FIXED: Detect and handle cancelled/failed order payments on return
@@ -394,45 +431,25 @@ export default function CheckoutForm() {
   };
 
   const handleRemoveCartItem = async (lineId: string) => {
-    const item = cartItems.find((entry) => (entry.lineId ?? entry.id) === lineId);
     removeItem(lineId);
-
-    const token = session?.accessToken;
-    if (!token || !item) return;
-
-    try {
-      // Re-read the server cart because quote calculation can rebuild it and
-      // therefore change backend cart-item IDs.
-      const serverCart = await CartService.get(token);
-      const serverItem = serverCart.items.find((entry) =>
-        item.kind === "DISH"
-          ? entry.menuItemId === item.id
-          : entry.productId === item.id,
-      );
-      if (serverItem) await CartService.removeItem(serverItem.id, token);
-    } catch (error: any) {
-      toast.error(error?.message || "The item could not be removed from your cart.");
+    if (useCartStore.getState().items.length === 0 && session?.accessToken) {
+      const token = session.accessToken;
       try {
-        const currentCart = await CartService.get(token);
-        useCartStore
-          .getState()
-          .replaceItems(mapServerCartItems(currentCart));
+        await withServerCart(() => CartService.clear(token));
       } catch {
-        // The optimistic local removal remains when refresh is unavailable.
+        toast.error("Could not clear the server cart. Please try again.");
       }
     }
   };
 
   const handleClearCart = async () => {
     if (!window.confirm("Remove every item from your cart?")) return;
-
     const previousItems = cartItems;
     clearCart();
     const token = session?.accessToken;
     if (!token) return;
-
     try {
-      await CartService.clear(token);
+      await withServerCart(() => CartService.clear(token));
       toast.success("Cart cleared");
     } catch (error: any) {
       useCartStore.getState().replaceItems(previousItems);
@@ -499,7 +516,7 @@ export default function CheckoutForm() {
     // Prevent placing an order when the delivery fee hasn't been calculated.
     // Without this guard the user sees ₦0 for delivery and the backend
     // charges the real amount — creating a pricing integrity mismatch.
-    if (deliveryFee === null) {
+    if (!quoteIsCurrent || isLoadingFee || deliveryFee === null) {
       toast.error(
         "Delivery fee could not be calculated. Please select or change your address and try again.",
       );
@@ -531,7 +548,23 @@ export default function CheckoutForm() {
       // in one call — the backend creates the order from its own cart and,
       // for CARD, returns a Paystack authorizationUrl directly. There's no
       // separate payment-initialize step.
-      await syncCartToServer(cartItems, token);
+      const reviewedRequest = quoteRequest.current;
+      const latestQuote = await withServerCart(async () => {
+        await syncCartToServer(cartItems, token);
+        return ApiService.post<{ pricing: { total: number; subtotal?: number } }>(
+          "/orders/quote", { deliveryAddressId: selectedAddress.id }, token,
+        );
+      });
+      if (reviewedRequest !== quoteRequest.current) {
+        toast.info("Your checkout changed. Please review the updated summary before paying.");
+        return;
+      }
+      if (latestQuote.pricing.total !== quoteGrandTotal ||
+          (latestQuote.pricing.subtotal !== undefined && latestQuote.pricing.subtotal !== quoteSubtotal)) {
+        toast.info("Prices have changed. Please review the updated summary before paying.");
+        await fetchQuote(selectedAddress);
+        return;
+      }
 
       if (!idempotencyKeyRef.current) {
         idempotencyKeyRef.current = `chk-${session?.user.id ?? "customer"}-${Date.now()}`;
@@ -925,16 +958,17 @@ export default function CheckoutForm() {
         <div className="lg:col-span-1">
           <div className="sticky top-24">
             <OrderSummary
-              cartTotal={cartTotal}
+              cartTotal={quoteIsCurrent ? cartTotal : null}
               deliveryFee={deliveryFee}
               serviceFee={serviceFee}
               vatAmount={vatAmount}
-              quoteGrandTotal={quoteGrandTotal}
+              quoteGrandTotal={quoteIsCurrent ? quoteGrandTotal : null}
               isLoadingFee={isLoadingFee}
               isProcessing={isProcessing}
               hasAddress={!!selectedAddress}
               isDisabled={
                 isProcessing ||
+                !quoteIsCurrent ||
                 !selectedAddress ||
                 !isOnline ||
                 !!validatePhone(phone) ||

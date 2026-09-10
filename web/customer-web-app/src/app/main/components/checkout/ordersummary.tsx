@@ -4,7 +4,7 @@ import React from "react";
 import { Loader2, ShieldCheck, CreditCard, Wallet } from "lucide-react";
 
 interface OrderSummaryProps {
-  cartTotal: number;
+  cartTotal: number | null;
   deliveryFee: number | null;
   serviceFee: number | null;
   vatAmount?: number | null;
@@ -36,16 +36,16 @@ export const OrderSummary = ({
   // When fee values are unknown (null) we must NOT silently resolve them
   // to 0 — that displays a false ₦0 delivery fee and under-quotes the total.
   // Show placeholder text instead and compute the total only from known values.
-  const feesKnown = deliveryFee !== null;
+  const feesKnown = cartTotal !== null && deliveryFee !== null && serviceFee !== null && vatAmount != null && quoteGrandTotal != null;
   const resolvedDelivery = deliveryFee ?? null;
-  const resolvedService = serviceFee ?? Math.round(cartTotal * 0.015);
-  const resolvedVat = vatAmount ?? Math.round(cartTotal * 0.075);
+  const resolvedService = serviceFee;
+  const resolvedVat = vatAmount;
   // Prefer the backend-authoritative grand total from the quote. Fall back to
   // client-side recomputation only when the quote hasn't loaded yet.
   const grandTotal =
     quoteGrandTotal ??
     (feesKnown
-      ? cartTotal + (resolvedDelivery ?? 0) + resolvedService + resolvedVat
+      ? (cartTotal ?? 0) + (resolvedDelivery ?? 0) + (resolvedService ?? 0) + (resolvedVat ?? 0)
       : null); // Cannot produce a total without a delivery fee
 
   return (
@@ -54,7 +54,7 @@ export const OrderSummary = ({
       <div className="space-y-3 text-sm">
         <div className="flex justify-between text-gray-600 dark:text-gray-400">
           <span>Subtotal</span>
-          <span>₦{cartTotal.toLocaleString()}</span>
+          <span>{cartTotal === null ? "—" : `₦${cartTotal.toLocaleString()}`}</span>
         </div>
         <div className="flex justify-between text-gray-600 dark:text-gray-400">
           <span>Delivery Fee</span>
@@ -71,7 +71,7 @@ export const OrderSummary = ({
           {isLoadingFee ? (
             <span className="w-12 h-4 bg-gray-200 dark:bg-white/10 rounded animate-pulse" />
           ) : (
-            <span>₦{resolvedService.toLocaleString()}</span>
+            <span>{resolvedService == null ? "—" : `₦${resolvedService.toLocaleString()}`}</span>
           )}
         </div>
         <div className="flex justify-between text-gray-600 dark:text-gray-400">
@@ -79,7 +79,7 @@ export const OrderSummary = ({
           {isLoadingFee ? (
             <span className="w-12 h-4 bg-gray-200 dark:bg-white/10 rounded animate-pulse" />
           ) : (
-            <span>₦{resolvedVat.toLocaleString()}</span>
+            <span>{resolvedVat == null ? "—" : `₦${resolvedVat.toLocaleString()}`}</span>
           )}
         </div>
       </div>

@@ -78,7 +78,7 @@ export function mapServerCartItems(cart: ServerCart): LocalCartItem[] {
 
 export class CartService {
   static get(token?: string) {
-    return ApiService.get<ServerCart>("/cart", token);
+    return ApiService.get<ServerCart>("/cart", token, { cache: "no-store" });
   }
 
   static add(
