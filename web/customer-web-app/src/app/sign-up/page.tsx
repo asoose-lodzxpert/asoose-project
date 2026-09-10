@@ -133,12 +133,10 @@ const SignUpPage = () => {
     setIsLoading(true);
 
     try {
-      const API_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
-
       const { firstName, lastName } = splitName(fields.name);
 
-      const response = await fetch(`${API_URL}/auth/register`, {
+      // Use the same-origin rewrite so registration does not require backend CORS.
+      const response = await fetch("/api/backend/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
