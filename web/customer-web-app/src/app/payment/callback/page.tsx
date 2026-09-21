@@ -9,6 +9,7 @@ import { useCartStore } from "@/store/useCartStore";
 import { useDeliveryStore } from "@/store/useDeliveryStore";
 import { useRideStore, type RideStage } from "@/app/main/ride/store/ride";
 import { RideService } from "@/services/ride.service";
+import { DeliveryService } from "@/services/delivery.service";
 import { WalletService } from "@/services/wallet.service";
 import {
   clearPurchaseContext,
@@ -75,6 +76,14 @@ function CallbackContent() {
     const pendingBookingRaw = localStorage.getItem("pending_booking_data");
     const isBooking = !!pendingBookingRaw;
 
+    const deliveryReturnPath = () => {
+      try {
+        const pending = JSON.parse(pendingDeliveryRaw!);
+        return typeof pending.id === "string" && /^[a-zA-Z0-9-]+$/.test(pending.id)
+          ? `/main/delivery/${pending.id}` : "/main/profile?tab=deliveries";
+      } catch { return "/main/profile?tab=deliveries"; }
+    };
+
     const bookingReturnPath = () => {
       try {
         const pending = JSON.parse(pendingBookingRaw!);
@@ -109,11 +118,8 @@ function CallbackContent() {
         setRideStatus("payment-required");
         router.replace("/main/ride");
       } else if (isDelivery) {
-        // ✅ FIXED: Clear pending_delivery_data on cancellation but preserve form data
-        // so user can restart the delivery process or retry immediately
         localStorage.removeItem("pending_delivery_data");
-        // User should be returned to delivery config form to retry, not stuck on processing
-        router.replace("/main/delivery");
+        router.replace(deliveryReturnPath());
       } else {
         // For checkout, return to checkout (cart items preserved by NOT clearing here)
         router.replace("/main/checkout");
@@ -139,9 +145,9 @@ function CallbackContent() {
         setRideStatus("payment-required");
         router.replace("/main/ride");
       } else if (isDelivery) {
-        // Do NOT clear pending_delivery_data — the delivery page's recovery
-        // effect will detect it and allow the user to retry or verify manually.
-        router.replace("/main/delivery");
+        // The parcel already exists: retry its payment, never create it again.
+        localStorage.removeItem("pending_delivery_data");
+        router.replace(deliveryReturnPath());
       } else {
         router.replace("/main/checkout");
       }
@@ -228,6 +234,22 @@ function CallbackContent() {
           callbackData = null;
         }
 
+        if (isDelivery && !isWalletTopup && !isRide && !isBooking) {
+          // A gateway redirect or a 200 callback is not proof of payment.
+          // Verify with the authenticated payment API; the detail page then
+          // renders the parcel's actual payment and scheduling state.
+          const confirmed = await DeliveryService.verifyPayment(reference, "PAYSTACK", token);
+          if (confirmed === true) {
+            localStorage.removeItem("pending_delivery_data");
+            resetDelivery();
+          } else {
+            toast.info("Payment is not confirmed yet. You can check or retry from your parcel.");
+          }
+          localStorage.removeItem("pending_delivery_data");
+          router.replace(deliveryReturnPath());
+          return;
+        }
+
         if (isWalletTopup) {
           let topupReference = reference;
           try {
@@ -239,11 +261,12 @@ function CallbackContent() {
 
           await WalletService.verifyTopup(topupReference, token);
           localStorage.removeItem("pending_wallet_topup");
-          showSuccessAndReturn(
-            "Wallet topped up",
-            "Your payment was successful and your new balance is ready to use.",
-            reference,
-          );
+          let returnTo = "/main/profile?tab=wallet";
+          try {
+            const pendingTopup = JSON.parse(pendingWalletTopupRaw!);
+            if (pendingTopup.returnTo === "/main/delivery") returnTo = pendingTopup.returnTo;
+          } catch { /* Use the wallet page when there is no saved return path. */ }
+          router.replace(returnTo);
           return;
         }
 
@@ -386,9 +409,12 @@ function CallbackContent() {
           localStorage.removeItem("pending_ride_id");
           showSuccessAndReturn("Ride payment successful", "Your ride payment has been confirmed.", reference);
         } else if (metaDeliveryId || pendingDeliveryData) {
-          resetDelivery();
+          if (metaDeliveryId) {
+            router.replace(`/main/delivery/${encodeURIComponent(metaDeliveryId)}`);
+          } else {
+            router.replace(deliveryReturnPath());
+          }
           localStorage.removeItem("pending_delivery_data");
-          showSuccessAndReturn("Delivery payment successful", "Your delivery request has been paid for and is ready for tracking.", reference);
         } else if (metaOrderGroupId || metaOrderId || isCheckout) {
           // Order — prefer backend-returned group/order ID, fall back to localStorage
           clearCart();

@@ -1,3 +1,4 @@
+import { parcelStatusLabel, formatParcelDate } from "@/lib/parcel-booking";
 import Link from "next/link";
 import { Package, Calendar, ArrowRight, Box } from "lucide-react";
 
@@ -8,6 +9,9 @@ interface DeliveryCardProps {
   total: number;
   description: string;
   recipient: string;
+  scheduledAt?: string | null;
+  paymentMethod?: string;
+  paymentStatus?: string;
 }
 
 export const DeliveryCard = ({
@@ -17,6 +21,9 @@ export const DeliveryCard = ({
   total,
   description,
   recipient,
+  scheduledAt,
+  paymentMethod,
+  paymentStatus,
 }: DeliveryCardProps) => {
   return (
     <Link
@@ -34,21 +41,35 @@ export const DeliveryCard = ({
             <span className="text-xs font-bold text-gray-400">
               DELIVERY #{id.slice(0, 8).toUpperCase()}
             </span>
-            <h4 className="line-clamp-2 text-sm font-bold sm:text-base">{description}</h4>
+            <h4 className="line-clamp-2 text-sm font-bold sm:text-base">
+              {description}
+            </h4>
           </div>
           <span
             className={`shrink-0 rounded-md px-2 py-1 text-[9px] font-bold sm:text-[10px] ${
               status === "DELIVERED"
                 ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
-                : status === "CANCELLED"
+                : status.startsWith("CANCELLED")
                   ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
-                  : "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400"
+                  : status === "SCHEDULED"
+                    ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300"
+                    : "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400"
             }`}
           >
-            {status}
+            {parcelStatusLabel(status, paymentMethod, paymentStatus)}
           </span>
         </div>
 
+        {scheduledAt && (
+          <p className="mb-2 text-xs font-semibold text-violet-600 dark:text-violet-300">
+            Scheduled pickup · {formatParcelDate(scheduledAt)}
+          </p>
+        )}
+        {paymentMethod === "CARD" &&
+          paymentStatus !== "COMPLETED" &&
+          status === "PENDING" && (
+            <p className="mb-2 text-xs font-bold text-yellow-700">Pay now →</p>
+          )}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-gray-500 dark:text-gray-400">
           <div className="flex items-center gap-1">
             <Package className="w-3 h-3" />

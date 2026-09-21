@@ -1,6 +1,7 @@
 import { HomeHeader } from '@/app/main/components/home/HomeHeader';
 import AppFooter from './components/layout/AppFooter';
 import BottomNav from '@/app/main/components/layout/BottomNav';
+import { PhoneNumberPrompt } from '@/components/profile/PhoneNumberPrompt';
 
 // Removed duplicate GoogleMapsProvider — it is already mounted at the app root
 // in providers.tsx. Double-mounting caused the Google Maps JS API to be loaded
@@ -19,6 +20,7 @@ export default function MainLayout({
   return (
     <div className="min-h-screen flex flex-col bg-white dark:bg-[#0a0a0a]">
       <HomeHeader />
+      <PhoneNumberPrompt />
 
       <main className="flex-1">
         {children}

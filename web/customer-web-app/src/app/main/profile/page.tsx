@@ -14,7 +14,6 @@ import Link from "next/link";
 import {
   ShoppingBag,
   Car,
-  Package,
   MapPin,
   User,
   ChevronRight,
@@ -36,14 +35,15 @@ import { AddAddressModal } from "@/app/main/components/profile/AddAddressModal";
 import { EditProfileModal } from "@/app/main/components/profile/EditProfileModal";
 import { OrderCard } from "@/app/main/components/profile/OrderCard";
 import { RideCard } from "@/app/main/components/profile/ridecard";
-import { DeliveryCard } from "@/app/main/components/profile/deliverycard";
 import { DisputeCard } from "@/app/main/components/profile/DisputeCard";
 import { EmptyState } from "@/app/main/components/profile/EmptyState";
+import { ReferralsTab } from "@/app/main/components/profile/ReferralsTab";
 import { WalletTab } from "@/app/main/components/profile/WalletTab";
 import {
   ProfileSkeleton,
   ContentSkeleton,
 } from "@/app/main/components/profile/skeleton";
+import { ParcelHistory } from "@/app/main/delivery/components/ParcelHistory";
 import { ApiService } from "@/services/api.service";
 import type { Booking } from "@/services/property.service";
 import { AddressService, type CreateAddressInput, type SavedAddress } from "@/services/address.service";
@@ -67,6 +67,7 @@ function ProfilePageContent() {
     "rides",
     "deliveries",
     "wallet",
+    "referrals",
     "disputes",
     "addresses",
     "settings",
@@ -97,7 +98,6 @@ function ProfilePageContent() {
   const [orders, setOrders] = useState<any[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [rides, setRides] = useState<any[]>([]);
-  const [deliveries, setDeliveries] = useState<any[]>([]);
   const [disputes, setDisputes] = useState<any[]>([]);
   const [addresses, setAddresses] = useState<SavedAddress[]>([]);
 
@@ -173,14 +173,6 @@ function ProfilePageContent() {
           case "rides":
             data = await fetchWithAuth("/rides?page=1&limit=20", accessToken);
             if (activeTabRef.current === "rides") setRides(data?.rides || []);
-            break;
-          case "deliveries":
-            // "Deliveries" here means parcels the customer has sent — the
-            // backend's separate /deliveries module is for order-delivery
-            // tracking, not for listing a customer's own delivery history.
-            data = await fetchWithAuth("/parcels?page=1&limit=20", accessToken);
-            if (activeTabRef.current === "deliveries")
-              setDeliveries(data?.parcels || []);
             break;
           case "disputes":
             // TODO: no confirmed customer-facing "my disputes" endpoint yet —
@@ -274,6 +266,8 @@ function ProfilePageContent() {
       token &&
       activeTab !== "addresses" &&
       activeTab !== "settings" &&
+      activeTab !== "deliveries" &&
+      activeTab !== "referrals" &&
       activeTab !== "wallet"
     ) {
       fetchTabData(activeTab, token);
@@ -456,6 +450,12 @@ function ProfilePageContent() {
         onLogout={() => signOut({ callbackUrl: "/sign-in" })}
       />
 
+      {token && activeTab !== "referrals" && (
+        <div className="mx-auto w-full max-w-5xl px-4 pb-5">
+          <ReferralsTab key={token} token={token} compact />
+        </div>
+      )}
+
       <ProfileTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
       <main className="mx-auto min-h-[400px] max-w-5xl px-4 py-6 sm:py-8">
@@ -542,31 +542,9 @@ function ProfilePageContent() {
               </div>
             )}
 
-            {activeTab === "deliveries" && (
-              <div className="space-y-4">
-                {deliveries.length === 0 ? (
-                  <EmptyState
-                    icon={Package}
-                    title="No deliveries yet"
-                    desc="Send items securely across the city."
-                    actionLabel="Send a Delivery"
-                    actionLink="/main/delivery"
-                  />
-                ) : (
-                  deliveries.map((delivery) => (
-                    <DeliveryCard
-                      key={delivery.id}
-                      id={delivery.id}
-                      status={delivery.status}
-                      date={new Date(delivery.createdAt).toLocaleDateString()}
-                      total={delivery.total ?? 0}
-                      description={delivery.description || `${delivery.size?.toLowerCase() || "Standard"} delivery`}
-                      recipient={delivery.recipientName}
-                    />
-                  ))
-                )}
-              </div>
-            )}
+            {activeTab === "deliveries" && token && <ParcelHistory token={token} />}
+
+            {activeTab === "referrals" && token && <ReferralsTab key={token} token={token} />}
 
             {activeTab === "wallet" && token && <WalletTab token={token} />}
 

@@ -1,28 +1,37 @@
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import type {
+  ParcelParty,
+  ParcelPaymentMethod,
+  CreateParcelInput,
+} from "@/services/delivery.service";
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 // Stage type: UI-only transient stages + backend-aligned tracking stages
 // Backend DeliveryStatus: PENDING | REQUESTED | ASSIGNED | ACCEPTED | PICKED_UP | IN_TRANSIT | DELIVERED | CANCELLED
 export type DeliveryStage =
-  | 'IDLE'
-  | 'CONFIGURING'
-  | 'Processing_Address'
-  | 'Calculating_Fee'
-  | 'REVIEW_PAYMENT'
-  | 'Payment_Pending'
-  | 'REQUESTED'    // Backend: REQUESTED (finding courier)
-  | 'ASSIGNED'     // Backend: ASSIGNED (courier matched)
-  | 'ACCEPTED'     // Backend: ACCEPTED (rider confirmed) — same UI step as ASSIGNED
-  | 'PICKED_UP'    // Backend: PICKED_UP
-  | 'IN_TRANSIT'   // Backend: IN_TRANSIT (en route to dropoff) — same UI step as PICKED_UP
-  | 'DELIVERED'    // Backend: DELIVERED (final state)
-  | 'CANCELLED';
+  | "SCHEDULED"
+  | "SEARCHING_RIDER"
+  | "RIDER_ASSIGNED"
+  | "RIDER_ACCEPTED"
+  | "IDLE"
+  | "CONFIGURING"
+  | "Processing_Address"
+  | "Calculating_Fee"
+  | "REVIEW_PAYMENT"
+  | "Payment_Pending"
+  | "REQUESTED" // Backend: REQUESTED (finding courier)
+  | "ASSIGNED" // Backend: ASSIGNED (courier matched)
+  | "ACCEPTED" // Backend: ACCEPTED (rider confirmed) — same UI step as ASSIGNED
+  | "PICKED_UP" // Backend: PICKED_UP
+  | "IN_TRANSIT" // Backend: IN_TRANSIT (en route to dropoff) — same UI step as PICKED_UP
+  | "DELIVERED" // Backend: DELIVERED (final state)
+  | "CANCELLED";
 
 type Position = { lat: number; lng: number };
 
 interface PackageInfo {
   type: string;
-  size: 'SMALL' | 'MEDIUM' | 'LARGE';
+  size: "SMALL" | "MEDIUM" | "LARGE";
   weight: string; // Legacy label (e.g., "< 5kg")
   instructions: string;
   recipientName: string;
@@ -33,29 +42,36 @@ interface PackageInfo {
   destinationAddress: string;
 
   // Numeric metadata fields
-  weightKg?: number | null;      // Numeric input for exact weight
-  declaredValue?: number | null;  // Numeric input for value
+  weightKg?: number | null; // Numeric input for exact weight
+  declaredValue?: number | null; // Numeric input for value
   isFragile?: boolean;
   isPerishable?: boolean;
   containsLiquid?: boolean;
 }
 
 interface DeliveryState {
+  bookingStep: number;
+  party: ParcelParty;
+  paymentMethod: ParcelPaymentMethod;
+  scheduledLocal: string;
+  scheduleLater: boolean;
+  submission: CreateParcelInput | null;
+
   stage: DeliveryStage;
   activeDeliveryId: string | null;
   pickupPos: Position | null;
   dropoffPos: Position | null;
-  
+
   // Added address IDs for backend linkage
   pickupAddressId: string | null;
   dropoffAddressId: string | null;
 
   courierPos: Position | undefined;
   packageInfo: PackageInfo;
-  
+
   // Changed from generic 'priceEstimates' to specific fee
   calculatedFee: number | null;
-  
+
   courierInfo: any | null;
   isCalculating: boolean;
 
@@ -69,17 +85,17 @@ interface DeliveryState {
 }
 
 const initialPackageInfo: PackageInfo = {
-  type: 'Small delivery',
-  size: 'SMALL',
-  weight: 'Small items',
-  instructions: '',
-  recipientName: '',
-  recipientPhone: '',
-  senderName: '',
-  senderPhone: '',
-  pickupAddress: '',
-  destinationAddress: '',
-  
+  type: "Small delivery",
+  size: "SMALL",
+  weight: "Small items",
+  instructions: "",
+  recipientName: "",
+  recipientPhone: "",
+  senderName: "",
+  senderPhone: "",
+  pickupAddress: "",
+  destinationAddress: "",
+
   // Initialize new fields
   weightKg: null,
   declaredValue: null,
@@ -91,7 +107,13 @@ const initialPackageInfo: PackageInfo = {
 export const useDeliveryStore = create<DeliveryState>()(
   persist(
     (set) => ({
-      stage: 'IDLE',
+      bookingStep: 0,
+      party: "SENDER",
+      paymentMethod: "CASH",
+      scheduledLocal: "",
+      scheduleLater: false,
+      submission: null,
+      stage: "IDLE",
       activeDeliveryId: null,
       pickupPos: null,
       dropoffPos: null,
@@ -104,38 +126,50 @@ export const useDeliveryStore = create<DeliveryState>()(
       isCalculating: false,
 
       setStage: (stage) => set({ stage }),
-      
-      setLocations: (pickup, dropoff) => set((state) => ({ 
-        pickupPos: pickup ?? state.pickupPos, 
-        dropoffPos: dropoff ?? state.dropoffPos 
-      })),
 
-      setAddressIds: (pickupId, dropoffId) => set((state) => ({
-        pickupAddressId: pickupId === undefined ? state.pickupAddressId : pickupId,
-        dropoffAddressId: dropoffId === undefined ? state.dropoffAddressId : dropoffId,
-      })),
+      setLocations: (pickup, dropoff) =>
+        set((state) => ({
+          pickupPos: pickup ?? state.pickupPos,
+          dropoffPos: dropoff ?? state.dropoffPos,
+        })),
 
-      setPackageInfo: (info) => set((state) => ({ 
-        packageInfo: { ...state.packageInfo, ...info } 
-      })),
+      setAddressIds: (pickupId, dropoffId) =>
+        set((state) => ({
+          pickupAddressId:
+            pickupId === undefined ? state.pickupAddressId : pickupId,
+          dropoffAddressId:
+            dropoffId === undefined ? state.dropoffAddressId : dropoffId,
+        })),
+
+      setPackageInfo: (info) =>
+        set((state) => ({
+          packageInfo: { ...state.packageInfo, ...info },
+        })),
 
       setCalculatedFee: (fee) => set({ calculatedFee: fee }),
 
-      resetDelivery: () => set({
-        stage: 'IDLE',
-        activeDeliveryId: null,
-        pickupPos: null,
-        dropoffPos: null,
-        pickupAddressId: null,
-        dropoffAddressId: null,
-        courierPos: undefined,
-        calculatedFee: null,
-        courierInfo: null,
-        packageInfo: initialPackageInfo,
-      }),
+      resetDelivery: () =>
+        set({
+          bookingStep: 0,
+          party: "SENDER",
+          paymentMethod: "CASH",
+          scheduledLocal: "",
+          scheduleLater: false,
+          submission: null,
+          stage: "IDLE",
+          activeDeliveryId: null,
+          pickupPos: null,
+          dropoffPos: null,
+          pickupAddressId: null,
+          dropoffAddressId: null,
+          courierPos: undefined,
+          calculatedFee: null,
+          courierInfo: null,
+          packageInfo: initialPackageInfo,
+        }),
     }),
     {
-      name: 'asoose-delivery-storage',
+      name: "asoose-delivery-storage",
       storage: createJSONStorage(() => localStorage),
       // Merge nested delivery fields so users with an older persisted form
       // automatically receive new defaults such as the explicit size enum.
@@ -150,16 +184,22 @@ export const useDeliveryStore = create<DeliveryState>()(
           },
         };
       },
-      partialize: (state) => ({ 
-        stage: state.stage, 
+      partialize: (state) => ({
+        bookingStep: state.bookingStep,
+        party: state.party,
+        paymentMethod: state.paymentMethod,
+        scheduledLocal: state.scheduledLocal,
+        scheduleLater: state.scheduleLater,
+        submission: state.submission,
+        stage: state.stage,
         packageInfo: state.packageInfo,
         activeDeliveryId: state.activeDeliveryId,
         pickupPos: state.pickupPos,
         dropoffPos: state.dropoffPos,
         pickupAddressId: state.pickupAddressId,
         dropoffAddressId: state.dropoffAddressId,
-        calculatedFee: state.calculatedFee
+        calculatedFee: state.calculatedFee,
       }),
-    }
-  )
+    },
+  ),
 );

@@ -86,7 +86,7 @@ export function LocationInput({
           );
         })
         .catch(() => {
-          // Silently swallow — the text is already set
+          setGeoError("Couldn’t locate this address. Please select it again or use the map.");
         })
         .finally(() => {
           setTimeout(() => {
@@ -204,6 +204,7 @@ export function LocationInput({
               setSuggestions([]);
             }
           }}
+          aria-label={placeholder}
           placeholder={placeholder}
           className="w-full p-3.5 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-500 focus:bg-white dark:focus:bg-zinc-900 focus:ring-2 focus:ring-zinc-900 dark:focus:ring-yellow-400 focus:outline-none transition-all text-sm font-medium border border-transparent focus:border-transparent pr-24"
         />
@@ -299,6 +300,9 @@ export function LocationInput({
             <li
               key={suggestion.id}
               onMouseDown={() => handleSelect(suggestion.id, suggestion.title)}
+              tabIndex={0}
+              role="button"
+              onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); handleSelect(suggestion.id, suggestion.title); } }}
               className="p-3.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center space-x-3 transition-colors border-b border-zinc-50 dark:border-zinc-800/50 last:border-0"
             >
               <div className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-full text-zinc-500 dark:text-zinc-400">

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { toast } from "react-toastify";
@@ -13,6 +13,7 @@ import {
 } from "@/services/delivery.service";
 import { socketService } from "@/services/socket.service";
 import ReportDisputeModal from "../../orders/component/reportDisputeModal";
+import { redirectToParcelPayment } from "@/lib/parcel-booking";
 import { useDeliveryStore } from "@/store/useDeliveryStore";
 
 export default function DeliveryDetailsPage() {
@@ -23,12 +24,16 @@ export default function DeliveryDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [isDisputeModalOpen, setIsDisputeModalOpen] = useState(false);
 
+  const [actionError, setActionError] = useState("");
+  const [actionBusy, setActionBusy] = useState(false);
+  const [reload, setReload] = useState(0);
+  const actionLock = useRef(false);
   const deliveryId = params.id as string;
   const resetDelivery = useDeliveryStore((s) => s.resetDelivery);
 
   // Fetch initial data
   useEffect(() => {
-    if (status === "loading") return;
+    if (status !== "authenticated") return;
 
     const fetchDelivery = async () => {
       try {
@@ -44,7 +49,7 @@ export default function DeliveryDetailsPage() {
           confirmationCode:
             codeResult.status === "fulfilled"
               ? codeResult.value.confirmationCode
-              : undefined,
+              : sessionStorage.getItem(`parcel-confirmation:${session?.user?.id || ""}:${deliveryId}`) || undefined,
         });
       } catch (error) {
         console.error(error);
@@ -55,7 +60,95 @@ export default function DeliveryDetailsPage() {
     };
 
     if (deliveryId) fetchDelivery();
-  }, [deliveryId, session, status]);
+  }, [deliveryId, session, status, reload]);
+
+  // Poll as a fallback for missed socket events and delayed gateway confirmation.
+  useEffect(() => {
+    if (!session?.accessToken) return;
+    let active = true;
+    let pending = false;
+    const timer = setInterval(async () => {
+      if (pending) return;
+      pending = true;
+      try {
+        const result = await DeliveryService.getDelivery(
+          deliveryId,
+          session.accessToken,
+        );
+        let code: string | undefined;
+        if (
+          result.paymentMethod !== "CARD" ||
+          result.paymentStatus === "COMPLETED"
+        ) {
+          try {
+            code = (
+              await DeliveryService.getConfirmationCode(
+                deliveryId,
+                session.accessToken,
+              )
+            ).confirmationCode;
+          } catch {
+            /* A code may not be available yet. */
+          }
+        }
+        if (active)
+          setDelivery((previous) => ({
+            ...result,
+            confirmationCode: code || previous?.confirmationCode,
+          }));
+      } catch {
+        /* Keep the last known tracking state during temporary failures. */
+      } finally {
+        pending = false;
+      }
+    }, 10000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [deliveryId, session?.accessToken]);
+
+  async function parcelAction(kind: "pay" | "cancel") {
+    if (actionLock.current || !session?.accessToken) return;
+    if (
+      kind === "cancel" &&
+      !window.confirm(
+        "Cancel this parcel booking? To change the pickup time, create a new booking after cancellation.",
+      )
+    )
+      return;
+    actionLock.current = true;
+    setActionBusy(true);
+    setActionError("");
+    try {
+      if (kind === "pay") {
+        const result = await DeliveryService.retryPayment(
+          deliveryId,
+          session.accessToken,
+        );
+        redirectToParcelPayment(
+          deliveryId,
+          result.authorizationUrl,
+          result.reference,
+        );
+      } else {
+        await DeliveryService.cancelDelivery(
+          deliveryId,
+          "Customer cancelled parcel booking",
+          session.accessToken,
+        );
+        setReload((value) => value + 1);
+      }
+    } catch (cause) {
+      setActionError(
+        (cause as Error).message ||
+          "Couldn’t complete that action. Please try again.",
+      );
+    } finally {
+      actionLock.current = false;
+      setActionBusy(false);
+    }
+  }
 
   // Socket Connection
   // ⚠️  The effect must depend on `session` so it reconnects once next-auth
@@ -68,7 +161,11 @@ export default function DeliveryDetailsPage() {
     socketService.connect(token);
 
     const handleUpdate = (data: any) => {
-      if (data.deliveryId === deliveryId || data.id === deliveryId) {
+      if (
+        data.deliveryId === deliveryId ||
+        data.parcelId === deliveryId ||
+        data.id === deliveryId
+      ) {
         setDelivery((prev) => {
           if (!prev) return null;
 
@@ -90,28 +187,43 @@ export default function DeliveryDetailsPage() {
 
           return {
             ...prev,
-            status: mapParcelStatus(data.status),
+            status: data.status ? mapParcelStatus(data.status) : prev.status,
+            paymentStatus: data.paymentStatus ?? prev.paymentStatus,
             rider: updatedRider,
           };
         });
 
         const nextStatus = mapParcelStatus(data.status);
-        if (nextStatus === "ASSIGNED" || nextStatus === "ACCEPTED") {
+        if (
+          ["ASSIGNED", "ACCEPTED", "RIDER_ASSIGNED", "RIDER_ACCEPTED"].includes(
+            nextStatus,
+          )
+        ) {
           toast.info("A rider has accepted your request!");
         }
         if (nextStatus === "PICKED_UP") toast.info("Delivery picked up.");
         if (nextStatus === "IN_TRANSIT")
           toast.info("Your delivery is on the way!");
-        if (nextStatus === "DELIVERED")
-          toast.success("Delivery completed!");
+        if (nextStatus === "DELIVERED") toast.success("Delivery completed!");
       }
     };
 
     socketService.on("delivery_update", handleUpdate);
+    socketService.on("parcel_update", handleUpdate);
     return () => {
       socketService.off("delivery_update", handleUpdate);
+      socketService.off("parcel_update", handleUpdate);
     };
   }, [deliveryId, session]);
+
+  if (status === "unauthenticated")
+    return (
+      <div className="p-8 text-center">
+        <a href="/sign-in" className="font-bold underline">
+          Sign in to view your parcel
+        </a>
+      </div>
+    );
 
   if (loading) {
     return (
@@ -124,7 +236,16 @@ export default function DeliveryDetailsPage() {
   if (!delivery) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white dark:bg-[#0a0a0a]">
-        <p className="text-zinc-500 mb-4">Delivery not found</p>
+        <p className="text-zinc-500 mb-4">Couldn’t load this delivery.</p>
+        <button
+          onClick={() => {
+            setLoading(true);
+            setReload((value) => value + 1);
+          }}
+          className="mb-4 font-bold underline"
+        >
+          Retry
+        </button>
         <button
           onClick={() => router.push("/main/delivery")}
           className="text-yellow-500 font-bold"
@@ -151,6 +272,38 @@ export default function DeliveryDetailsPage() {
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-5 sm:px-6 sm:py-6">
         {/* Main Delivery Progress */}
         <DeliveryProgressUI delivery={delivery} />
+        {actionError && (
+          <p
+            role="alert"
+            className="rounded-xl bg-red-50 p-4 text-sm text-red-700"
+          >
+            {actionError}
+          </p>
+        )}
+        <div className="flex flex-wrap gap-3">
+          {delivery.paymentMethod === "CARD" &&
+            delivery.paymentStatus !== "COMPLETED" &&
+            delivery.status === "PENDING" && (
+              <button
+                disabled={actionBusy}
+                onClick={() => parcelAction("pay")}
+                className="rounded-xl bg-yellow-400 px-6 py-3 font-bold text-black disabled:opacity-50"
+              >
+                {actionBusy ? "Please wait…" : "Pay now"}
+              </button>
+            )}
+          {["SCHEDULED", "PENDING", "SEARCHING_RIDER", "REQUESTED"].includes(
+            delivery.status,
+          ) && (
+            <button
+              disabled={actionBusy}
+              onClick={() => parcelAction("cancel")}
+              className="rounded-xl border border-red-300 px-6 py-3 font-bold text-red-600 disabled:opacity-50"
+            >
+              Cancel parcel
+            </button>
+          )}
+        </div>
 
         {/* Actions Section */}
         <div className="space-y-4">
@@ -209,7 +362,7 @@ export default function DeliveryDetailsPage() {
           onSuccess={() =>
             toast.success(
               "Dispute created successfully. You can view it in the Dispute tab of your profile.",
-              { autoClose: 4000 }
+              { autoClose: 4000 },
             )
           }
         />

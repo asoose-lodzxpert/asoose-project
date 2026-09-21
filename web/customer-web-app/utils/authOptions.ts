@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
@@ -108,12 +109,17 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
+          const cookieStore = await cookies();
+          const referralCookie = cookieStore.get("asoose_referral")?.value;
+          cookieStore.set("asoose_referral", "", { path: "/api/auth", maxAge: 0 });
+          const referralCode = referralCookie ? decodeURIComponent(referralCookie).trim() : "";
           const res = await fetch(`${SERVER_API_URL}/auth/social`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               provider: "google",
               idToken: account.id_token,
+              ...(referralCode ? { referralCode } : {}),
             }),
           });
 

@@ -1,5 +1,6 @@
 // as/customer-web-app/src/components/profile/ProfileTabs.tsx
 import {
+  Gift,
   ShoppingBag,
   Car,
   Package,
@@ -15,6 +16,7 @@ export const TABS = [
   { id: "bookings", label: "Bookings", icon: BedDouble },
   { id: "rides", label: "Rides", icon: Car },
   { id: "deliveries", label: "Deliveries", icon: Package },
+  { id: "referrals", label: "Referrals", icon: Gift },
   { id: "wallet", label: "Wallet", icon: Wallet },
   { id: "disputes", label: "Disputes", icon: ShieldAlert },
   { id: "addresses", label: "Addresses", icon: MapPin },

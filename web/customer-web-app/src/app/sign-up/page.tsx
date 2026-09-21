@@ -1,7 +1,7 @@
 "use client";
 
 import { EyeOff, Eye, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
@@ -75,6 +75,10 @@ const SignUpPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [referralCode, setReferralCode] = useState("");
+  useEffect(() => {
+    setReferralCode(new URLSearchParams(window.location.search).get("referralCode")?.trim() || "");
+  }, []);
   const [apiError, setApiError] = useState("");
   const router = useRouter();
 
@@ -145,6 +149,7 @@ const SignUpPage = () => {
           email: fields.email.trim(),
           password: fields.password,
           phone: toApiPhone(fields.phone.trim()),
+          ...(referralCode.trim() ? { referralCode: referralCode.trim() } : {}),
         }),
       });
 
@@ -207,6 +212,7 @@ const SignUpPage = () => {
       setIsLoading(true);
       // Use /auth/callback so the server reads the session role and routes
       // admins to /super-admin/dashboard and regular users to /main/store.
+      document.cookie = `asoose_referral=${encodeURIComponent(referralCode.trim())}; Path=/api/auth; Max-Age=${referralCode.trim() ? 600 : 0}; SameSite=Lax${window.location.protocol === "https:" ? "; Secure" : ""}`;
       await signIn("google", { callbackUrl: "/auth/callback" });
     } catch (err: any) {
       setApiError(err.message || "Google sign-up failed");
@@ -242,6 +248,12 @@ const SignUpPage = () => {
               {apiError}
             </div>
           )}
+
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-white/10 dark:bg-white/5">
+            <label htmlFor="referral-code" className="text-sm font-semibold">Referral code <span className="font-normal text-gray-500">(optional)</span></label>
+            <input id="referral-code" value={referralCode} onChange={(e) => setReferralCode(e.target.value)} disabled={isLoading} placeholder="Enter a friend’s code" autoComplete="off" className={`${inputCls("")} mt-2`} />
+            <p className="mt-2 text-xs text-gray-500">Applies when you sign up with Google or email.</p>
+          </div>
 
           {/* Google */}
           <button

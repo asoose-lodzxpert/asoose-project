@@ -1,5 +1,6 @@
 "use client";
 
+import { parcelStatusLabel, formatParcelDate } from "@/lib/parcel-booking";
 import { SUPPORT_WHATSAPP_URL } from "@/lib/support";
 import React, { useState } from "react";
 import {
@@ -81,7 +82,19 @@ export default function DeliveryProgressUI({
   delivery,
   stage: propStage,
 }: DeliveryProgressUIProps) {
-  const status = delivery?.status || propStage || "REQUESTED";
+  const rawStatus = delivery?.status || propStage || "PENDING";
+  const status =
+    (
+      {
+        SEARCHING_RIDER: "REQUESTED",
+        RIDER_ASSIGNED: "ASSIGNED",
+        RIDER_ACCEPTED: "ACCEPTED",
+      } as Record<string, string>
+    )[rawStatus] || rawStatus;
+  const awaitingDispatch =
+    ["PENDING", "SCHEDULED", "CANCELLED"].includes(status) ||
+    (delivery?.paymentMethod === "CARD" &&
+      delivery?.paymentStatus !== "COMPLETED");
   const rider = delivery?.rider;
   const [codeCopied, setCodeCopied] = useState(false);
 
@@ -92,7 +105,9 @@ export default function DeliveryProgressUI({
     {
       id: "REQUESTED",
       label: "Request Placed",
-      desc: "Looking for a courier",
+      desc: awaitingDispatch
+        ? "Rider matching has not started"
+        : "Looking for a courier",
       icon: Clock,
       date: delivery?.createdAt,
     },
@@ -130,7 +145,7 @@ export default function DeliveryProgressUI({
     // ACCEPTED is the same visual step as ASSIGNED (rider confirmed)
     if (status === "ASSIGNED" || status === "ACCEPTED") return 1;
     // CANCELLED shows step 0 with a distinct colour override in the badge
-    return 0; // REQUESTED / PENDING / CANCELLED
+    return awaitingDispatch ? -1 : 0;
   };
 
   const currentStep = getCurrentStepIndex();
@@ -152,7 +167,8 @@ export default function DeliveryProgressUI({
     delivery?.dropoffAddress?.street ||
     "Processing location...";
   const getCityDisplay = (addr: any) =>
-    [addr?.city, addr?.state].filter(Boolean).join(", ") || "Location resolving";
+    [addr?.city, addr?.state].filter(Boolean).join(", ") ||
+    "Location resolving";
 
   const copyConfirmationCode = async () => {
     if (!delivery?.confirmationCode) return;
@@ -188,7 +204,9 @@ export default function DeliveryProgressUI({
                 ? "bg-green-100 text-green-700"
                 : status === "CANCELLED"
                   ? "bg-red-100 text-red-700"
-                  : "bg-yellow-100 text-yellow-800"
+                  : status === "SCHEDULED"
+                    ? "bg-violet-100 text-violet-800"
+                    : "bg-yellow-100 text-yellow-800"
             }`}
           >
             {status === "REQUESTED" && (
@@ -196,10 +214,34 @@ export default function DeliveryProgressUI({
             )}
             {status === "DELIVERED" && <CheckCircle2 size={16} />}
             {/* Replace all underscores for readable display (e.g. IN_TRANSIT → IN TRANSIT) */}
-            {status.replace(/_/g, " ")}
+            {parcelStatusLabel(
+              rawStatus,
+              delivery?.paymentMethod,
+              delivery?.paymentStatus,
+            )}
           </div>
         </div>
 
+        {delivery?.scheduledAt && (
+          <div className="mb-5 rounded-xl bg-violet-50 p-4 text-sm text-violet-800 dark:bg-violet-500/10 dark:text-violet-300">
+            <p className="font-bold">
+              Scheduled pickup · {formatParcelDate(delivery.scheduledAt)}
+            </p>
+            <p className="mt-1">
+              Rider matching begins at this time; arrival is not guaranteed. To
+              change the time, cancel and create a new booking.
+            </p>
+          </div>
+        )}
+        {awaitingDispatch && (
+          <p className="mb-5 text-sm text-zinc-500">
+            {status === "CANCELLED"
+              ? "This booking was cancelled."
+              : status === "SCHEDULED"
+                ? "Your parcel is scheduled. Rider matching has not started."
+                : "Your parcel has not been dispatched. Complete payment if required."}
+          </p>
+        )}
         {/* TIMELINE */}
         <div className="relative">
           {/* Connecting Line (Desktop) */}
@@ -247,20 +289,38 @@ export default function DeliveryProgressUI({
         </div>
       </div>
 
-      {delivery?.confirmationCode && status !== "DELIVERED" && status !== "CANCELLED" && (
-        <div className="rounded-2xl border border-yellow-200 bg-yellow-50 p-4 sm:p-5 dark:border-yellow-500/20 dark:bg-yellow-500/10">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-yellow-700 dark:text-yellow-400">Delivery confirmation code</p>
-              <p className="mt-2 font-mono text-3xl font-black tracking-[0.2em] text-zinc-900 dark:text-white">{delivery.confirmationCode}</p>
-              <p className="mt-2 max-w-xl text-xs leading-5 text-zinc-600 dark:text-zinc-400">Give this code to the rider only after the recipient has received the delivery. The rider uses it to complete the delivery.</p>
+      {delivery?.confirmationCode &&
+        status !== "DELIVERED" &&
+        status !== "CANCELLED" && (
+          <div className="rounded-2xl border border-yellow-200 bg-yellow-50 p-4 sm:p-5 dark:border-yellow-500/20 dark:bg-yellow-500/10">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-yellow-700 dark:text-yellow-400">
+                  Delivery confirmation code
+                </p>
+                <p className="mt-2 font-mono text-3xl font-black tracking-[0.2em] text-zinc-900 dark:text-white">
+                  {delivery.confirmationCode}
+                </p>
+                <p className="mt-2 max-w-xl text-xs leading-5 text-zinc-600 dark:text-zinc-400">
+                  Give this code to the rider only after the recipient has
+                  received the delivery. The rider uses it to complete the
+                  delivery.
+                </p>
+              </div>
+              <button
+                onClick={copyConfirmationCode}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-zinc-700 shadow-sm transition hover:bg-yellow-100 dark:bg-white/10 dark:text-white"
+                aria-label="Copy confirmation code"
+              >
+                {codeCopied ? (
+                  <Check className="h-5 w-5 text-green-600" />
+                ) : (
+                  <Copy className="h-5 w-5" />
+                )}
+              </button>
             </div>
-            <button onClick={copyConfirmationCode} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-zinc-700 shadow-sm transition hover:bg-yellow-100 dark:bg-white/10 dark:text-white" aria-label="Copy confirmation code">
-              {codeCopied ? <Check className="h-5 w-5 text-green-600" /> : <Copy className="h-5 w-5" />}
-            </button>
           </div>
-        </div>
-      )}
+        )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* 2. LEFT COL: COURIER & DELIVERY */}
@@ -377,7 +437,9 @@ export default function DeliveryProgressUI({
                   </p>
                 )}
                 {delivery?.size && (
-                  <p className="mt-1 text-xs capitalize text-zinc-500">{delivery.size.toLowerCase()} size</p>
+                  <p className="mt-1 text-xs capitalize text-zinc-500">
+                    {delivery.size.toLowerCase()} size
+                  </p>
                 )}
               </div>
               <div>
@@ -418,15 +480,29 @@ export default function DeliveryProgressUI({
               </div>
               <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-2" />
               <div className="flex justify-between text-lg font-bold">
-                <span>{delivery?.paymentStatus === "COMPLETED" ? "Total Paid" : "Total"}</span>
+                <span>
+                  {delivery?.paymentStatus === "COMPLETED"
+                    ? "Total Paid"
+                    : "Total"}
+                </span>
                 <span>₦{delivery?.deliveryFee?.toLocaleString() || "0"}</span>
               </div>
             </div>
 
             <div className="flex items-center gap-3 bg-zinc-50 dark:bg-zinc-800 p-3 rounded-xl border border-zinc-100 dark:border-zinc-700">
-              {delivery?.paymentMethod === "WALLET" ? <Wallet size={18} className="text-zinc-500" /> : <CreditCard size={18} className="text-zinc-500" />}
-              <span className="text-sm font-medium">{delivery?.paymentMethod === "WALLET" ? "Wallet" : "Pay online"}</span>
-              <span className={`ml-auto rounded-full px-2 py-1 text-[10px] font-bold ${delivery?.paymentStatus === "COMPLETED" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{delivery?.paymentStatus || "PENDING"}</span>
+              {delivery?.paymentMethod === "WALLET" ? (
+                <Wallet size={18} className="text-zinc-500" />
+              ) : (
+                <CreditCard size={18} className="text-zinc-500" />
+              )}
+              <span className="text-sm font-medium">
+                {delivery?.paymentMethod === "WALLET" ? "Wallet" : "Pay online"}
+              </span>
+              <span
+                className={`ml-auto rounded-full px-2 py-1 text-[10px] font-bold ${delivery?.paymentStatus === "COMPLETED" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}
+              >
+                {delivery?.paymentStatus || "PENDING"}
+              </span>
             </div>
           </div>
 
@@ -439,7 +515,10 @@ export default function DeliveryProgressUI({
               Having trouble with this delivery? Our support team is here to
               assist you.
             </p>
-            <a href={SUPPORT_WHATSAPP_URL} className="block text-center w-full py-3 rounded-xl border border-zinc-200 dark:border-zinc-700 font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors dark:text-white">
+            <a
+              href={SUPPORT_WHATSAPP_URL}
+              className="block text-center w-full py-3 rounded-xl border border-zinc-200 dark:border-zinc-700 font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors dark:text-white"
+            >
               Contact Support
             </a>
           </div>
