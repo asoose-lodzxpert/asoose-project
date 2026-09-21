@@ -8,7 +8,9 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
+  ChevronDown,
   MapPin,
+  MapPinned,
   Package,
   Loader2,
 } from "lucide-react";
@@ -71,9 +73,23 @@ const parties: { value: ParcelParty; title: string; description: string }[] = [
 const inputClass =
   "mt-2 w-full rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 dark:border-zinc-700 dark:bg-zinc-800";
 const cardClass =
-  "rounded-3xl border border-black/5 bg-white p-5 sm:p-7 dark:border-white/10 dark:bg-[#151515]";
+  "rounded-2xl border border-black/5 bg-white p-4 sm:rounded-3xl sm:p-7 dark:border-white/10 dark:bg-[#151515]";
 const choiceClass = (selected: boolean) =>
   `rounded-2xl border p-4 text-left transition focus-visible:outline-yellow-500 ${selected ? "border-yellow-500 bg-yellow-400/10 ring-1 ring-yellow-500" : "border-zinc-200 hover:border-yellow-400 dark:border-zinc-700"}`;
+
+function savedAddressText(address: SavedAddress) {
+  return [address.apartment, address.street, address.city, address.state]
+    .filter(Boolean)
+    .join(", ");
+}
+
+function savedAddressOption(address: SavedAddress) {
+  const location = savedAddressText(address) || address.label;
+  const label = String(address.label || "Saved")
+    .toLowerCase()
+    .replace(/^./, (letter) => letter.toUpperCase());
+  return `${label}${address.isDefault ? " (Default)" : ""} — ${location}`;
+}
 
 export default function DeliveryPage() {
   const { data: session, status } = useSession();
@@ -393,6 +409,8 @@ export default function DeliveryPage() {
     ? `${profile.firstName} ${profile.lastName}`.trim()
     : "Loading your profile…";
   const ownPhone = profile?.phone || "Phone number not set";
+  const paymentLabel =
+    paymentMethod === "WALLET" ? "Wallet" : "Pay on web";
   const summary = [
     ["Pickup", fields.pickupAddress, 0],
     ["Drop-off", fields.destinationAddress, 0],
@@ -428,31 +446,31 @@ export default function DeliveryPage() {
         : "Send now",
       2,
     ],
-    ["Payment", paymentMethod, 2],
+    ["Payment", paymentLabel, 2],
   ] as const;
 
   return (
-    <div className="min-h-screen bg-[#f7f7f5] pb-28 text-zinc-900 dark:bg-[#0a0a0a] dark:text-white">
-      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
-        <header className="mb-6 flex items-start justify-between gap-3">
-          <div>
-            <h1 className="mt-2 text-3xl font-black tracking-tight">
+    <div className="min-h-screen overflow-x-hidden bg-[#f7f7f5] pb-28 text-zinc-900 dark:bg-[#0a0a0a] dark:text-white">
+      <div className="mx-auto w-full max-w-5xl px-3 py-4 sm:px-6 sm:py-10">
+        <header className="mb-4 flex items-center justify-between gap-3 sm:mb-6 sm:items-start">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-black tracking-tight sm:mt-2 sm:text-3xl">
               Send Parcel
             </h1>
-            <p className="mt-2 text-sm text-zinc-500">
+            <p className="mt-1 text-xs text-zinc-500 sm:mt-2 sm:text-sm">
               Book now or schedule a pickup for later.
             </p>
           </div>
           <Link
             href="/main/profile?tab=deliveries"
-            className="shrink-0 rounded-xl border border-zinc-200 px-3 py-2 text-xs font-bold dark:border-zinc-700"
+            className="shrink-0 rounded-xl border border-zinc-200 bg-white px-2.5 py-2 text-[11px] font-bold shadow-sm dark:border-zinc-700 dark:bg-zinc-900 sm:px-3 sm:text-xs"
           >
             My parcels
           </Link>
         </header>
         <nav
           aria-label="Booking progress"
-          className="mb-6 grid grid-cols-3 gap-2"
+          className="mb-4 grid grid-cols-3 gap-1.5 sm:mb-6 sm:gap-2"
         >
           {["Locations", "Contact", "Review"].map(
             (label, index) => (
@@ -461,9 +479,9 @@ export default function DeliveryPage() {
                 disabled={index > step || locked}
                 onClick={() => go(index)}
                 aria-current={step === index ? "step" : undefined}
-                className={`flex items-center gap-2 rounded-xl p-3 text-left text-xs font-bold sm:text-sm ${index === step ? "bg-[#181816] text-white dark:bg-yellow-400 dark:text-black" : "bg-white text-zinc-500 dark:bg-white/5"}`}
+                className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-center text-[10px] font-bold sm:flex-row sm:gap-2 sm:p-3 sm:text-left sm:text-sm ${index === step ? "bg-[#181816] text-white dark:bg-yellow-400 dark:text-black" : "bg-white text-zinc-500 dark:bg-white/5"}`}
               >
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-current">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-current text-[10px] sm:h-6 sm:w-6 sm:text-xs">
                   {index < step ? <Check size={14} /> : index + 1}
                 </span>
                 {label}
@@ -476,7 +494,7 @@ export default function DeliveryPage() {
             <h2
               ref={heading}
               tabIndex={-1}
-              className="mb-5 text-xl font-bold outline-none"
+              className="mb-4 text-lg font-bold outline-none sm:mb-5 sm:text-xl"
             >
               {
                 [
@@ -522,44 +540,54 @@ export default function DeliveryPage() {
                           selectLocation(kind, position, address)
                         }
                       />
-                      <div className="mt-2 flex flex-wrap gap-2">
+                      <div className="mt-2 grid gap-2 sm:flex sm:flex-wrap">
                         <button
                           type="button"
                           onClick={() => setMapKind(kind)}
-                          className="flex items-center gap-1 rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold dark:border-zinc-700"
+                          className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold shadow-sm transition hover:border-yellow-400 hover:bg-yellow-50/50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-yellow-400/5 sm:justify-start"
                         >
                           <MapPin size={14} />
                           Choose on map
                         </button>
                         {addresses.length > 0 && (
-                          <select
-                            aria-label={`Saved ${kind} address`}
-                            value=""
-                            onChange={(event) => {
-                              const address = addresses.find(
-                                (item) => item.id === event.target.value,
-                              );
-                              if (address)
-                                selectLocation(
-                                  kind,
-                                  {
-                                    lat: address.latitude,
-                                    lng: address.longitude,
-                                  },
-                                  [address.street, address.city, address.state]
-                                    .filter(Boolean)
-                                    .join(", "),
+                          <div className="relative min-w-0 sm:max-w-xs sm:flex-1">
+                            <MapPinned
+                              aria-hidden="true"
+                              size={15}
+                              className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-yellow-600"
+                            />
+                            <select
+                              aria-label={`Saved ${kind} address`}
+                              value=""
+                              onChange={(event) => {
+                                const address = addresses.find(
+                                  (item) => item.id === event.target.value,
                                 );
-                            }}
-                            className="min-w-0 max-w-full rounded-lg border border-zinc-200 bg-transparent px-2 text-xs dark:border-zinc-700"
-                          >
-                            <option value="">Saved addresses</option>
-                            {addresses.map((address) => (
-                              <option key={address.id} value={address.id}>
-                                {address.street}, {address.city}
-                              </option>
-                            ))}
-                          </select>
+                                if (address)
+                                  selectLocation(
+                                    kind,
+                                    {
+                                      lat: address.latitude,
+                                      lng: address.longitude,
+                                    },
+                                    savedAddressText(address),
+                                  );
+                              }}
+                              className="min-h-10 w-full appearance-none truncate rounded-xl border border-zinc-200 bg-white py-2 pl-9 pr-9 text-xs font-semibold text-zinc-700 shadow-sm outline-none transition hover:border-yellow-400 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-400/30 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+                            >
+                              <option value="">Use a saved address</option>
+                              {addresses.map((address) => (
+                                <option key={address.id} value={address.id}>
+                                  {savedAddressOption(address)}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown
+                              aria-hidden="true"
+                              size={15}
+                              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400"
+                            />
+                          </div>
                         )}
                       </div>
                       {(kind === "pickup"
@@ -587,7 +615,7 @@ export default function DeliveryPage() {
                     <legend className="mb-3 text-sm font-bold">
                       Parcel size
                     </legend>
-                    <div className="grid gap-2 sm:grid-cols-3">
+                    <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                       {sizes.map((size) => (
                         <button
                           type="button"
@@ -596,13 +624,13 @@ export default function DeliveryPage() {
                           onClick={() =>
                             store.setPackageInfo({ size: size.value })
                           }
-                          className={choiceClass(fields.size === size.value)}
+                          className={`min-w-0 rounded-xl border px-1.5 py-3 text-center transition focus-visible:outline-yellow-500 sm:rounded-2xl sm:p-4 sm:text-left ${fields.size === size.value ? "border-yellow-500 bg-yellow-400/10 ring-1 ring-yellow-500" : "border-zinc-200 hover:border-yellow-400 dark:border-zinc-700"}`}
                         >
-                          <Package className="mb-3 h-5 w-5 text-yellow-600" />
-                          <span className="block text-sm font-bold">
+                          <Package className="mx-auto mb-2 h-5 w-5 text-yellow-600 sm:mx-0 sm:mb-3" />
+                          <span className="block truncate text-xs font-bold sm:text-sm">
                             {size.title}
                           </span>
-                          <span className="mt-1 block text-xs leading-5 text-zinc-500">
+                          <span className="mt-1 block text-[10px] leading-4 text-zinc-500 sm:text-xs sm:leading-5">
                             {size.description}
                           </span>
                         </button>
@@ -759,7 +787,7 @@ export default function DeliveryPage() {
                     <legend className="mb-3 text-sm font-bold">
                       Delivery time
                     </legend>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2">
                       {[false, true].map((later) => (
                         <button
                           type="button"
@@ -828,33 +856,26 @@ export default function DeliveryPage() {
                     <legend className="mb-3 text-sm font-bold">
                       Payment method
                     </legend>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(
-                        ["CASH", "WALLET", "CARD"] as ParcelPaymentMethod[]
-                      ).map((method) => (
-                        <button
-                          type="button"
-                          key={method}
-                          aria-pressed={paymentMethod === method}
-                          onClick={() =>
-                            useDeliveryStore.setState({ paymentMethod: method })
-                          }
-                          className={choiceClass(paymentMethod === method)}
-                        >
-                          {method === "CASH"
-                            ? "Cash"
-                            : method === "WALLET"
-                              ? "Wallet"
-                              : "Card"}
-                        </button>
-                      ))}
+                    <div className="grid grid-cols-2 gap-2">
+                      {(["WALLET", "CARD"] as ParcelPaymentMethod[]).map(
+                        (method) => (
+                          <button
+                            type="button"
+                            key={method}
+                            aria-pressed={paymentMethod === method}
+                            onClick={() =>
+                              useDeliveryStore.setState({
+                                paymentMethod: method,
+                              })
+                            }
+                            className={choiceClass(paymentMethod === method)}
+                          >
+                            {method === "WALLET" ? "Wallet" : "Pay on web"}
+                          </button>
+                        ),
+                      )}
                     </div>
                   </fieldset>
-                  {paymentMethod === "CASH" && (
-                    <p className="text-sm text-zinc-500">
-                      Payment will be collected during the delivery process.
-                    </p>
-                  )}
                   {paymentMethod === "CARD" && (
                     <p className="text-sm text-zinc-500">
                       Pay securely with Paystack. Your parcel stays payment
@@ -896,7 +917,7 @@ export default function DeliveryPage() {
                     {formatNaira(quote!.fare - wallet!)} to book.
                   </p>
                 )}
-                <div className="mt-3 flex flex-wrap items-end gap-2">
+                <div className="mt-3 grid items-end gap-2 sm:flex sm:flex-wrap">
                   <label
                     className="min-w-0 flex-1 text-xs font-semibold"
                     htmlFor="topup"
@@ -915,7 +936,7 @@ export default function DeliveryPage() {
                   <button
                     onClick={topUp}
                     disabled={topupBusy || sending}
-                    className="rounded-xl bg-zinc-900 px-4 py-3 text-sm font-bold text-white dark:bg-white dark:text-black"
+                    className="w-full rounded-xl bg-zinc-900 px-4 py-3 text-sm font-bold text-white dark:bg-white dark:text-black sm:w-auto"
                   >
                     {topupBusy ? "Opening…" : "Top up wallet"}
                   </button>
@@ -934,7 +955,7 @@ export default function DeliveryPage() {
                   {summary.map(([label, value, target]) => (
                     <div
                       key={label}
-                      className="flex items-start justify-between gap-3"
+                      className="flex min-w-0 items-start justify-between gap-3"
                     >
                       <div className="min-w-0">
                         <dt className="text-xs text-zinc-500">{label}</dt>
@@ -981,7 +1002,7 @@ export default function DeliveryPage() {
             )}
           </div>
           <aside
-            className={`${cardClass} min-h-[210px] lg:sticky lg:top-24`}
+            className={`${cardClass} min-h-0 lg:sticky lg:top-24 lg:min-h-[210px]`}
             aria-label="Delivery estimate"
             aria-live="polite"
           >
@@ -990,13 +1011,15 @@ export default function DeliveryPage() {
             </p>
             {quote ? (
               <>
-                <p className="mt-4 text-3xl font-black">
-                  {formatNaira(quote.fare)}
-                </p>
-                <p className="mt-3 text-sm">
-                  {quote.distanceKm.toFixed(1)} km · about{" "}
-                  {Math.ceil(quote.estimatedDurationMinutes)} min
-                </p>
+                <div className="mt-3 flex flex-wrap items-end justify-between gap-2 lg:block">
+                  <p className="text-2xl font-black sm:text-3xl">
+                    {formatNaira(quote.fare)}
+                  </p>
+                  <p className="text-xs sm:text-sm lg:mt-3">
+                    {quote.distanceKm.toFixed(1)} km · about{" "}
+                    {Math.ceil(quote.estimatedDurationMinutes)} min
+                  </p>
+                </div>
                 <p className="mt-2 text-sm text-zinc-500">
                   {fields.size.toLowerCase()} parcel
                 </p>
@@ -1031,8 +1054,8 @@ export default function DeliveryPage() {
             )}
           </aside>
         </div>
-        <footer className="sticky bottom-16 z-20 mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white/95 p-4 shadow-lg backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/95 md:bottom-3">
-          <div className="flex gap-3">
+        <footer className="sticky bottom-16 z-20 mt-4 flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white/95 p-3 shadow-lg backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/95 sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:p-4 md:bottom-3">
+          <div className="order-2 flex w-full items-center justify-between gap-3 sm:order-1 sm:w-auto sm:justify-start">
             {step > 0 && (
               <button
                 disabled={locked}
@@ -1067,7 +1090,7 @@ export default function DeliveryPage() {
                 paymentMethod === "WALLET" &&
                 (walletLoading || wallet === null || Boolean(insufficient)))
             }
-            className="flex items-center gap-2 rounded-xl bg-yellow-400 px-5 py-3 text-sm font-bold text-black hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-50"
+            className="order-1 flex min-h-12 w-full min-w-0 items-center justify-center gap-2 rounded-xl bg-yellow-400 px-4 py-3 text-center text-sm font-bold leading-tight text-black hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-50 sm:order-2 sm:min-h-0 sm:w-auto sm:px-5"
           >
             {sending ? (
               <>

@@ -28,6 +28,7 @@ const addresses = [
   },
 ];
 for (const viewport of [
+  { width: 320, height: 740 },
   { width: 390, height: 844 },
   { width: 768, height: 1024 },
   { width: 1440, height: 1000 },
@@ -108,7 +109,7 @@ for (const viewport of [
       .click();
     await page.getByLabel("Pickup date and time").fill("2030-12-01T09:00");
     await expect(
-      page.getByRole("button", { name: /Book delivery/ }),
+      page.getByRole("button", { name: /Continue to payment/ }),
     ).toBeEnabled();
     await expect(page.getByText("Chidi Okafor · +2348098765432")).toBeVisible();
     expect(

@@ -13,6 +13,7 @@ import { WalletService } from "@/services/wallet.service";
 import { redirectToParcelPayment } from "@/lib/parcel-booking";
 
 const mockPush = jest.fn();
+const mockAddressList = jest.fn();
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush, replace: mockPush }),
 }));
@@ -26,7 +27,7 @@ jest.mock("@/services/delivery.service", () => ({
   DeliveryService: { estimateParcel: jest.fn(), createDelivery: jest.fn() },
 }));
 jest.mock("@/services/address.service", () => ({
-  AddressService: { list: () => Promise.resolve([]) },
+  AddressService: { list: (...args) => mockAddressList(...args) },
 }));
 jest.mock("@/services/api.service", () => ({
   ApiService: {
@@ -60,6 +61,7 @@ jest.mock("@/lib/parcel-booking", () => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockAddressList.mockResolvedValue([]);
   useDeliveryStore.getState().resetDelivery();
   useDeliveryStore.setState({
     pickupPos: { lat: 6, lng: 3 },
@@ -126,7 +128,37 @@ test("editing address text immediately blocks Continue until coordinates and quo
   expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   expect(useDeliveryStore.getState().pickupPos).toBeNull();
 });
-test("immediate cash booking omits scheduling and prevents double submission", async () => {
+test("saved addresses have readable labels and populate the selected location", async () => {
+  mockAddressList.mockResolvedValue([
+    {
+      id: "home-address",
+      label: "HOME",
+      apartment: "Flat 4",
+      street: "12 Marina Road",
+      city: "Lagos",
+      state: "Lagos",
+      latitude: 6.45,
+      longitude: 3.39,
+      isDefault: true,
+    },
+  ]);
+  render(<DeliveryPage />);
+  const savedPickup = await screen.findByLabelText("Saved pickup address");
+  expect(
+    screen.getAllByRole("option", {
+      name: "Home (Default) — Flat 4, 12 Marina Road, Lagos, Lagos",
+    }),
+  ).toHaveLength(2);
+  fireEvent.change(savedPickup, { target: { value: "home-address" } });
+  expect(useDeliveryStore.getState().pickupPos).toEqual({
+    lat: 6.45,
+    lng: 3.39,
+  });
+  expect(useDeliveryStore.getState().packageInfo.pickupAddress).toBe(
+    "Flat 4, 12 Marina Road, Lagos, Lagos",
+  );
+});
+test("immediate web payment omits scheduling and prevents double submission", async () => {
   let resolve;
   DeliveryService.createDelivery.mockImplementation(
     () =>
@@ -135,12 +167,16 @@ test("immediate cash booking omits scheduling and prevents double submission", a
       }),
   );
   await review();
-  const button = screen.getByRole("button", { name: /Book parcel/ });
+  expect(screen.queryByRole("button", { name: "Cash" })).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Pay on web" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  const button = screen.getByRole("button", { name: /Continue to payment/ });
   fireEvent.click(button);
   fireEvent.click(button);
   expect(DeliveryService.createDelivery).toHaveBeenCalledTimes(1);
   const payload = DeliveryService.createDelivery.mock.calls[0][0];
-  expect(payload.paymentMethod).toBe("CASH");
+  expect(payload.paymentMethod).toBe("CARD");
   expect(payload).not.toHaveProperty("scheduledAt");
   expect(payload).not.toHaveProperty("senderName");
   expect(payload.idempotencyKey).toMatch(/^parcel-/);
@@ -153,7 +189,7 @@ test("failed submissions retain a stable idempotency key and entered values", as
     new Error("Network unavailable"),
   );
   await review();
-  fireEvent.click(screen.getByRole("button", { name: /Book parcel/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Continue to payment/ }));
   await screen.findByText("Network unavailable");
   expect(useDeliveryStore.getState().packageInfo.recipientName).toBe(
     "Ada Okafor",
@@ -201,20 +237,20 @@ test("past date blocks booking with a focused field error", async () => {
   fireEvent.change(screen.getByLabelText("Pickup date and time"), {
     target: { value: "2020-12-01T09:00" },
   });
-  fireEvent.click(screen.getByRole("button", { name: /Schedule parcel/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Continue to payment/ }));
   expect(
     await screen.findByText("Choose a future pickup date and time."),
   ).toBeInTheDocument();
   expect(DeliveryService.createDelivery).not.toHaveBeenCalled();
   expect(screen.getByLabelText("Pickup date and time")).toHaveFocus();
 });
-test("card booking redirects using the returned authorization URL", async () => {
+test("pay on web redirects using the returned authorization URL", async () => {
   DeliveryService.createDelivery.mockResolvedValue({
     delivery: { id: "card-parcel", status: "PENDING" },
     authorizationUrl: "https://checkout.paystack.com/test",
   });
   await review();
-  fireEvent.click(screen.getByRole("button", { name: "Card" }));
+  fireEvent.click(screen.getByRole("button", { name: "Pay on web" }));
   fireEvent.click(screen.getByRole("button", { name: /Continue to payment/ }));
   await waitFor(() =>
     expect(redirectToParcelPayment).toHaveBeenCalledWith(

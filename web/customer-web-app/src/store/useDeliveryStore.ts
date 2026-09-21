@@ -109,7 +109,7 @@ export const useDeliveryStore = create<DeliveryState>()(
     (set) => ({
       bookingStep: 0,
       party: "SENDER",
-      paymentMethod: "CASH",
+      paymentMethod: "CARD",
       scheduledLocal: "",
       scheduleLater: false,
       submission: null,
@@ -152,7 +152,7 @@ export const useDeliveryStore = create<DeliveryState>()(
         set({
           bookingStep: 0,
           party: "SENDER",
-          paymentMethod: "CASH",
+          paymentMethod: "CARD",
           scheduledLocal: "",
           scheduleLater: false,
           submission: null,
@@ -175,9 +175,24 @@ export const useDeliveryStore = create<DeliveryState>()(
       // automatically receive new defaults such as the explicit size enum.
       merge: (persisted, current) => {
         const saved = persisted as Partial<DeliveryState> | undefined;
+        const paymentMethod =
+          saved?.paymentMethod === "CASH"
+            ? "CARD"
+            : (saved?.paymentMethod ?? current.paymentMethod);
+        const submission = saved?.submission
+          ? {
+              ...saved.submission,
+              paymentMethod:
+                saved.submission.paymentMethod === "CASH"
+                  ? "CARD"
+                  : saved.submission.paymentMethod,
+            }
+          : current.submission;
         return {
           ...current,
           ...saved,
+          paymentMethod,
+          submission,
           packageInfo: {
             ...initialPackageInfo,
             ...(saved?.packageInfo ?? {}),
