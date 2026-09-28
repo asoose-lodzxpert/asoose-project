@@ -56,7 +56,7 @@ export function CityFallbackDialog({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/55 p-0 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="city-dialog-title">
-      <div className="w-full max-w-md overflow-hidden rounded-t-[2rem] border border-black/5 bg-white shadow-2xl dark:border-white/10 dark:bg-[#151515] sm:rounded-[2rem]">
+      <div className="w-full max-w-2xl overflow-hidden rounded-t-[2rem] border border-black/5 bg-white shadow-2xl dark:border-white/10 dark:bg-[#151515] sm:rounded-[2rem]">
         <div className="flex items-start justify-between gap-4 border-b border-black/5 p-5 dark:border-white/10 sm:p-6">
           <div className="flex min-w-0 gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-yellow-100 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400"><MapPin className="h-5 w-5" /></span>
