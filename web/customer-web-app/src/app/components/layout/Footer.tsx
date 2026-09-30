@@ -39,7 +39,7 @@ export default function Footer() {
       links: [
         { n: "About Us", h: "/about" },
         { n: "Contact Us", h: "/contact" },
-        { n: "Careers", h: "#" },
+        { n: "Careers", h: "/careers" },
       ],
     },
     {

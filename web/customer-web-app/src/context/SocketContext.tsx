@@ -63,25 +63,9 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       socketService.disconnect();
     }
 
-    const socket = socketService.connect(
-      session.accessToken,
-      // H3: notify the user when all 5 reconnection attempts are exhausted
-      () => {
-        import("react-toastify").then(({ toast }) => {
-          toast.warn(
-            "Live tracking disconnected. Ride status updates may be delayed by up to 15 seconds.",
-            { autoClose: false, toastId: "socket-exhausted" },
-          );
-        });
-        setIsConnected(false);
-      },
-    );
+    const socket = socketService.connect(session.accessToken);
 
     socket.on("connect", () => {
-      // Dismiss the exhaustion warning if the socket recovers
-      import("react-toastify").then(({ toast }) =>
-        toast.dismiss("socket-exhausted"),
-      );
       setIsConnected(true);
     });
 
