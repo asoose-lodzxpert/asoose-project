@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowRight, BriefcaseBusiness, MapPin, Search } from "lucide-react";
-import { API_URL, CareerJob, formatCareerDate, RoleFacts } from "./careers-shared";
+import { CareerJob, formatCareerDate, RoleFacts } from "./careers-shared";
 
 type PageData = { jobs: CareerJob[]; pagination?: { page: number; limit: number; total: number; totalPages: number } };
 const paramsFor = (params: URLSearchParams) => {
@@ -23,7 +23,10 @@ export default function CareersListing() {
   const load = useCallback(async () => {
     setLoading(true); setError(false);
     try {
-      const response = await fetch(`${API_URL}/careers/jobs?${query.toString()}`, { headers: { Accept: "application/json" }, cache: "no-store" });
+      // Use Next's same-origin backend rewrite in the browser. The public API
+      // does not permit requests from asoose.com, so calling it directly here
+      // is blocked by CORS before a response can be read.
+      const response = await fetch(`/api/backend/careers/jobs?${query.toString()}`, { headers: { Accept: "application/json" }, cache: "no-store" });
       if (!response.ok) throw new Error("Unable to retrieve roles");
       const payload = await response.json();
       setData(payload?.data ?? { jobs: [] });
