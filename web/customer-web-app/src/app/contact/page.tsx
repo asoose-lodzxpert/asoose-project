@@ -79,7 +79,7 @@ export default function ContactPage() {
         subject: "General Support",
         message: "",
       });
-    } catch (error) {
+    } catch {
       setStatus({
         type: "error",
         message: "Something went wrong. Please try again later.",
@@ -121,21 +121,41 @@ export default function ContactPage() {
               />
               <ContactInfo
                 icon={<Phone />}
-                label="Phone"
+                label="Maiduguri line"
                 value="+234 (0) 8061966145"
                 href="tel:+2348061966145"
                 method="phone"
               />
-              <div className="flex gap-4 items-start">
-                <MapPin className="text-yellow-500 shrink-0" size={20} />
-                <div>
-                  <div className="text-sm opacity-60">Address</div>
-                  <div className="text-sm">
-                    Suite B17 Musty Global Plaza, Old GRA, Maiduguri
-                  </div>
-                </div>
-              </div>
+              <ContactInfo
+                icon={<Phone />}
+                label="Jos line"
+                value="08161133762"
+                href="tel:+2348161133762"
+                method="phone"
+              />
             </div>
+
+            <section aria-labelledby="office-addresses-title">
+              <h2 id="office-addresses-title" className="text-xl font-bold mb-6">
+                Office addresses
+              </h2>
+              <div className="grid sm:grid-cols-2 gap-5">
+                {[
+                  "103 Bachita Close, Behind GSS Garki, Area 10, Abuja.",
+                  "No. 17B Musty Global Plaza, Circular Road, Opp. Nanne & Boi, Maiduguri, Borno State, Nigeria.",
+                  "18, Ihejirika Avenue, Becky 2 Gardens Estate, Karu.",
+                  "BAMFA's House After Lebanese QTRs Abattoir, Jos, Plateau State, Nigeria.",
+                ].map((address) => (
+                  <div
+                    key={address}
+                    className={`flex gap-4 rounded-lg border p-5 ${darkMode ? "border-white/10 bg-white/[0.02]" : "border-black/10 bg-zinc-50"}`}
+                  >
+                    <MapPin className="text-yellow-500 shrink-0" size={20} />
+                    <p className="text-sm leading-relaxed">{address}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
 
             <div
               className={`p-8 rounded-lg border ${darkMode ? "border-white/10" : "border-black/10"}`}
